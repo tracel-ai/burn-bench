@@ -1,0 +1,2 @@
+# Do not commit dependencies esp. since we use a configurable burn version/revision
+Cargo.lock
