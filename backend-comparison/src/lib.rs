@@ -110,19 +110,21 @@ macro_rules! bench_on_backend {
         #[cfg(any(feature = "wgpu-spirv"))]
         {
             use burn::backend::wgpu::{Wgpu, WgpuDevice};
+            use burn::tensor::f16;
 
-            $fn_name::<Wgpu<half::f16, i32>>(&WgpuDevice::default(), feature_name, url, token);
+            $fn_name::<Wgpu<f16, i32>>(&WgpuDevice::default(), feature_name, url, token);
         }
 
         #[cfg(feature = "tch-gpu")]
         {
             use burn::backend::{libtorch::LibTorchDevice, LibTorch};
+            use burn::tensor::f16;
 
             #[cfg(not(target_os = "macos"))]
             let device = LibTorchDevice::Cuda(0);
             #[cfg(target_os = "macos")]
             let device = LibTorchDevice::Mps;
-            $fn_name::<LibTorch<half::f16>>(&device, feature_name, url, token);
+            $fn_name::<LibTorch<f16>>(&device, feature_name, url, token);
         }
 
         #[cfg(feature = "tch-cpu")]
@@ -178,15 +180,17 @@ macro_rules! bench_on_backend {
         #[cfg(feature = "cuda")]
         {
             use burn::backend::cuda::{Cuda, CudaDevice};
+            use burn::tensor::f16;
 
-            $fn_name::<Cuda<half::f16>>(&CudaDevice::default(), feature_name, url, token);
+            $fn_name::<Cuda<f16>>(&CudaDevice::default(), feature_name, url, token);
         }
 
         #[cfg(feature = "hip")]
         {
             use burn::backend::hip::{Hip, HipDevice};
+            use burn::tensor::f16;
 
-            $fn_name::<Hip<half::f16>>(&HipDevice::default(), feature_name, url, token);
+            $fn_name::<Hip<f16>>(&HipDevice::default(), feature_name, url, token);
         }
     };
 }

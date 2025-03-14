@@ -42,11 +42,6 @@ clap = { version = "4.5.27", features = ["derive"] }
 colored = "2.1.0"
 derive-new = { version = "0.7.0", default-features = false }
 dirs = "5.0.1"
-half = { version = "2.4.1", features = [
-    "alloc",
-    "num-traits",
-    "serde",
-], default-features = false } # TODO: use burn_tensor::f16
 indicatif = "0.17.11"
 log = { version = "0.4.25", default-features = false }
 os_info = "3.10.0"
