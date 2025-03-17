@@ -68,10 +68,16 @@ pub fn save<B: Backend>(
         fs::create_dir_all(&cache_dir)?;
     }
 
+    // Previous versions of burn did not require a device to be specified for the backend name
+    #[cfg(burn_backend_name_uses_device)]
+    let backend_name = B::name(device).to_string();
+    #[cfg(not(burn_backend_name_uses_device))]
+    let backend_name = B::name().to_string();
+
     let records: Vec<BenchmarkRecord> = benches
         .into_iter()
         .map(|bench| BenchmarkRecord {
-            backend: B::name(device).to_string(),
+            backend: backend_name.clone(),
             device: format!("{:?}", device),
             feature: feature.to_string(),
             system_info: BenchmarkSystemInfo::new(),

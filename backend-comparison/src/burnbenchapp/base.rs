@@ -243,6 +243,8 @@ fn run_cargo(
     token: Option<&str>,
     progress_bar: &Option<Arc<Mutex<RunnerProgressBar>>>,
 ) -> io::Result<ExitStatus> {
+    let rev = crate::get_package_rev("burn");
+    println!("Benchmarking Burn @ {rev}");
     let processor: Arc<dyn OutputProcessor> = if let Some(pb) = progress_bar {
         Arc::new(NiceProcessor::new(
             bench.to_string(),

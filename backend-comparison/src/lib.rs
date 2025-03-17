@@ -5,6 +5,11 @@ use tracing_subscriber::filter::LevelFilter;
 pub mod burnbenchapp;
 pub mod persistence;
 
+// Captured package metadata
+pub mod build_info {
+    include!(concat!(env!("OUT_DIR"), "/metadata.rs"));
+}
+
 /// Simple parse to retrieve additional argument passed to cargo bench command
 /// We cannot use clap here as clap parser does not allow to have unknown arguments.
 pub fn get_argument<'a>(args: &'a [String], arg_name: &'a str) -> Option<&'a str> {
@@ -49,6 +54,33 @@ fn update_panic_hook() {
         log::error!("PANIC => {}", info.to_string());
         hook(info);
     }));
+}
+
+pub fn get_package_rev(package: &str) -> String {
+    // Benchmarks are written as examples so their dependencies (e.g., Burn) marked as dev
+    let dep = crate::build_info::DEPENDENCIES
+        .get("burn")
+        .expect(&format!("Could not find dependency '{package}'"));
+
+    let revision = if dep.source.starts_with("git+") {
+        let rev = if dep.source.contains("?rev=") {
+            dep.source.rsplit("?rev=").collect::<Vec<_>>()[0].into()
+        } else {
+            dep.version // no specific revision, just latest git
+        };
+        format!("git+{rev}")
+    } else if dep.source.starts_with("path+") {
+        String::from("local")
+    } else if dep.source.starts_with("registry+") {
+        dep.version.into()
+    } else {
+        panic!(
+            "Unexpected source for dependency '{}': {}",
+            package, dep.source
+        );
+    };
+
+    revision
 }
 
 #[macro_export]
