@@ -1,5 +1,7 @@
-use burn::serde::{Deserialize, Serialize};
-use cubecl::wgpu::GraphicsApi;
+use burn::{
+    backend::wgpu::graphics::{AutoGraphicsApi, GraphicsApi},
+    serde::{Deserialize, Serialize},
+};
 use std::collections::HashSet;
 use sysinfo;
 use wgpu::{self, Backends};
@@ -52,7 +54,7 @@ impl BenchmarkSystemInfo {
         let instance = wgpu::Instance::default();
         let adapters: Vec<wgpu::Adapter> = instance
             .enumerate_adapters({
-                let backend = cubecl::wgpu::AutoGraphicsApi::backend();
+                let backend = AutoGraphicsApi::backend();
                 Backends::from_bits(1 << backend as u32).unwrap()
             })
             .into_iter()
