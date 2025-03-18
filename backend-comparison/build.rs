@@ -301,6 +301,7 @@ fn clone_resnet_source() {
 fn capture_packages_info() {
     let package_name = env!("CARGO_PKG_NAME");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_NAME");
 
     let output = Command::new("cargo")

@@ -1,2 +1,6 @@
 # Do not commit dependencies esp. since we use a configurable burn version/revision
 Cargo.lock
+# Backup for compare.sh script
+Cargo.toml.bak
+# Comparison output
+*.log
