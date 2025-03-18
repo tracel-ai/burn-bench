@@ -241,10 +241,9 @@ where
 }
 
 fn clone_resnet_source() {
-    let models_dir = std::env::temp_dir().join("models");
-    let models_dir = models_dir.as_path();
+    let temp_dir = tempfile::tempdir().unwrap();
     // Checkout ResNet code from models repo
-    let models_dir = Path::new(models_dir);
+    let models_dir = temp_dir.path();
     if !models_dir.join(".git").exists() {
         run("git", |command| {
             command
@@ -292,10 +291,6 @@ fn clone_resnet_source() {
             fs::copy(source_file, dest_file).expect("should copy file successfully");
         }
     }
-
-    // Delete cloned repository contents
-    fs::remove_dir_all(models_dir.join(".git")).unwrap();
-    fs::remove_dir_all(models_dir).unwrap();
 }
 
 fn capture_packages_info() {

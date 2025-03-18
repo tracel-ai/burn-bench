@@ -37,7 +37,7 @@ version_lt_0_17() {
     # Extract major and minor components
     local major=$(echo "$1" | cut -d. -f1)
     local minor=$(echo "$1" | cut -d. -f2)
-    
+
     # Check if major is 0 and minor is less than 17
     [[ "$major" -eq 0 && "$minor" -lt 17 ]]
 }
@@ -65,14 +65,14 @@ replace_feature_flags_ge_0_17() {
 update_cargo_toml() {
     local VERSION="$1"
     local CARGO_TOML="$2"
-    
+
     if is_version "$VERSION"; then
         echo "Applying Burn version: $VERSION"
-        
+
         # For version, update both burn and burn-common
         sed -i.tmp -E "s|burn = \{ .+, default-features = false \}|burn = { version = \"$VERSION\", default-features = false }|g" "$CARGO_TOML"
         sed -i.tmp -E "s|burn-common = \{ .+ \}|burn-common = { version = \"$VERSION\" }|g" "$CARGO_TOML"
-        
+
         # Handle feature flags for previous versions
         if version_lt_0_17 "$VERSION"; then
             echo "Version < 0.17.0 detected, changing feature flags"
@@ -100,12 +100,12 @@ run_burnbench() {
     local VERSION="$1"
     shift
     local ARGS=("$@")
-    
+
     echo "----------------------------------------------"
     echo "Running burnbench for version: $VERSION"
     echo "Command: cargo run --release --bin burnbench -- run ${ARGS[*]}"
     echo "----------------------------------------------"
-    
+
     cargo run --release --color=always --bin burnbench -- run "${ARGS[@]}" | tee -a ${LOGFILE}
 
     echo "----------------------------------------------"
@@ -183,7 +183,7 @@ for VERSION in "${VERSIONS[@]}"; do
     # Update Cargo.toml for this version
     update_cargo_toml "$VERSION" "$CARGO_TOML"
     echo "Cargo.toml updated successfully with version: $VERSION"
-    
+
     # Build and run burnbench with provided arguments
     run_burnbench "$VERSION" "${BURNBENCH_ARGS[@]}"
 
