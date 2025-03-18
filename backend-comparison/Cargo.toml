@@ -74,6 +74,7 @@ serial_test = "3.2.0"
 [build-dependencies]
 serde = { version = "1.0.218", features = ["std", "derive"] }
 serde_json = "1.0.140"
+semver = "1.0.26"
 
 [[bench]]
 harness = false

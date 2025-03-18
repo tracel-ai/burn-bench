@@ -367,10 +367,14 @@ fn capture_packages_info() {
             dep.req = pkg.version.clone();
 
             // Cannot easily threshold based on git revision (commit hash), so
-            // we only check for version 0.16.0 to set `burn_backend_name_uses_device`
+            // we only check for version 0.17.0 to set `burn_version_lt_0170`
             // since it is the lowest comparison point at this point
-            if dep.name == "burn" && pkg.version != "0.16.0" {
-                println!("cargo:rustc-cfg=burn_backend_name_uses_device");
+            if dep.name == "burn" {
+                let pkg_version =
+                    semver::Version::parse(&pkg.version).expect("Invalid version format");
+                if pkg_version < semver::Version::new(0, 17, 0) {
+                    println!("cargo:rustc-cfg=burn_version_lt_0170");
+                }
             }
         }
 
@@ -406,7 +410,7 @@ fn capture_packages_info() {
 }
 
 fn main() {
-    println!("cargo::rustc-check-cfg=cfg(burn_backend_name_uses_device)");
+    println!("cargo::rustc-check-cfg=cfg(burn_version_lt_0170)");
 
     // For the ResNet benchmark we need to clone the source since we want it to use the selected burn version or revision
     clone_resnet_source();

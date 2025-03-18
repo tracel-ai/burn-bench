@@ -69,10 +69,10 @@ pub fn save<B: Backend>(
     }
 
     // Previous versions of burn did not require a device to be specified for the backend name
-    #[cfg(burn_backend_name_uses_device)]
-    let backend_name = B::name(device).to_string();
-    #[cfg(not(burn_backend_name_uses_device))]
+    #[cfg(burn_version_lt_0170)]
     let backend_name = B::name().to_string();
+    #[cfg(not(burn_version_lt_0170))]
+    let backend_name = B::name(device).to_string();
 
     let records: Vec<BenchmarkRecord> = benches
         .into_iter()

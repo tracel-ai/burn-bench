@@ -1,7 +1,8 @@
-use burn::{
-    backend::wgpu::graphics::{AutoGraphicsApi, GraphicsApi},
-    serde::{Deserialize, Serialize},
-};
+#[cfg(not(burn_version_lt_0170))]
+use burn::backend::wgpu::graphics::{AutoGraphicsApi, GraphicsApi};
+#[cfg(burn_version_lt_0170)]
+use burn::backend::wgpu::{AutoGraphicsApi, GraphicsApi};
+use burn::serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use sysinfo;
 use wgpu::{self, Backends};
