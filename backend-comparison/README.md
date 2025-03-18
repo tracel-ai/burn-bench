@@ -19,7 +19,8 @@ then becomes: `cargo bb list`.
 
 ### Compare across versions
 
-This script allows you to compare the performance of different Burn versions using `burnbench -- run`.
+This script allows you to compare the performance of different Burn versions using
+`burnbench -- run`.
 
 You can specify one or more versions (or git commit revision) and provide custom `burnbench`
 arguments to benchmark them.
@@ -42,7 +43,13 @@ This will run benchmarks on the specified versions and log the results in a time
 allowing you to compare their performance.
 
 > **Note:** this might not work out of the box for previous versions with unspecified breaking
-> changes to the API or feature flag names. We currently handle changes after the 0.16 release.
+> changes to the API or feature flag names. We currently handle changes after the 0.16 release.  
+> To handle feature flag changes, you probably want to modify `compare.sh` to overwrite the
+> `Cargo.toml` based on some condition. See for example
+> [`replace_feature_flags_lt_0_17`](./compare.sh#L45).   
+> For breaking API changes, this can be handled in the build script to add a cfg. See for example
+> [`burn_version_lt_0170`](./build.rs#L372) and how it is
+> [used for conditional compilation](./src/persistence/base.rs#L71).
 
 ### Commands
 
