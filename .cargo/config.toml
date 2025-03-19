@@ -1,0 +1,2 @@
+[alias]
+bb = "run --release --bin burnbench --"

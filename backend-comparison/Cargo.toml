@@ -1,0 +1,149 @@
+[package]
+authors = ["Tracel Technologies Inc."]
+categories = ["science"]
+description = "This crate is used to time the execution of various computations, from operation kernels to complex model scenarios."
+edition = "2021"
+license = "MIT OR Apache-2.0"
+name = "backend-comparison"
+readme = "README.md"
+repository = "https://github.com/tracel-ai/burn-bench/tree/main/backend-comparison"
+version = "0.1.0"
+
+[features]
+# we depend on wgpu and autotune by default because we use the burn-wgpu crate to get system information
+candle-accelerate = ["burn/candle", "burn/accelerate"]
+candle-cpu = ["burn/candle"]
+candle-cuda = ["burn/candle-cuda"]
+candle-metal = ["burn/candle", "burn/metal"]
+cuda = ["burn/cuda"]
+cuda-fusion = ["cuda", "burn/fusion"]
+default = ["burn/std", "burn/autodiff", "burn/wgpu", "burn/autotune"]
+hip = ["burn/hip"]
+ndarray = ["burn/ndarray"]
+ndarray-blas-accelerate = ["burn/ndarray", "burn/accelerate"]
+ndarray-blas-netlib = ["burn/ndarray", "burn/blas-netlib"]
+ndarray-blas-openblas = ["burn/ndarray", "burn/openblas"]
+ndarray-simd = ["burn/ndarray", "burn/simd"]
+tch-cpu = ["burn/tch"]
+tch-gpu = ["burn/tch"]
+wgpu = ["burn/wgpu", "burn/autotune"]
+wgpu-fusion = ["wgpu", "burn/fusion"]
+wgpu-spirv = ["burn/vulkan", "burn/autotune"]
+wgpu-spirv-fusion = ["wgpu-spirv", "burn/fusion"]
+
+[dependencies]
+burn = { git = "https://github.com/tracel-ai/burn", default-features = false }
+burn-common = { git = "https://github.com/tracel-ai/burn" }
+
+arboard = "3.4.1"
+chrono = "0.4.39"
+clap = { version = "4.5.27", features = ["derive"] }
+colored = "2.1.0"
+derive-new = { version = "0.7.0", default-features = false }
+dirs = "5.0.1"
+indicatif = "0.17.11"
+log = { version = "0.4.25", default-features = false }
+os_info = "3.10.0"
+phf = {version = "0.11.3", features = ["macros"] } # for package info static map
+percent-encoding = "2.3.1"
+rand = { version = "0.9.0", default-features = false, features = [
+    "std_rng",
+    "thread_rng",
+] } # std_rng is for no_std
+reqwest = { version = "0.12.12", default-features = false, features = [
+    "rustls-tls",
+    "blocking",
+    "json",
+] }
+serde = { version = "1.0.218", default-features = false, features = [
+    "derive",
+    "alloc",
+] } # alloc is for no_std, derive is needed
+serde_json = { version = "1.0.140", default-features = false }
+strum = "0.26.3"
+strum_macros = "0.26.4"
+sysinfo = { version = "0.33.1", features = ["serde"] }
+tracing-subscriber = "0.3.19"
+wgpu = "24.0.1"
+wsl = "0.1.0"
+
+[dev-dependencies]
+rstest = "0.23.0"
+serial_test = "3.2.0"
+
+[build-dependencies]
+serde = { version = "1.0.218", features = ["std", "derive"] }
+serde_json = "1.0.140"
+semver = "1.0.26"
+tempfile = "3.17.1"
+
+[[bench]]
+harness = false
+name = "unary"
+
+[[bench]]
+harness = false
+name = "binary"
+
+[[bench]]
+harness = false
+name = "max-pool2d"
+path = "benches/max_pool2d.rs"
+
+[[bench]]
+harness = false
+name = "conv-transpose2d"
+path = "benches/conv_transpose2d.rs"
+
+[[bench]]
+harness = false
+name = "conv-transpose3d"
+path = "benches/conv_transpose3d.rs"
+
+[[bench]]
+harness = false
+name = "conv2d"
+
+[[bench]]
+harness = false
+name = "conv3d"
+
+[[bench]]
+harness = false
+name = "matmul"
+
+[[bench]]
+harness = false
+name = "matmul-fused"
+path = "benches/matmul_fused.rs"
+
+[[bench]]
+harness = false
+name = "data"
+
+[[bench]]
+harness = false
+name = "load-record"
+path = "benches/load_record.rs"
+
+[[bench]]
+harness = false
+name = "custom-gelu"
+path = "benches/custom_gelu.rs"
+
+[[bench]]
+harness = false
+name = "resnet50"
+path = "benches/resnet.rs"
+
+[[bench]]
+harness = false
+name = "autodiff"
+
+[[bench]]
+harness = false
+name = "reduce"
+
+[[bin]]
+name = "burnbench"
+path = "src/bin/burnbench.rs"
