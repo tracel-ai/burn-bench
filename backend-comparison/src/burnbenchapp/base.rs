@@ -101,6 +101,8 @@ enum BenchmarkValues {
     Binary,
     #[strum(to_string = "custom-gelu")]
     CustomGelu,
+    #[strum(to_string = "transformer-encoder")]
+    TransformerEncoder,
     #[strum(to_string = "data")]
     Data,
     #[strum(to_string = "matmul")]

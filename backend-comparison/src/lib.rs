@@ -144,7 +144,7 @@ macro_rules! bench_on_backend {
             use burn::backend::wgpu::{Wgpu, WgpuDevice};
             use burn::tensor::f16;
 
-            $fn_name::<Wgpu<f16, i32>>(&WgpuDevice::default(), feature_name, url, token);
+            $fn_name::<Wgpu<f32, i32>>(&WgpuDevice::default(), feature_name, url, token);
         }
 
         #[cfg(feature = "tch-gpu")]
@@ -214,7 +214,7 @@ macro_rules! bench_on_backend {
             use burn::backend::cuda::{Cuda, CudaDevice};
             use burn::tensor::f16;
 
-            $fn_name::<Cuda<f16>>(&CudaDevice::default(), feature_name, url, token);
+            $fn_name::<Cuda<f32>>(&CudaDevice::default(), feature_name, url, token);
         }
 
         #[cfg(feature = "hip")]
