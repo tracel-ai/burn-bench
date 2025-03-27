@@ -16,16 +16,15 @@ restore_backup() {
 # Ensure the backup is restored on exit
 trap restore_backup EXIT
 
-# Function to display usage information
 show_usage() {
-    echo "Usage: $0 <version1> [version2...] [-- <burnbench_args>]"
+    echo "Usage: $0 <version1> [version2...] <burnbench_args>"
     echo ""
     echo "Arguments:"
     echo "  <version>         One or more Burn versions or git commits"
-    echo "  --                Everything after this is passed to burnbench"
+    echo "  <burnbench_args>  Any argument(s) to pass to burnbench"
     echo ""
     echo "Examples:"
-    echo "  $0 0.16.1 -- --benches unary --backends ndarray"
+    echo "  $0 0.16.1 --benches unary --backends ndarray"
     exit 1
 }
 
@@ -70,13 +69,17 @@ update_cargo_toml() {
         echo "Applying Burn version: $VERSION"
 
         # For version, update both burn and burn-common
-        sed -i.tmp -E "s|burn = \{ .+, default-features = false \}|burn = { version = \"$VERSION\", default-features = false }|g" "$CARGO_TOML"
-        sed -i.tmp -E "s|burn-common = \{ .+ \}|burn-common = { version = \"$VERSION\" }|g" "$CARGO_TOML"
+        sed -i.tmp -E \
+            -e "s|burn = \{ .+, default-features = false \}|burn = { version = \"$VERSION\", default-features = false }|g" \
+            -e "s|burn-common = \{ .+ \}|burn-common = { version = \"$VERSION\" }|g" \
+            "$CARGO_TOML"
 
         # Handle feature flags for previous versions
         if version_lt_0_17 "$VERSION"; then
             echo "Version < 0.17.0 detected, changing feature flags"
             replace_feature_flags_lt_0_17 "$CARGO_TOML"
+            # Pin bincode pre-release (used in burn < 0.17)
+            sed -i '/^\[dependencies\]/a bincode = "=2.0.0-rc.3"\nbincode_derive = "=2.0.0-rc.3"' Cargo.toml
         else
             echo "Version >= 0.17.0 detected, using cuda, hip, vulkan and simd feature flags"
             replace_feature_flags_ge_0_17 "$CARGO_TOML"
@@ -85,8 +88,10 @@ update_cargo_toml() {
         echo "Applying Burn git commit: $VERSION"
 
         # For git commit, update both burn and burn-common
-        sed -i.tmp -E "s|burn = \{ .+, default-features = false \}|burn = { git = \"https://github.com/tracel-ai/burn\", rev = \"$VERSION\", default-features = false }|g" "$CARGO_TOML"
-        sed -i.tmp -E "s|burn-common = \{ .+ \}|burn-common = { git = \"https://github.com/tracel-ai/burn\", rev = \"$VERSION\" }|g" "$CARGO_TOML"
+        sed -i.tmp -E \
+            -e "s|burn = \{ .+, default-features = false \}|burn = { git = \"https://github.com/tracel-ai/burn\", rev = \"$VERSION\", default-features = false }|g" \
+            -e "s|burn-common = \{ .+ \}|burn-common = { git = \"https://github.com/tracel-ai/burn\", rev = \"$VERSION\" }|g" \
+            "$CARGO_TOML"
 
         echo "Warning: Assuming version >= 0.17 for git commit, you may need to manually check the cuda feature flag name."
         replace_feature_flags_ge_0_17 "$CARGO_TOML"
@@ -119,21 +124,20 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     show_usage
 fi
 
-# Check if at least one version is provided
-if [ $# -lt 1 ]; then
-    echo "Error: No Burn versions or commits specified."
-    echo ""
-    show_usage
-fi
-
 # Parse command-line arguments
 VERSIONS=()
 BURNBENCH_ARGS=()
 PARSE_BURNBENCH_ARGS=false
 
 for arg in "$@"; do
+    # Keep support for `--` separator as before, but not required anymore to match powershell usage (special token)
     if [[ "$arg" == "--" && $PARSE_BURNBENCH_ARGS == false ]]; then
         PARSE_BURNBENCH_ARGS=true
+    elif [[ "$arg" == -* && $PARSE_BURNBENCH_ARGS == false ]]; then
+        # Any argument that starts with `-` will be interpreted as a burnbench arg
+        # All arguments, short or long, require this prefix (-b, --benches, -B, --backends, etc.)
+        PARSE_BURNBENCH_ARGS=true
+        BURNBENCH_ARGS+=("$arg")
     elif [[ $PARSE_BURNBENCH_ARGS == true ]]; then
         BURNBENCH_ARGS+=("$arg")
     else
@@ -141,6 +145,11 @@ for arg in "$@"; do
     fi
 done
 
+if [ ${#VERSIONS[@]} == 0  ]; then
+    echo "Error: No Burn versions or commits specified."
+    echo ""
+    show_usage
+fi
 
 if [ ${#BURNBENCH_ARGS[@]} == 0 ]; then
     echo "Error: No burnbench arguments provided."

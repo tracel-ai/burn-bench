@@ -25,10 +25,10 @@ This script allows you to compare the performance of different Burn versions usi
 You can specify one or more versions (or git commit revision) and provide custom `burnbench`
 arguments to benchmark them.
 
-To run the comparison, use the `compare.sh` script as follows:
+To run the comparison, use the `compare.sh` (`compare.ps1` on Windows) script as follows:
 
 ```sh
-./compare.sh <version1> [version2...] [-- <burnbench_args>]
+./compare.sh <version1> [version2...] <burnbench_args>
 ```
 
 For example, to compare version `0.16.0` and the version at commit
@@ -36,7 +36,7 @@ For example, to compare version `0.16.0` and the version at commit
 using specific burnbench arguments:
 
 ```sh
-./compare.sh 0.16.0 af653d9ff332c80a7887c733d0693c2f9c4cefb3 -- --benches unary --backends ndarray
+./compare.sh 0.16.0 af653d9ff332c80a7887c733d0693c2f9c4cefb3 --benches unary --backends ndarray
 ```
 
 This will run benchmarks on the specified versions and log the results in a timestamped file,
@@ -46,7 +46,7 @@ allowing you to compare their performance.
 > changes to the API or feature flag names. We currently handle changes after the 0.16 release.  
 > To handle feature flag changes, you probably want to modify `compare.sh` to overwrite the
 > `Cargo.toml` based on some condition. See for example
-> [`replace_feature_flags_lt_0_17`](./compare.sh#L45).   
+> [`replace_feature_flags_lt_0_17`](./compare.sh#L44).
 > For breaking API changes, this can be handled in the build script to add a cfg. See for example
 > [`burn_version_lt_0170`](./build.rs#L372) and how it is
 > [used for conditional compilation](./src/persistence/base.rs#L71).
