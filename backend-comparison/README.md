@@ -22,8 +22,8 @@ then becomes: `cargo bb list`.
 This script allows you to compare the performance of different Burn versions using
 `burnbench -- run`.
 
-You can specify one or more versions (or git commit revision) and provide custom `burnbench`
-arguments to benchmark them.
+You can specify one or more versions (published version, git branch or commit hash) and provide
+custom `burnbench` arguments to benchmark them.
 
 To run the comparison, use the `compare.sh` (`compare.ps1` on Windows) script as follows:
 
@@ -31,12 +31,10 @@ To run the comparison, use the `compare.sh` (`compare.ps1` on Windows) script as
 ./compare.sh <version1> [version2...] <burnbench_args>
 ```
 
-For example, to compare version `0.16.0` and the version at commit
-[`af653d9ff332c80a7887c733d0693c2f9c4cefb3`](https://github.com/tracel-ai/burn/tree/af653d9ff332c80a7887c733d0693c2f9c4cefb3)
-using specific burnbench arguments:
+For example, to compare version `0.16.0` and the main branch using specific burnbench arguments:
 
 ```sh
-./compare.sh 0.16.0 af653d9ff332c80a7887c733d0693c2f9c4cefb3 --benches unary --backends ndarray
+./compare.sh 0.16.0 main --benches unary --backends ndarray
 ```
 
 This will run benchmarks on the specified versions and log the results in a timestamped file,
@@ -46,7 +44,7 @@ allowing you to compare their performance.
 > changes to the API or feature flag names. We currently handle changes after the 0.16 release.  
 > To handle feature flag changes, you probably want to modify `compare.sh` to overwrite the
 > `Cargo.toml` based on some condition. See for example
-> [`replace_feature_flags_lt_0_17`](./compare.sh#L44).
+> [`replace_feature_flags_lt_0_17`](./compare.sh#L44).  
 > For breaking API changes, this can be handled in the build script to add a cfg. See for example
 > [`burn_version_lt_0170`](./build.rs#L372) and how it is
 > [used for conditional compilation](./src/persistence/base.rs#L71).
@@ -62,10 +60,15 @@ To list all the available benches and backends use the `list` command:
     Finished dev [unoptimized] target(s) in 0.10s
      Running `target/debug/burnbench list`
 Available Backends:
+- all
 - candle-cpu
 - candle-cuda
 - candle-metal
+- cuda
+- cuda-fusion
+- hip
 - ndarray
+- ndarray-simd
 - ndarray-blas-accelerate
 - ndarray-blas-netlib
 - ndarray-blas-openblas
@@ -77,10 +80,13 @@ Available Backends:
 - wgpu-spirv-fusion
 
 Available Benchmarks:
+- all
 - binary
 - custom-gelu
+- transformer-encoder
 - data
 - matmul
+- matmul-fused
 - unary
 - max-pool2d
 - resnet50

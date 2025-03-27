@@ -20,7 +20,7 @@ show_usage() {
     echo "Usage: $0 <version1> [version2...] <burnbench_args>"
     echo ""
     echo "Arguments:"
-    echo "  <version>         One or more Burn versions or git commits"
+    echo "  <version>         One or more Burn version, git branch or commit hash"
     echo "  <burnbench_args>  Any argument(s) to pass to burnbench"
     echo ""
     echo "Examples:"
@@ -85,12 +85,19 @@ update_cargo_toml() {
             replace_feature_flags_ge_0_17 "$CARGO_TOML"
         fi
     else
-        echo "Applying Burn git commit: $VERSION"
+        # Support commit hashes (7 to 40 hexadecimal characters) or branch names
+        GIT_REV="";
+        if [[ "$VERSION" =~ ^[0-9a-f]{7,40}$ ]]; then
+            GIT_REV="rev = \"$VERSION\""
+        else
+            GIT_REV="branch = \"$VERSION\""
+        fi
+        echo "Applying Burn git: $GIT_REV"
 
         # For git commit, update both burn and burn-common
         sed -i.tmp -E \
-            -e "s|burn = \{ .+, default-features = false \}|burn = { git = \"https://github.com/tracel-ai/burn\", rev = \"$VERSION\", default-features = false }|g" \
-            -e "s|burn-common = \{ .+ \}|burn-common = { git = \"https://github.com/tracel-ai/burn\", rev = \"$VERSION\" }|g" \
+            -e "s|burn = \{ .+, default-features = false \}|burn = { git = \"https://github.com/tracel-ai/burn\", $GIT_REV, default-features = false }|g" \
+            -e "s|burn-common = \{ .+ \}|burn-common = { git = \"https://github.com/tracel-ai/burn\", $GIT_REV }|g" \
             "$CARGO_TOML"
 
         echo "Warning: Assuming version >= 0.17 for git commit, you may need to manually check the cuda feature flag name."

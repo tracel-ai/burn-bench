@@ -25,7 +25,7 @@ function Show-Usage {
     Write-Host "Usage: .\burnbench.ps1 <version1> [version2...] <burnbench_args>"
     Write-Host ""
     Write-Host "Arguments:"
-    Write-Host "  <version>         One or more Burn versions or git commits"
+    Write-Host "  <version>         One or more Burn version, git branch or commit hash"
     Write-Host "  <burnbench_args>  Any argument(s) to pass to burnbench"
     Write-Host ""
     Write-Host "Examples:"
@@ -94,12 +94,19 @@ function Update-CargoToml {
         }
     }
     else {
-        Write-Host "Applying Burn git commit: $Version"
+        # Support commit hashes (7 to 40 hexadecimal characters) or branch names
+        $GitRev = ""
+        if ($Version -match "^[0-9a-f]{7,40}$") {
+            $GitRev = "rev = `"$Version`""
+        } else {
+            $GitRev = "branch = `"$Version`""
+        }
+        Write-Host "Applying Burn git commit: $GitRev"
 
         # For git commit, update both burn and burn-common
         (Get-Content $CargoToml) | ForEach-Object {
-            $_ -replace 'burn = \{ .+, default-features = false \}', "burn = { git = ""https://github.com/tracel-ai/burn"", rev = ""$Version"", default-features = false }" `
-               -replace 'burn-common = \{ .+ \}', "burn-common = { git = ""https://github.com/tracel-ai/burn"", rev = ""$Version"" }"
+            $_ -replace 'burn = \{ .+, default-features = false \}', "burn = { git = ""https://github.com/tracel-ai/burn"", $GitRev, default-features = false }" `
+               -replace 'burn-common = \{ .+ \}', "burn-common = { git = ""https://github.com/tracel-ai/burn"", $GitRev }"
         } | Set-Content $CargoToml
 
         Write-Host "Warning: Assuming version >= 0.17 for git commit, you may need to manually check the cuda feature flag name."
