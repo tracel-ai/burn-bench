@@ -53,5 +53,4 @@ cargo bb run --share --benches unary --backends wgpu-fusion
 
 ## Contributing
 
-We welcome contributions to improve benchmarking coverage and add new performance tests. For more
-details, check [backend-comparison/README.md](./backend-comparison/README.md).
+We welcome contributions to improve benchmarking coverage and add new performance tests.

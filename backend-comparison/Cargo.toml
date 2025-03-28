@@ -2,7 +2,7 @@
 authors = ["Tracel Technologies Inc."]
 categories = ["science"]
 description = "This crate is used to time the execution of various computations, from operation kernels to complex model scenarios."
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 name = "backend-comparison"
 readme = "README.md"
