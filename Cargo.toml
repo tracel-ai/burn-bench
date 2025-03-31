@@ -1,0 +1,63 @@
+[workspace]
+# Try
+# require version 2 to avoid "feature" additiveness for dev-dependencies
+# https://doc.rust-lang.org/cargo/reference/resolver.html#feature-resolver-version-2
+resolver = "2"
+
+members = [
+    "backend-comparison",
+    "xtask",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[workspace.dependencies]
+
+arboard = "3.4.1"
+chrono = "0.4.39"
+clap = { version = "4.5.27" }
+colored = "2.1.0"
+derive-new = { version = "0.7.0", default-features = false }
+dirs = "5.0.1"
+indicatif = "0.17.11"
+log = { version = "0.4.25", default-features = false }
+os_info = "3.10.0"
+phf = { version = "0.11.3", features = [
+    "macros",
+] } # for package info static map
+percent-encoding = "2.3.1"
+rand = { version = "0.9.0", default-features = false, features = [
+    "std_rng",
+    "thread_rng",
+] } # std_rng is for no_std
+regex = "1.11.1"
+reqwest = { version = "0.12.12", default-features = false, features = [
+    "rustls-tls",
+    "blocking",
+    "json",
+] }
+serde = { version = "1.0.218" }
+serde_json = { version = "1.0.140", default-features = false }
+strum = "0.27.1"
+sysinfo = { version = "0.33.1", features = ["serde"] }
+tracing-subscriber = "0.3.19"
+wgpu = "24.0.1"
+wsl = "0.1.0"
+
+# Tests
+rstest = "0.23.0"
+serial_test = "3.2.0"
+
+# Build
+semver = "1.0.26"
+tempfile = "3.17.1"
+
+### For xtask crate ###
+tracel-xtask = { version = "=1.1.8" }
+
+[profile.dev]
+debug = 0 # Speed up compilation time and not necessary.
