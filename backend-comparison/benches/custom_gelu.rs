@@ -1,6 +1,6 @@
 use backend_comparison::persistence::save;
 use burn::backend::Autodiff;
-use burn::tensor::{backend::Backend, Distribution, Shape, Tensor};
+use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, Element};
 use burn_common::benchmark::{run_benchmark, Benchmark};
 use core::f64::consts::SQRT_2;
 use derive_new::new;
@@ -27,8 +27,8 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
 
     fn name(&self) -> String {
         match self.autodiff {
-            true => format!("gelu_autodiff_{:?}", self.kind),
-            false => format!("gelu_{:?}", self.kind),
+            true => format!("gelu-autodiff-{:?}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase(),
+            false => format!("gelu-{:?}-{:?}", self.kind,  B::FloatElem::dtype()).to_lowercase(),
         }
     }
 

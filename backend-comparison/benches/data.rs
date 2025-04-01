@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, TensorData};
+use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, TensorData, Element};
 use burn_common::benchmark::{run_benchmark, Benchmark};
 use derive_new::new;
 
@@ -13,7 +13,7 @@ impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
     type Args = Tensor<B, D>;
 
     fn name(&self) -> String {
-        "to_data".into()
+        format!("to_data-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{backend::Backend, Distribution, Shape, Tensor};
+use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, Element};
 use burn_common::benchmark::{run_benchmark, Benchmark};
 use derive_new::new;
 
@@ -14,11 +14,15 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     type Args = (Tensor<B, D>, Tensor<B, D>);
 
     fn name(&self) -> String {
-        "matmul".into()
+        format!("matmul-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape_lhs.dims.clone(), self.shape_rhs.dims.clone()]
+        if self.shape_lhs ==  self.shape_rhs {
+            vec![self.shape_lhs.dims.clone()]
+        } else {
+            vec![self.shape_lhs.dims.clone(), self.shape_rhs.dims.clone()]
+        }
     }
 
     fn execute(&self, (lhs, rhs): Self::Args) {
@@ -47,9 +51,9 @@ fn bench<B: Backend>(
     let benchmarks = [
         (2, 4096, 4096, 4096),
         (1, 6144, 6144, 6144),
-        (32, 2048, 2048, 2048),
-        (256, 1024, 1024, 1024),
-        (1024, 256, 256, 256),
+        (4, 2048, 2048, 2048),
+        (32, 1024, 1024, 1024),
+        (256, 256, 256, 256),
     ]
     .into_iter()
     .map(|(b, m, n, k)| {

@@ -2,7 +2,7 @@ use backend_comparison::persistence::save;
 use burn::{
     backend::Autodiff, nn::{
         loss::CrossEntropyLossConfig, transformer::{TransformerEncoder, TransformerEncoderConfig, TransformerEncoderInput}, Embedding, EmbeddingConfig, Linear, LinearConfig
-    }, prelude::*, tensor::{activation::softmax, backend::AutodiffBackend}
+    }, prelude::*, tensor::{activation::softmax, backend::AutodiffBackend, Element}
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};
 
@@ -55,7 +55,7 @@ impl ModelConfig {
             output,
             n_classes: self.n_classes,
             max_seq_length: self.max_seq_length,
-        }
+        }.to_device(device)
     }
 }
 
@@ -141,7 +141,7 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
     type Args = (Model<B>, TrainingBatch<B>);
 
     fn name(&self) -> String {
-        format!("transformer-encoder-training-{}", core::any::type_name::<B::FloatElem>())
+        format!("transformer-encoder-training-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -173,7 +173,7 @@ impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
     type Args = (Model<B>, InferenceBatch<B>);
 
     fn name(&self) -> String {
-        format!("transformer-encoder-inference-{}", core::any::type_name::<B::FloatElem>())
+        format!("transformer-encoder-inference-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

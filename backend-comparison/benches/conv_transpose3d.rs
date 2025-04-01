@@ -1,7 +1,7 @@
 use backend_comparison::persistence::save;
 use burn::tensor::{
     backend::Backend, module::conv_transpose3d, ops::ConvTransposeOptions, Distribution, Shape,
-    Tensor,
+    Tensor, Element
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};
 
@@ -17,7 +17,7 @@ impl<B: Backend> Benchmark for ConvTranspose3dBenchmark<B> {
     type Args = (Tensor<B, 5>, Tensor<B, 5>, Tensor<B, 1>);
 
     fn name(&self) -> String {
-        "conv_transpose3d".into()
+        format!("conv_transpose3d-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

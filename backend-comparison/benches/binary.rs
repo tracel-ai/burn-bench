@@ -14,7 +14,7 @@ impl<B: Backend, const D: usize> Benchmark for BinaryBenchmark<B, D> {
     type Args = (Tensor<B, D>, Tensor<B, D>);
 
     fn name(&self) -> String {
-        "binary".into()
+        format!("binary-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

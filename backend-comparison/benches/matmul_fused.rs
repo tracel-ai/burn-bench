@@ -2,7 +2,7 @@ use backend_comparison::persistence::save;
 use burn::tensor::{
     activation::{gelu, relu},
     backend::Backend,
-    Distribution, Shape, Tensor,
+    Distribution, Shape, Tensor, Element
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};
 use derive_new::new;
@@ -18,7 +18,7 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     type Args = (Tensor<B, D>, Tensor<B, D>, Tensor<B, 1>);
 
     fn name(&self) -> String {
-        "matmul_relu_bias_gelu".into()
+        format!("matmul_relu_bias_gelu-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

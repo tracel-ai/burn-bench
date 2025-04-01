@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use backend_comparison::persistence::save;
 use burn::tensor::{
-    backend::Backend, module::conv2d, ops::ConvOptions, Distribution, Shape, Tensor,
+    backend::Backend, module::conv2d, ops::ConvOptions, Distribution, Shape, Tensor,Element
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};
 
@@ -19,7 +19,7 @@ impl<B: Backend> Benchmark for Conv2dBenchmark<B> {
     type Args = (Tensor<B, 4>, Tensor<B, 4>, Tensor<B, 1>);
 
     fn name(&self) -> String {
-        format!("conv2d-{}", self.suffix)
+        format!("conv2d-{}-{:?}", self.suffix, B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
