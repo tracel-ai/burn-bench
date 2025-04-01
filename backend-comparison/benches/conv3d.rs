@@ -1,6 +1,6 @@
 use backend_comparison::persistence::save;
 use burn::tensor::{
-    backend::Backend, module::conv3d, ops::ConvOptions, Distribution, Shape, Tensor, Element
+    backend::Backend, module::conv3d, ops::ConvOptions, Distribution, Element, Shape, Tensor,
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};
 

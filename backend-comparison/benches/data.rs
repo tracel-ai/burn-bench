@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, TensorData, Element};
+use burn::tensor::{backend::Backend, Distribution, Element, Shape, Tensor, TensorData};
 use burn_common::benchmark::{run_benchmark, Benchmark};
 use derive_new::new;
 

@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, Element};
+use burn::tensor::{backend::Backend, Distribution, Element, Shape, Tensor};
 use burn_common::benchmark::{run_benchmark, Benchmark};
 
 // Files retrieved during build to avoid reimplementing ResNet for benchmarks

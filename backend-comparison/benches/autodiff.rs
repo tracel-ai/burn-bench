@@ -4,7 +4,7 @@ use burn::{
     nn,
     tensor::{
         backend::{AutodiffBackend, Backend},
-        Distribution, Tensor, Element
+        Distribution, Element, Tensor,
     },
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};

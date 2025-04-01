@@ -1,7 +1,7 @@
 use backend_comparison::persistence::save;
 use burn::tensor::{
-    backend::Backend, module::conv_transpose2d, ops::ConvTransposeOptions, Distribution, Shape,
-    Tensor, Element
+    backend::Backend, module::conv_transpose2d, ops::ConvTransposeOptions, Distribution, Element,
+    Shape, Tensor,
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};
 

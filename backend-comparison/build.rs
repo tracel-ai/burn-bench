@@ -327,7 +327,7 @@ fn capture_packages_info() {
     // Find the direct dependencies of this package
     let mut direct_dependencies: Vec<DependencyInfo> = dependencies
         .iter()
-        .find(|p| p.get("name").and_then(|v| v.as_str()) == Some(&package_name))
+        .find(|p| p.get("name").and_then(|v| v.as_str()) == Some(package_name))
         .and_then(|p| {
             p.get("dependencies").map(|deps| {
                 serde_json::from_value(deps.clone()).expect("Should parse direct dependencies")

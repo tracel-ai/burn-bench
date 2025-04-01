@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, Element};
+use burn::tensor::{backend::Backend, Distribution, Element, Shape, Tensor};
 use burn_common::benchmark::{run_benchmark, Benchmark};
 use derive_new::new;
 
@@ -18,7 +18,7 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        if self.shape_lhs ==  self.shape_rhs {
+        if self.shape_lhs == self.shape_rhs {
             vec![self.shape_lhs.dims.clone()]
         } else {
             vec![self.shape_lhs.dims.clone(), self.shape_rhs.dims.clone()]

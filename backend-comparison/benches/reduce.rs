@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{backend::Backend, Distribution, Shape, Tensor, Element};
+use burn::tensor::{backend::Backend, Distribution, Element, Shape, Tensor};
 use burn_common::benchmark::{run_benchmark, Benchmark};
 
 enum Instruction {
@@ -65,12 +65,19 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
 
     fn name(&self) -> String {
         match self.instruction {
-            Instruction::ArgMin(axis) => format!("reduce-argmin-{axis}-{:?}", B::FloatElem::dtype()),
-            Instruction::ArgMinFused(axis) => format!("reduce-argmin-{axis}-fused-{:?}", B::FloatElem::dtype()),
+            Instruction::ArgMin(axis) => {
+                format!("reduce-argmin-{axis}-{:?}", B::FloatElem::dtype())
+            }
+            Instruction::ArgMinFused(axis) => {
+                format!("reduce-argmin-{axis}-fused-{:?}", B::FloatElem::dtype())
+            }
             Instruction::SumDim(axis) => format!("reduce-sum-{axis}-{:?}", B::FloatElem::dtype()),
-            Instruction::SumDimFused(axis) => format!("reduce-sum-{axis}-fused-{:?}", B::FloatElem::dtype()),
+            Instruction::SumDimFused(axis) => {
+                format!("reduce-sum-{axis}-fused-{:?}", B::FloatElem::dtype())
+            }
             Instruction::Sum => format!("reduce-sum-full-{:?}", B::FloatElem::dtype()),
-        }.to_lowercase()
+        }
+        .to_lowercase()
     }
 
     fn sync(&self) {

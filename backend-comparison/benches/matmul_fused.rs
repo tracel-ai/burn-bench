@@ -2,7 +2,7 @@ use backend_comparison::persistence::save;
 use burn::tensor::{
     activation::{gelu, relu},
     backend::Backend,
-    Distribution, Shape, Tensor, Element
+    Distribution, Element, Shape, Tensor,
 };
 use burn_common::benchmark::{run_benchmark, Benchmark};
 use derive_new::new;

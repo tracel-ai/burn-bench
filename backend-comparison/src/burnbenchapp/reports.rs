@@ -61,13 +61,13 @@ impl BenchmarkCollection {
                     println!("Cannot find the benchmark-record file: {}", file_path);
                 };
             }
-            self.successful_records.sort_by(|a, b| a.results.computed.median.cmp(&b.results.computed.median));
+            self.successful_records
+                .sort_by(|a, b| a.results.computed.median.cmp(&b.results.computed.median));
         }
 
         self
     }
 }
-
 
 pub struct ShapeFmt<'a> {
     shapes: &'a Vec<Vec<usize>>,
@@ -75,39 +75,37 @@ pub struct ShapeFmt<'a> {
 
 impl<'a> ShapeFmt<'a> {
     pub fn new(shapes: &'a Vec<Vec<usize>>) -> Self {
-        Self {
-            shapes
-        }
+        Self { shapes }
     }
 }
 
-impl<'a> Display for ShapeFmt<'a> {
+impl Display for ShapeFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            if self.shapes.is_empty() {
-                return f.write_str("()")
-            }
+        if self.shapes.is_empty() {
+            return f.write_str("()");
+        }
 
-            if self.shapes.len() > 1 {
-                f.write_str("[")?;
-            }
+        if self.shapes.len() > 1 {
+            f.write_str("[")?;
+        }
 
-            for shape in self.shapes {
-                f.write_str("(")?;
-                for (i, val) in shape.iter().enumerate() {
-                    if i == shape.len() -1 {
-                        f.write_fmt(format_args!("{val}"))?;
-                    } else {
-                        f.write_fmt(format_args!("{val}, "))?;
-                    }
+        for shape in self.shapes {
+            f.write_str("(")?;
+            for (i, val) in shape.iter().enumerate() {
+                if i == shape.len() - 1 {
+                    f.write_fmt(format_args!("{val}"))?;
+                } else {
+                    f.write_fmt(format_args!("{val}, "))?;
                 }
-                f.write_str(")")?;
             }
+            f.write_str(")")?;
+        }
 
-            if self.shapes.len() > 1 {
-                f.write_str("]")?;
-            }
+        if self.shapes.len() > 1 {
+            f.write_str("]")?;
+        }
 
-            Ok(())
+        Ok(())
     }
 }
 
@@ -123,7 +121,12 @@ impl Display for BenchmarkCollection {
         for record in self.successful_records.iter() {
             max_name_len = max_name_len.max(record.results.name.len());
             // + 2 because if the added backticks
-            max_shapes_len = max_shapes_len.max(format!("{}", ShapeFmt::new(&record.results.shapes)).green().len() + 2);
+            max_shapes_len = max_shapes_len.max(
+                format!("{}", ShapeFmt::new(&record.results.shapes))
+                    .green()
+                    .len()
+                    + 2,
+            );
             max_backend_len = max_backend_len.max(record.backend.len() + 2);
             max_device_len = max_device_len.max(record.device.len());
             max_feature_len = max_feature_len.max(record.feature.len());

@@ -51,7 +51,7 @@ fn update_panic_hook() {
     let hook = std::panic::take_hook();
 
     std::panic::set_hook(Box::new(move |info| {
-        log::error!("PANIC => {}", info.to_string());
+        log::error!("PANIC => {}", info);
         hook(info);
     }));
 }
@@ -60,11 +60,11 @@ pub fn get_package_rev(package: &str) -> String {
     // Benchmarks are written as examples so their dependencies (e.g., Burn) marked as dev
     let dep = crate::build_info::DEPENDENCIES
         .get("burn")
-        .expect(&format!("Could not find dependency '{package}'"));
+        .unwrap_or_else(|| panic!("Could not find dependency '{package}'"));
 
     let revision = if dep.source.starts_with("git+") {
         let rev = if dep.source.contains("?rev=") {
-            dep.source.rsplit("?rev=").collect::<Vec<_>>()[0].into()
+            dep.source.rsplit("?rev=").collect::<Vec<_>>()[0]
         } else {
             dep.version // no specific revision, just latest git
         };
