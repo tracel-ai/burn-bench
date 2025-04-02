@@ -278,6 +278,11 @@ impl BenchManifest {
                 "ndarray-simd = [\"burn/ndarray\", \"burn/simd\"]",
                 "ndarray-simd = [\"burn/ndarray\"]",
             )
+            // Use matching `rand` version (binary and data benchmarks)
+            .replace(
+                "rand = { version = \"0.9.0\" }",
+                "rand = { version = \"0.8.5\" }",
+            )
     }
 
     fn replace_feature_flags_ge_17(&self, content: &str) -> String {
@@ -291,6 +296,11 @@ impl BenchManifest {
             .replace(
                 "ndarray-simd = [\"burn/ndarray\"]",
                 "ndarray-simd = [\"burn/ndarray\", \"burn/simd\"]",
+            )
+            // Use matching `rand` version (binary and data benchmarks)
+            .replace(
+                "rand = { version = \"0.8.5\" }",
+                "rand = { version = \"0.9.0\" }",
             )
     }
 }

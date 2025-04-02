@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{Distribution, Shape, Tensor, backend::Backend, module::max_pool2d};
+use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend, module::max_pool2d};
 use burn_common::benchmark::{Benchmark, run_benchmark};
 
 pub struct MaxPool2dBenchmark<B: Backend> {
@@ -16,7 +16,7 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
     type Args = Tensor<B, 4>;
 
     fn name(&self) -> String {
-        format!("max_pool2d_{}", self.name)
+        format!("max_pool2d_{}-{:?}", self.name, B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

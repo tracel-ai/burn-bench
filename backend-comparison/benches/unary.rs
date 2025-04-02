@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{Distribution, Shape, Tensor, backend::Backend};
+use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, run_benchmark};
 use derive_new::new;
 
@@ -13,7 +13,7 @@ impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
     type Args = Tensor<B, D>;
 
     fn name(&self) -> String {
-        "unary".into()
+        format!("unary-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

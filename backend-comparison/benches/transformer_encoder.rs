@@ -7,7 +7,7 @@ use burn::{
         transformer::{TransformerEncoder, TransformerEncoderConfig, TransformerEncoderInput},
     },
     prelude::*,
-    tensor::{activation::softmax, backend::AutodiffBackend},
+    tensor::{Element, activation::softmax, backend::AutodiffBackend},
 };
 use burn_common::benchmark::{Benchmark, run_benchmark};
 
@@ -59,6 +59,7 @@ impl ModelConfig {
             n_classes: self.n_classes,
             max_seq_length: self.max_seq_length,
         }
+        .to_device(device)
     }
 }
 
@@ -141,10 +142,7 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
     type Args = (Model<B>, TrainingBatch<B>);
 
     fn name(&self) -> String {
-        format!(
-            "transformer-encoder-training-{}",
-            core::any::type_name::<B::FloatElem>()
-        )
+        format!("transformer-encoder-training-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -177,10 +175,7 @@ impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
     type Args = (Model<B>, InferenceBatch<B>);
 
     fn name(&self) -> String {
-        format!(
-            "transformer-encoder-inference-{}",
-            core::any::type_name::<B::FloatElem>()
-        )
+        format!("transformer-encoder-inference-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

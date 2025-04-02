@@ -1,7 +1,12 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{Distribution, Shape, Tensor, TensorData, backend::Backend};
+use burn::tensor::{Distribution, Element, Shape, Tensor, TensorData, backend::Backend};
 use burn_common::benchmark::{Benchmark, run_benchmark};
 use derive_new::new;
+
+#[cfg(not(burn_version_lt_0170))]
+use rand::rng;
+#[cfg(burn_version_lt_0170)]
+use rand::thread_rng as rng;
 
 #[derive(new)]
 struct ToDataBenchmark<B: Backend, const D: usize> {
@@ -13,7 +18,7 @@ impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
     type Args = Tensor<B, D>;
 
     fn name(&self) -> String {
-        "to_data".into()
+        format!("to_data-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -59,7 +64,7 @@ impl<B: Backend, const D: usize> Benchmark for FromDataBenchmark<B, D> {
             TensorData::random::<B::FloatElem, _, _>(
                 self.shape.clone(),
                 Distribution::Default,
-                &mut rand::rng(),
+                &mut rng(),
             ),
             self.device.clone(),
         )

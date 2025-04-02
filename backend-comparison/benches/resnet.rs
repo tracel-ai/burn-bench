@@ -1,5 +1,5 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{Distribution, Shape, Tensor, backend::Backend};
+use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, run_benchmark};
 
 // Files retrieved during build to avoid reimplementing ResNet for benchmarks
@@ -21,7 +21,7 @@ impl<B: Backend> Benchmark for ResNetBenchmark<B> {
     type Args = (model::ResNet<B>, Tensor<B, 4>);
 
     fn name(&self) -> String {
-        "resnet50".into()
+        format!("resnet50-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

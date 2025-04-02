@@ -51,7 +51,7 @@ fn update_panic_hook() {
     let hook = std::panic::take_hook();
 
     std::panic::set_hook(Box::new(move |info| {
-        log::error!("PANIC => {}", info.to_string());
+        log::error!("PANIC => {}", info);
         hook(info);
     }));
 }
@@ -60,11 +60,11 @@ pub fn get_package_rev(package: &str) -> String {
     // Benchmarks are written as examples so their dependencies (e.g., Burn) marked as dev
     let dep = crate::build_info::DEPENDENCIES
         .get("burn")
-        .expect(&format!("Could not find dependency '{package}'"));
+        .unwrap_or_else(|| panic!("Could not find dependency '{package}'"));
 
     let revision = if dep.source.starts_with("git+") {
         let rev = if dep.source.contains("?rev=") {
-            dep.source.rsplit("?rev=").collect::<Vec<_>>()[0].into()
+            dep.source.rsplit("?rev=").collect::<Vec<_>>()[0]
         } else {
             dep.version // no specific revision, just latest git
         };
@@ -144,6 +144,7 @@ macro_rules! bench_on_backend {
             use burn::backend::wgpu::{Wgpu, WgpuDevice};
             use burn::tensor::f16;
 
+            $fn_name::<Wgpu<f16, i32>>(&WgpuDevice::default(), feature_name, url, token);
             $fn_name::<Wgpu<f32, i32>>(&WgpuDevice::default(), feature_name, url, token);
         }
 
@@ -156,7 +157,9 @@ macro_rules! bench_on_backend {
             let device = LibTorchDevice::Cuda(0);
             #[cfg(target_os = "macos")]
             let device = LibTorchDevice::Mps;
+
             $fn_name::<LibTorch<f16>>(&device, feature_name, url, token);
+            $fn_name::<LibTorch<f32>>(&device, feature_name, url, token);
         }
 
         #[cfg(feature = "tch-cpu")]
@@ -211,18 +214,26 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "cuda")]
         {
+            #[cfg(not(burn_version_lt_0170))]
             use burn::backend::cuda::{Cuda, CudaDevice};
+            #[cfg(burn_version_lt_0170)]
+            use burn::backend::cuda_jit::{Cuda, CudaDevice};
             use burn::tensor::f16;
 
+            $fn_name::<Cuda<f16>>(&CudaDevice::default(), feature_name, url, token);
             $fn_name::<Cuda<f32>>(&CudaDevice::default(), feature_name, url, token);
         }
 
         #[cfg(feature = "hip")]
         {
+            #[cfg(not(burn_version_lt_0170))]
             use burn::backend::hip::{Hip, HipDevice};
+            #[cfg(burn_version_lt_0170)]
+            use burn::backend::hip_jit::{Hip, HipDevice};
             use burn::tensor::f16;
 
             $fn_name::<Hip<f16>>(&HipDevice::default(), feature_name, url, token);
+            $fn_name::<Hip<f32>>(&HipDevice::default(), feature_name, url, token);
         }
     };
 }

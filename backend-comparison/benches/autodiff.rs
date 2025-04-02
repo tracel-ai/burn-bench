@@ -3,7 +3,7 @@ use burn::{
     module::Module,
     nn,
     tensor::{
-        Distribution, Tensor,
+        Distribution, Element, Tensor,
         backend::{AutodiffBackend, Backend},
     },
 };
@@ -19,7 +19,7 @@ impl<B: AutodiffBackend> Benchmark for AutodiffOverheadBenchmark<B> {
     type Args = Tensor<B, 3>;
 
     fn name(&self) -> String {
-        "autodiff_overhead".into()
+        format!("autodiff_overhead-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

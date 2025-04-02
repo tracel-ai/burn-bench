@@ -1,6 +1,6 @@
 use backend_comparison::persistence::save;
-use burn::tensor::Device;
 use burn::tensor::backend::Backend;
+use burn::tensor::{Device, Element};
 use burn::{config::Config, module::Module, nn};
 use burn_common::benchmark::{Benchmark, run_benchmark};
 use derive_new::new;
@@ -56,7 +56,7 @@ impl<B: Backend> Benchmark for LoadRecordBenchmark<B> {
     type Args = BenchmarkModule<B>;
 
     fn name(&self) -> String {
-        format!("load_record_{:?}", self.kind).to_lowercase()
+        format!("load_record_{:?}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
