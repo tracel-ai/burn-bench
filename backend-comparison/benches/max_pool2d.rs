@@ -1,6 +1,6 @@
 use backend_comparison::persistence::save;
-use burn::tensor::{backend::Backend, module::max_pool2d, Distribution, Element, Shape, Tensor};
-use burn_common::benchmark::{run_benchmark, Benchmark};
+use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend, module::max_pool2d};
+use burn_common::benchmark::{Benchmark, run_benchmark};
 
 pub struct MaxPool2dBenchmark<B: Backend> {
     shape: Shape,

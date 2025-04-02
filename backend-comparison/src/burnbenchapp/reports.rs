@@ -16,7 +16,11 @@ pub(crate) struct FailedBenchmark {
 
 impl fmt::Display for FailedBenchmark {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Run the benchmark with verbose enabled to see the error:\ncargo run --bin burnbench -- run --benches {} --backends {} --verbose", self.bench, self.backend)
+        write!(
+            f,
+            "Run the benchmark with verbose enabled to see the error:\ncargo run --bin burnbench -- run --benches {} --backends {} --verbose",
+            self.bench, self.backend
+        )
     }
 }
 
@@ -140,7 +144,16 @@ impl Display for BenchmarkCollection {
         writeln!(
             f,
             "| {:<width_name$} | {:<width_shapes$} | {:<width_feature$} | {:<width_backend$} | {:<width_device$} | Median         |\n|{:->width_name$}--|{:->width_shapes$}--|{:->width_feature$}--|{:->width_backend$}--|{:->width_device$}--|----------------|",
-            "Benchmark", "Shapes", "Feature", "Backend", "Device", "", "", "", "", "",
+            "Benchmark",
+            "Shapes",
+            "Feature",
+            "Backend",
+            "Device",
+            "",
+            "",
+            "",
+            "",
+            "",
             width_name = max_name_len,
             width_shapes = max_shapes_len,
             width_feature = max_feature_len,

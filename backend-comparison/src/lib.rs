@@ -150,7 +150,7 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "tch-gpu")]
         {
-            use burn::backend::{libtorch::LibTorchDevice, LibTorch};
+            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
             use burn::tensor::f16;
 
             #[cfg(not(target_os = "macos"))]
@@ -164,7 +164,7 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "tch-cpu")]
         {
-            use burn::backend::{libtorch::LibTorchDevice, LibTorch};
+            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
 
             let device = LibTorchDevice::Cpu;
             $fn_name::<LibTorch>(&device, feature_name, url, token);
@@ -178,8 +178,8 @@ macro_rules! bench_on_backend {
             feature = "ndarray-blas-accelerate",
         ))]
         {
-            use burn::backend::ndarray::NdArrayDevice;
             use burn::backend::NdArray;
+            use burn::backend::ndarray::NdArrayDevice;
 
             let device = NdArrayDevice::Cpu;
             $fn_name::<NdArray>(&device, feature_name, url, token);
@@ -187,8 +187,8 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "candle-cpu")]
         {
-            use burn::backend::candle::CandleDevice;
             use burn::backend::Candle;
+            use burn::backend::candle::CandleDevice;
 
             let device = CandleDevice::Cpu;
             $fn_name::<Candle>(&device, feature_name, url, token);
@@ -196,8 +196,8 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "candle-cuda")]
         {
-            use burn::backend::candle::CandleDevice;
             use burn::backend::Candle;
+            use burn::backend::candle::CandleDevice;
 
             let device = CandleDevice::cuda(0);
             $fn_name::<Candle>(&device, feature_name, url, token);
@@ -205,8 +205,8 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "candle-metal")]
         {
-            use burn::backend::candle::CandleDevice;
             use burn::backend::Candle;
+            use burn::backend::candle::CandleDevice;
 
             let device = CandleDevice::metal(0);
             $fn_name::<Candle>(&device, feature_name, url, token);

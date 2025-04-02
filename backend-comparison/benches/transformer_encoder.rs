@@ -2,14 +2,14 @@ use backend_comparison::persistence::save;
 use burn::{
     backend::Autodiff,
     nn::{
+        Embedding, EmbeddingConfig, Linear, LinearConfig,
         loss::CrossEntropyLossConfig,
         transformer::{TransformerEncoder, TransformerEncoderConfig, TransformerEncoderInput},
-        Embedding, EmbeddingConfig, Linear, LinearConfig,
     },
     prelude::*,
-    tensor::{activation::softmax, backend::AutodiffBackend, Element},
+    tensor::{Element, activation::softmax, backend::AutodiffBackend},
 };
-use burn_common::benchmark::{run_benchmark, Benchmark};
+use burn_common::benchmark::{Benchmark, run_benchmark};
 
 #[derive(Debug, Clone)]
 pub struct TrainingBatch<B: Backend> {
@@ -71,15 +71,14 @@ impl<B: Backend> Model<B> {
     ) -> (Tensor<B, 1>, Tensor<B, 2>, Tensor<B, 1, Int>) {
         // Get batch and sequence length, and the device
         let [batch_size, seq_length] = item.tokens.dims();
-        let device = &self.embedding_token.devices()[0];
 
-        // Move tensors to the correct device
-        let tokens = item.tokens.to_device(device);
-        let labels = item.labels.to_device(device);
-        let mask_pad = item.mask_pad.to_device(device);
+        let device = item.tokens.device();
+        let tokens = item.tokens;
+        let labels = item.labels;
+        let mask_pad = item.mask_pad;
 
         // Calculate token and position embeddings, and combine them
-        let index_positions = Tensor::arange(0..seq_length as i64, device)
+        let index_positions = Tensor::arange(0..seq_length as i64, &device)
             .reshape([1, seq_length])
             .repeat_dim(0, batch_size);
         let embedding_positions = self.embedding_pos.forward(index_positions);
@@ -107,14 +106,13 @@ impl<B: Backend> Model<B> {
     pub fn infer(&self, item: InferenceBatch<B>) -> Tensor<B, 2> {
         // Get batch and sequence length, and the device
         let [batch_size, seq_length] = item.tokens.dims();
-        let device = &self.embedding_token.devices()[0];
 
-        // Move tensors to the correct device
-        let tokens = item.tokens.to_device(device);
-        let mask_pad = item.mask_pad.to_device(device);
+        let device = item.tokens.device();
+        let tokens = item.tokens;
+        let mask_pad = item.mask_pad;
 
         // Calculate token and position embeddings, and combine them
-        let index_positions = Tensor::arange(0..seq_length as i64, device)
+        let index_positions = Tensor::arange(0..seq_length as i64, &device)
             .reshape([1, seq_length])
             .repeat_dim(0, batch_size);
         let embedding_positions = self.embedding_pos.forward(index_positions);
