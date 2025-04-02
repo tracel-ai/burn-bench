@@ -1,6 +1,9 @@
 use regex::Regex;
 use semver::Version;
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use tracel_xtask::prelude::*;
 
 #[derive(clap::Args)]
@@ -32,7 +35,7 @@ pub struct BurnBenchRunArgs {
 
 impl ToString for BurnBenchRunArgs {
     fn to_string(&self) -> String {
-        let verbose = if self.verbose { "" } else { " -v" };
+        let verbose = if self.verbose { " -v" } else { "" };
         format!(
             "--benches {} --backends {}{verbose}",
             self.benches.join(" "),
@@ -41,6 +44,85 @@ impl ToString for BurnBenchRunArgs {
     }
 }
 
+impl BurnBenchCompareArgs {
+    pub(crate) fn parse(self) -> anyhow::Result<()> {
+        let mut log_file = LogFile::new()?;
+
+        // Log execution summary to file & log output
+        let mut log_both = |msg: &str| -> anyhow::Result<()> {
+            log_file.log_line(msg)?;
+            log::info!("{msg}");
+            Ok(())
+        };
+
+        log_both("========================================================")?;
+        log_both("           BURN BENCHMARK EXECUTION SUMMARY             ")?;
+        log_both("========================================================")?;
+        log_both("Running burnbench with:")?;
+        log_both(&format!("  {}", self.run_args.to_string()))?;
+        log_both("Version to benchmark:")?;
+        for (i, version) in self.versions.iter().enumerate() {
+            log_both(&format!("  {}. {}", i + 1, version))?;
+        }
+        log_both("========================================================")?;
+
+        let manifest = BenchManifest {
+            root: "./backend-comparison".into(),
+        };
+
+        self.run(&manifest, &mut log_file).map_err(|err| {
+            manifest.restore_backup().ok();
+            err
+        })?;
+        Ok(())
+    }
+
+    fn run(self, manifest: &BenchManifest, log_file: &mut LogFile) -> anyhow::Result<()> {
+        manifest.create_backup()?;
+
+        for version in self.versions {
+            manifest.update(&version)?;
+            BurnBench::run_with_log(version, &self.run_args, log_file)?;
+            manifest.restore_backup()?;
+        }
+        log::info!("All benchmark runs completed!");
+        log::info!("Check out the aggregated results: {}", log_file.path());
+        Ok(())
+    }
+}
+
+/// Burn bench info.
+pub(crate) struct BurnBench<'a> {
+    version: String,
+    args: String,
+    log_file: Option<&'a mut LogFile>,
+}
+
+impl BurnBench<'_> {
+    pub(crate) fn run_with_log(
+        version: String,
+        run_args: &BurnBenchRunArgs,
+        log_file: &mut LogFile,
+    ) -> anyhow::Result<()> {
+        let bench = BurnBench {
+            version,
+            args: run_args.to_string(),
+            log_file: Some(log_file),
+        };
+        bench.execute()
+    }
+
+    fn execute(&self) -> anyhow::Result<()> {
+        log::info!("Running burnbench for version: {}", self.version);
+        run_bench(
+            &self.args.split(" ").collect::<Vec<_>>(),
+            &self.log_file,
+            "backend comparison should run successfully",
+        )
+    }
+}
+
+/// Cargo.toml manifest updates operations for benchmark comparison.
 pub(crate) struct BenchManifest {
     root: PathBuf,
 }
@@ -70,7 +152,6 @@ impl BenchManifest {
     }
 
     pub(crate) fn update(&self, version: &str) -> Result<(), std::io::Error> {
-        log::info!("UPDATE VERSION {version}");
         let content = match Version::parse(version) {
             Ok(version) => {
                 let content = self.read_content()?;
@@ -94,9 +175,10 @@ impl BenchManifest {
                 }
                 content
             }
-            Err(_) => {
+            Err(err) => {
+                log::info!("Version::parse err {err}");
                 let content = self.read_content()?;
-                
+
                 let git_ref = if is_commit_hash(&version) {
                     format!("rev = \"{version}\"")
                 } else {
@@ -104,13 +186,19 @@ impl BenchManifest {
                 };
 
                 let content = self.update_burn_git(&content, &git_ref)?;
-                log::warn!("Assuming version >= 0.17 for git commit, you may need to manually check the cuda feature flag name.");
+                log::warn!(
+                    "Assuming version >= 0.17 for git commit, you may need to manually check the cuda feature flag name."
+                );
                 self.replace_feature_flags_ge_17(&content)
-            },
+            }
         };
 
         self.write_content(content)?;
-        log::info!("{} updated successfully with version: {}", Self::SOURCE, version);
+        log::info!(
+            "{} updated successfully with version: {}",
+            Self::SOURCE,
+            version
+        );
         Ok(())
     }
 
@@ -122,7 +210,11 @@ impl BenchManifest {
         std::fs::write(self.source(), content)
     }
 
-    fn update_burn_version(&self, content: &str, version: &Version) -> Result<String, std::io::Error> {
+    fn update_burn_version(
+        &self,
+        content: &str,
+        version: &Version,
+    ) -> Result<String, std::io::Error> {
         let version_str = version.to_string();
         log::info!("Applying Burn version: {version_str}");
 
@@ -157,13 +249,19 @@ impl BenchManifest {
         let burn_re = Regex::new(r"burn = \{ .+, default-features = false \}").unwrap();
         let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
 
-        let content = burn_re.replace_all(&content, 
+        let content = burn_re.replace_all(&content,
             format!("burn = {{ git = \"https://github.com/tracel-ai/burn\", {}, default-features = false }}", reference)
         ).to_string();
-        
-        let content = burn_common_re.replace_all(&content, 
-            format!("burn-common = {{ git = \"https://github.com/tracel-ai/burn\", {} }}", reference)
-        ).to_string();
+
+        let content = burn_common_re
+            .replace_all(
+                &content,
+                format!(
+                    "burn-common = {{ git = \"https://github.com/tracel-ai/burn\", {} }}",
+                    reference
+                ),
+            )
+            .to_string();
 
         Ok(content)
     }
@@ -203,107 +301,96 @@ fn is_commit_hash(reference: &str) -> bool {
     re.is_match(reference)
 }
 
-/// Burn bench info.
-pub(crate) struct BurnBench {
-    version: String,
-    args: String,
-}
-
-impl BurnBenchCompareArgs {
-    pub(crate) fn parse(self) -> anyhow::Result<()> {
-        // TODO:  BURN BENCHMARK EXECUTION SUMMARY
-        /* Do you want to proceed? ([y]/n):
-
-        Created backup of Cargo.toml at Cargo.toml.bak
-        Applying Burn version: 0.16.0
-        Version < 0.17.0 detected, changing feature flags
-        Cargo.toml updated successfully with version: 0.16.0
-        ----------------------------------------------
-        Running burnbench for version: 0.16.0
-        Command: cargo run --release --bin burnbench -- run --benches unary --backends ndarray
-        ----------------------------------------------
-        */
-
-        log::info!("========================================================");
-        log::info!("           BURN BENCHMARK EXECUTION SUMMARY             ");
-        log::info!("========================================================");
-        log::info!("Version to benchmark:");
-        for (i, version) in self.versions.iter().enumerate() {
-            log::info!("  {}. {}", i + 1, version);
-        }
-
-        let manifest = BenchManifest {
-            root: "./backend-comparison".into(),
-        };
-
-        manifest.create_backup()?;
-
-        for version in self.versions {
-            manifest.update(&version)?;
-            BurnBench::run(version, &self.run_args)?;
-            manifest.restore_backup()?;
-        }
-        log::info!("All benchmark runs completed!");
-        Ok(())
-    }
-}
-
-impl BurnBench {
-    pub(crate) fn run(version: String, run_args: &BurnBenchRunArgs) -> anyhow::Result<()> {
-        let bench = BurnBench {
-            version,
-            args: run_args.to_string(),
-        };
-        bench.execute()
-    }
-
-    fn execute(&self) -> anyhow::Result<()> {
-        log::info!("Running burnbench for version: {}", self.version);
-        run_bench(
-            // "cargo bb run",
-            &self.args.split(" ").collect::<Vec<_>>(),
-            None,
-            None,
-            // Some(self.path),
-            "backend comparison should run successfully",
-        )
-    }
-}
-
-
-
-/// Run a process
-pub fn run_bench(
+pub(crate) fn run_bench(
     args: &[&str],
-    envs: Option<HashMap<&str, &str>>,
-    path: Option<&Path>,
+    log_file: &Option<&mut LogFile>,
     error_msg: &str,
 ) -> anyhow::Result<()> {
-    let cmd = "cargo bb run";
-    let joined_args = args.join(" ");
-    group_info!("Command line: {} {}", cmd, &joined_args);
-    let mut command = std::process::Command::new(cmd);
-    if let Some(path) = path {
-        command.current_dir(path);
-    }
-    if let Some(envs) = envs {
-        command.envs(&envs);
-    }
-    // command.args(args).output()
-    let output = command.args(args).output().map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to execute {} {}: {}",
-            cmd,
-            args.first().unwrap(),
-            e
-        )
-    })?;
-    if !output.status.success() {
+    let full_args = [&["bb", "run"], args].concat();
+    let cmd = "cargo";
+    let joined_args = full_args.join(" ");
+    log::info!("Command line: {} {}", cmd, &joined_args);
+
+    let mut child = Command::new(cmd)
+        .env("CARGO_TERM_COLOR", "always")
+        .args(&full_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow::anyhow!("Failed to execute cargo {}: {}", full_args.join(" "), e))?;
+
+    let mut log_file = log_file.as_ref().map(|x| x.try_clone().unwrap());
+
+    // stdout
+    let stdout = BufReader::new(child.stdout.take().expect("stdout should be captured"));
+    let stdout_thread = std::thread::spawn(move || {
+        for line in stdout.lines() {
+            let line = line.expect("A line from stdout should be read");
+            println!("{line}");
+
+            if let Some(ref mut file) = log_file {
+                file.log_line(&line).unwrap();
+            }
+        }
+    });
+
+    // stderr
+    let stderr = BufReader::new(child.stderr.take().expect("stderr should be captured"));
+    let stderr_thread = std::thread::spawn(move || {
+        for line in stderr.lines() {
+            let line = line.expect("A line from stderr should be read");
+            eprintln!("{line}");
+        }
+    });
+
+    // Wait for the process to complete
+    let status = child.wait()?;
+    stdout_thread
+        .join()
+        .expect("The stderr thread should not panic");
+    stderr_thread
+        .join()
+        .expect("The stderr thread should not panic");
+
+    if !status.success() {
         return Err(anyhow::anyhow!("{}", error_msg));
     }
 
-    let stdout = String::from_utf8(output.stdout)?;
-    println!("BURN BENCH OUTPUT:\n{}", stdout);
-
     anyhow::Ok(())
+}
+
+pub(crate) struct LogFile {
+    file: File,
+    path: String,
+}
+
+impl LogFile {
+    pub fn new() -> anyhow::Result<Self> {
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let path = format!("burnbench_{}.log", timestamp);
+
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
+
+        Ok(LogFile { file, path })
+    }
+
+    pub fn log_line(&mut self, line: &str) -> anyhow::Result<()> {
+        writeln!(self.file, "{}", line)?;
+        self.file.flush()?;
+        Ok(())
+    }
+
+    pub fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+
+    // Clone the file handle for use in a different thread
+    pub fn try_clone(&self) -> anyhow::Result<Self> {
+        let file = self.file.try_clone()?;
+
+        Ok(LogFile {
+            file,
+            path: self.path.clone(),
+        })
+    }
 }
