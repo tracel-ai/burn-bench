@@ -28,9 +28,28 @@ cargo bb run -b unary -B wgpu-fusion
 To compare performance across versions:
 
 ```sh
-cd backend-comparison
-./compare.sh 0.16.0 main --benches unary binary --backends  wgpu wgpu-fusion
+cargo xtask compare 0.16.0 main --benches unary binary --backends  wgpu wgpu-fusion
 ```
+
+You can specify one or more versions (published version, git branch or commit hash) and provide
+custom `burnbench` arguments to benchmark them.
+
+```sh
+cargo xtask compare <version1> [version2...] <burnbench_args>
+```
+
+This will run benchmarks on the specified versions and log the results in a timestamped file,
+allowing you to compare their performance.
+
+> **Note:** this might not work out of the box for previous versions with unspecified breaking
+> changes to the API or feature flag names. We currently handle changes after the 0.16 release.  
+> To handle feature flag changes, you probably want to modify
+> [`compare.rs`](./xtask/src/commands/compare.rs) to overwrite the `Cargo.toml` based on some
+> condition. See for example
+> [`replace_feature_flags_lt_0_17`](./xtask/src/commands/compare.rs#269).  
+> For breaking API changes, this can be handled in the build script to add a cfg. See for example
+> [`burn_version_lt_0170`](./backend-comparison/build.rs#L372) and how it is
+> [used for conditional compilation](./backend-comparison/src/persistence/base.rs#L71).
 
 For detailed instructions, see the [`backend-comparison/README.md`](./backend-comparison/README.md).
 

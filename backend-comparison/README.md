@@ -17,38 +17,6 @@ calling `burnbench list`.
 There is also a cargo alias `cargo bb` which simplifies the command line. The example command above
 then becomes: `cargo bb list`.
 
-### Compare across versions
-
-This script allows you to compare the performance of different Burn versions using
-`burnbench -- run`.
-
-You can specify one or more versions (published version, git branch or commit hash) and provide
-custom `burnbench` arguments to benchmark them.
-
-To run the comparison, use the `compare.sh` (`compare.ps1` on Windows) script as follows:
-
-```sh
-./compare.sh <version1> [version2...] <burnbench_args>
-```
-
-For example, to compare version `0.16.0` and the main branch using specific burnbench arguments:
-
-```sh
-./compare.sh 0.16.0 main --benches unary --backends ndarray
-```
-
-This will run benchmarks on the specified versions and log the results in a timestamped file,
-allowing you to compare their performance.
-
-> **Note:** this might not work out of the box for previous versions with unspecified breaking
-> changes to the API or feature flag names. We currently handle changes after the 0.16 release.  
-> To handle feature flag changes, you probably want to modify `compare.sh` to overwrite the
-> `Cargo.toml` based on some condition. See for example
-> [`replace_feature_flags_lt_0_17`](./compare.sh#L44).  
-> For breaking API changes, this can be handled in the build script to add a cfg. See for example
-> [`burn_version_lt_0170`](./build.rs#L372) and how it is
-> [used for conditional compilation](./src/persistence/base.rs#L71).
-
 ### Commands
 
 #### List benches and backends
