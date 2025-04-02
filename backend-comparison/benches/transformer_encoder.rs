@@ -1,17 +1,21 @@
 use backend_comparison::persistence::save;
 use burn::{
-    backend::Autodiff, nn::{
-        loss::CrossEntropyLossConfig, transformer::{TransformerEncoder, TransformerEncoderConfig, TransformerEncoderInput}, Embedding, EmbeddingConfig, Linear, LinearConfig
-    }, prelude::*, tensor::{activation::softmax, backend::AutodiffBackend}
+    backend::Autodiff,
+    nn::{
+        Embedding, EmbeddingConfig, Linear, LinearConfig,
+        loss::CrossEntropyLossConfig,
+        transformer::{TransformerEncoder, TransformerEncoderConfig, TransformerEncoderInput},
+    },
+    prelude::*,
+    tensor::{activation::softmax, backend::AutodiffBackend},
 };
-use burn_common::benchmark::{run_benchmark, Benchmark};
-
+use burn_common::benchmark::{Benchmark, run_benchmark};
 
 #[derive(Debug, Clone)]
 pub struct TrainingBatch<B: Backend> {
     pub tokens: Tensor<B, 2, Int>,
     pub labels: Tensor<B, 1, Int>,
-    pub mask_pad: Tensor<B, 2, Bool>, 
+    pub mask_pad: Tensor<B, 2, Bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -19,7 +23,6 @@ pub struct InferenceBatch<B: Backend> {
     pub tokens: Tensor<B, 2, Int>,
     pub mask_pad: Tensor<B, 2, Bool>,
 }
-
 
 #[derive(Config)]
 pub struct ModelConfig {
@@ -61,18 +64,20 @@ impl ModelConfig {
 
 /// Define model behavior
 impl<B: Backend> Model<B> {
-    pub fn forward(&self, item: TrainingBatch<B>) -> (Tensor<B, 1>, Tensor<B, 2>, Tensor<B, 1, Int>){
+    pub fn forward(
+        &self,
+        item: TrainingBatch<B>,
+    ) -> (Tensor<B, 1>, Tensor<B, 2>, Tensor<B, 1, Int>) {
         // Get batch and sequence length, and the device
         let [batch_size, seq_length] = item.tokens.dims();
-        let device = &self.embedding_token.devices()[0];
 
-        // Move tensors to the correct device
-        let tokens = item.tokens.to_device(device);
-        let labels = item.labels.to_device(device);
-        let mask_pad = item.mask_pad.to_device(device);
+        let device = item.tokens.device();
+        let tokens = item.tokens;
+        let labels = item.labels;
+        let mask_pad = item.mask_pad;
 
         // Calculate token and position embeddings, and combine them
-        let index_positions = Tensor::arange(0..seq_length as i64, device)
+        let index_positions = Tensor::arange(0..seq_length as i64, &device)
             .reshape([1, seq_length])
             .repeat_dim(0, batch_size);
         let embedding_positions = self.embedding_pos.forward(index_positions);
@@ -93,25 +98,20 @@ impl<B: Backend> Model<B> {
             .init(&output_classification.device())
             .forward(output_classification.clone(), labels.clone());
 
-        (
-            loss,
-            output_classification,
-            labels,
-        )
+        (loss, output_classification, labels)
     }
 
     /// Defines forward pass for inference
     pub fn infer(&self, item: InferenceBatch<B>) -> Tensor<B, 2> {
         // Get batch and sequence length, and the device
         let [batch_size, seq_length] = item.tokens.dims();
-        let device = &self.embedding_token.devices()[0];
 
-        // Move tensors to the correct device
-        let tokens = item.tokens.to_device(device);
-        let mask_pad = item.mask_pad.to_device(device);
+        let device = item.tokens.device();
+        let tokens = item.tokens;
+        let mask_pad = item.mask_pad;
 
         // Calculate token and position embeddings, and combine them
-        let index_positions = Tensor::arange(0..seq_length as i64, device)
+        let index_positions = Tensor::arange(0..seq_length as i64, &device)
             .reshape([1, seq_length])
             .repeat_dim(0, batch_size);
         let embedding_positions = self.embedding_pos.forward(index_positions);
@@ -141,7 +141,10 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
     type Args = (Model<B>, TrainingBatch<B>);
 
     fn name(&self) -> String {
-        format!("transformer-encoder-training-{}", core::any::type_name::<B::FloatElem>())
+        format!(
+            "transformer-encoder-training-{}",
+            core::any::type_name::<B::FloatElem>()
+        )
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -156,11 +159,13 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
     fn prepare(&self) -> Self::Args {
         (
             self.config.init(&self.device),
-        TrainingBatch {
-            tokens: Tensor::arange(0..self.shape.num_elements() as i64, &self.device).reshape(self.shape.clone()),
-            labels: Tensor::arange(0..self.shape.dims[0] as i64, &self.device),
-            mask_pad: Tensor::<B, 2>::zeros(self.shape.clone(), &self.device).equal_elem(0.0),
-        })
+            TrainingBatch {
+                tokens: Tensor::arange(0..self.shape.num_elements() as i64, &self.device)
+                    .reshape(self.shape.clone()),
+                labels: Tensor::arange(0..self.shape.dims[0] as i64, &self.device),
+                mask_pad: Tensor::<B, 2>::zeros(self.shape.clone(), &self.device).equal_elem(0.0),
+            },
+        )
     }
 
     fn sync(&self) {
@@ -168,12 +173,14 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
     }
 }
 
-
 impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
     type Args = (Model<B>, InferenceBatch<B>);
 
     fn name(&self) -> String {
-        format!("transformer-encoder-inference-{}", core::any::type_name::<B::FloatElem>())
+        format!(
+            "transformer-encoder-inference-{}",
+            core::any::type_name::<B::FloatElem>()
+        )
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -188,9 +195,11 @@ impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
         (
             self.config.init(&self.device),
             InferenceBatch {
-            tokens: Tensor::arange(0..self.shape.num_elements() as i64, &self.device).reshape(self.shape.clone()),
-            mask_pad: Tensor::<B, 2>::zeros(self.shape.clone(), &self.device).equal_elem(0.0),
-        })
+                tokens: Tensor::arange(0..self.shape.num_elements() as i64, &self.device)
+                    .reshape(self.shape.clone()),
+                mask_pad: Tensor::<B, 2>::zeros(self.shape.clone(), &self.device).equal_elem(0.0),
+            },
+        )
     }
 
     fn sync(&self) {
@@ -206,8 +215,12 @@ fn bench<B: Backend>(
     token: Option<&str>,
 ) {
     // Something similar to RoBERTa-base.
-    let config = ModelConfig::new(TransformerEncoderConfig::new(768, 3072, 12, 12)
-            .with_norm_first(true), 10, 50_265, 512);
+    let config = ModelConfig::new(
+        TransformerEncoderConfig::new(768, 3072, 12, 12).with_norm_first(true),
+        10,
+        50_265,
+        512,
+    );
 
     let batch_size = 2;
     let sequence_length = 256;
@@ -224,7 +237,10 @@ fn bench<B: Backend>(
     };
 
     save::<B>(
-        vec![run_benchmark(benchmark_inference), run_benchmark(benchmark_training)],
+        vec![
+            run_benchmark(benchmark_inference),
+            run_benchmark(benchmark_training),
+        ],
         device,
         feature_name,
         url,

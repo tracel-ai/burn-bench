@@ -2,8 +2,8 @@
 authors = ["Tracel Technologies Inc."]
 categories = ["science"]
 description = "This crate is used to time the execution of various computations, from operation kernels to complex model scenarios."
-edition = "2021"
-license = "MIT OR Apache-2.0"
+edition.workspace = true
+license.workspace = true
 name = "backend-comparison"
 readme = "README.md"
 repository = "https://github.com/tracel-ai/burn-bench/tree/main/backend-comparison"
@@ -35,49 +35,36 @@ wgpu-spirv-fusion = ["wgpu-spirv", "burn/fusion"]
 burn = { git = "https://github.com/tracel-ai/burn", default-features = false }
 burn-common = { git = "https://github.com/tracel-ai/burn" }
 
-arboard = "3.4.1"
-chrono = "0.4.39"
-clap = { version = "4.5.27", features = ["derive"] }
-colored = "2.1.0"
-derive-new = { version = "0.7.0", default-features = false }
-dirs = "5.0.1"
-indicatif = "0.17.11"
-log = { version = "0.4.25", default-features = false }
-os_info = "3.10.0"
-phf = { version = "0.11.3", features = [
-    "macros",
-] } # for package info static map
-percent-encoding = "2.3.1"
-rand = { version = "0.9.0", default-features = false, features = [
-    "std_rng",
-    "thread_rng",
-] } # std_rng is for no_std
-reqwest = { version = "0.12.12", default-features = false, features = [
-    "rustls-tls",
-    "blocking",
-    "json",
-] }
-serde = { version = "1.0.218", default-features = false, features = [
-    "derive",
-    "alloc",
-] } # alloc is for no_std, derive is needed
-serde_json = { version = "1.0.140", default-features = false }
-strum = "0.26.3"
-strum_macros = "0.26.4"
-sysinfo = { version = "0.33.1", features = ["serde"] }
-tracing-subscriber = "0.3.19"
-wgpu = "24.0.1"
-wsl = "0.1.0"
+arboard = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+colored = { workspace = true }
+derive-new = { workspace = true }
+dirs = { workspace = true }
+indicatif = { workspace = true }
+log = { workspace = true }
+os_info = { workspace = true }
+phf = { workspace = true }
+percent-encoding = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["std"] }
+strum = { workspace = true, features = ["derive"] }
+sysinfo = { workspace = true }
+tracing-subscriber = { workspace = true }
+wgpu = { workspace = true }
+wsl = { workspace = true }
 
 [dev-dependencies]
-rstest = "0.23.0"
-serial_test = "3.2.0"
+rstest = { workspace = true }
+serial_test = { workspace = true }
 
 [build-dependencies]
-serde = { version = "1.0.218", features = ["std", "derive"] }
-serde_json = "1.0.140"
-semver = "1.0.26"
-tempfile = "3.17.1"
+serde = { workspace = true, features = ["std", "derive"] }
+serde_json = { workspace = true, features = ["std"] }
+semver = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 harness = false

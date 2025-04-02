@@ -1,0 +1,11 @@
+[package]
+name = "xtask"
+version = "1.0.0"
+edition.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+log = { workspace = true }
+regex = { workspace = true }
+semver = { workspace = true }
+tracel-xtask = { workspace = true }
