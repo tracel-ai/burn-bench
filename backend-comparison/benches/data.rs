@@ -3,6 +3,11 @@ use burn::tensor::{Distribution, Element, Shape, Tensor, TensorData, backend::Ba
 use burn_common::benchmark::{Benchmark, run_benchmark};
 use derive_new::new;
 
+#[cfg(not(burn_version_lt_0170))]
+use rand::rng;
+#[cfg(burn_version_lt_0170)]
+use rand::thread_rng as rng;
+
 #[derive(new)]
 struct ToDataBenchmark<B: Backend, const D: usize> {
     shape: Shape,
@@ -59,7 +64,7 @@ impl<B: Backend, const D: usize> Benchmark for FromDataBenchmark<B, D> {
             TensorData::random::<B::FloatElem, _, _>(
                 self.shape.clone(),
                 Distribution::Default,
-                &mut rand::rng(),
+                &mut rng(),
             ),
             self.device.clone(),
         )

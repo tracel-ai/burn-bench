@@ -3,7 +3,11 @@ use std::marker::PhantomData;
 use backend_comparison::persistence::save;
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, run_benchmark};
+
+#[cfg(not(burn_version_lt_0170))]
 use rand::rng;
+#[cfg(burn_version_lt_0170)]
+use rand::thread_rng as rng;
 
 pub struct BinaryBenchmark<B: Backend, const D: usize> {
     shape: Shape,

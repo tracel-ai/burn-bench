@@ -30,10 +30,6 @@ phf = { version = "0.11.3", features = [
     "macros",
 ] } # for package info static map
 percent-encoding = "2.3.1"
-rand = { version = "0.9.0", default-features = false, features = [
-    "std_rng",
-    "thread_rng",
-] } # std_rng is for no_std
 regex = "1.11.1"
 reqwest = { version = "0.12.12", default-features = false, features = [
     "rustls-tls",

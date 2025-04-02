@@ -204,6 +204,8 @@ fn run_backend_comparison_benchmarks(
         Some(Arc::new(Mutex::new(RunnerProgressBar::new(total_count))))
     };
     // Iterate through every combination of benchmark and backend
+    let rev = crate::get_package_rev("burn");
+    println!("Benchmarking Burn @ {rev}");
     for bench in benches.iter() {
         for backend in backends.iter() {
             let bench_str = bench.to_string();
@@ -244,8 +246,6 @@ fn run_cargo(
     token: Option<&str>,
     progress_bar: &Option<Arc<Mutex<RunnerProgressBar>>>,
 ) -> io::Result<ExitStatus> {
-    let rev = crate::get_package_rev("burn");
-    println!("Benchmarking Burn @ {rev}");
     let processor: Arc<dyn OutputProcessor> = if let Some(pb) = progress_bar {
         Arc::new(NiceProcessor::new(
             bench.to_string(),

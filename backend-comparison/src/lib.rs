@@ -214,7 +214,10 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "cuda")]
         {
+            #[cfg(not(burn_version_lt_0170))]
             use burn::backend::cuda::{Cuda, CudaDevice};
+            #[cfg(burn_version_lt_0170)]
+            use burn::backend::cuda_jit::{Cuda, CudaDevice};
             use burn::tensor::f16;
 
             $fn_name::<Cuda<f16>>(&CudaDevice::default(), feature_name, url, token);
@@ -223,7 +226,10 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "hip")]
         {
+            #[cfg(not(burn_version_lt_0170))]
             use burn::backend::hip::{Hip, HipDevice};
+            #[cfg(burn_version_lt_0170)]
+            use burn::backend::hip_jit::{Hip, HipDevice};
             use burn::tensor::f16;
 
             $fn_name::<Hip<f16>>(&HipDevice::default(), feature_name, url, token);
