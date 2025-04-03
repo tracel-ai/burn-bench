@@ -147,7 +147,7 @@ impl Display for BenchmarkCollection {
         // success benchmarks
         for record in &records {
             if prev_benchmark != record.results.name || prev_shapes != record.results.shapes {
-                if prev_benchmark != "" {
+                if !prev_benchmark.is_empty() {
                     table.add_row(vec![
                         Cell::new("----").fg(Color::DarkGrey),
                         Cell::new("----").fg(Color::DarkGrey),

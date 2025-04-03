@@ -25,16 +25,16 @@ Or use the shorthand alias:
 cargo bb run -b unary -B wgpu-fusion
 ```
 
-To compare performance across versions:
+To benchmark performance across version(s):
 
 ```sh
-cargo xtask compare 0.16.0 main --benches unary binary --backends  wgpu wgpu-fusion
+cargo bench-versions 0.16.0 main local --benches unary --backends wgpu-fusion
 ```
 
 You can specify one or more versions and provide custom `burnbench` arguments to benchmark them.
 
 ```sh
-cargo xtask compare <version1> [version2...] <burnbench_args>
+cargo bench-versions <version1> [version2...] <burnbench_args>
 ```
 
 This will run benchmarks on the specified versions and log the results in a timestamped file,

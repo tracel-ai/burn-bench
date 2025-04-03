@@ -8,8 +8,8 @@ use std::process::{Command, Stdio};
 use tracel_xtask::prelude::*;
 
 #[derive(clap::Args)]
-#[command(about = "Compare multiple Burn versions using burnbench")]
-pub struct BurnBenchCompareArgs {
+#[command(about = "Benchmark one or more Burn versions using burnbench")]
+pub struct BurnBenchVersionArgs {
     /// One or more Burn versions, git branches, or commit hashes
     #[arg(required = true)]
     pub versions: Vec<String>,
@@ -34,10 +34,11 @@ pub struct BurnBenchRunArgs {
     benches: Vec<String>,
 }
 
-impl ToString for BurnBenchRunArgs {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for BurnBenchRunArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let verbose = if self.verbose { " -v" } else { "" };
-        format!(
+        write!(
+            f,
             "--benches {} --backends {}{verbose}",
             self.benches.join(" "),
             self.backends.join(" ")
@@ -45,7 +46,7 @@ impl ToString for BurnBenchRunArgs {
     }
 }
 
-impl BurnBenchCompareArgs {
+impl BurnBenchVersionArgs {
     pub(crate) fn parse(self) -> anyhow::Result<()> {
         let mut log_file = LogFile::new()?;
 
@@ -60,7 +61,7 @@ impl BurnBenchCompareArgs {
         log_both("           BURN BENCHMARK EXECUTION SUMMARY             ")?;
         log_both("========================================================")?;
         log_both("Running burnbench with:")?;
-        log_both(&format!("  {}", self.run_args.to_string()))?;
+        log_both(&format!("  {}", self.run_args))?;
         log_both("Version to benchmark:")?;
         for (i, version) in self.versions.iter().enumerate() {
             log_both(&format!("  {}. {}", i + 1, version))?;
@@ -71,9 +72,9 @@ impl BurnBenchCompareArgs {
             root: "./backend-comparison".into(),
         };
 
-        self.run(&manifest, &mut log_file).map_err(|err| {
+        self.run(&manifest, &mut log_file).inspect_err(|err| {
             manifest.restore_backup().ok();
-            err
+            eprintln!("{err}");
         })?;
         Ok(())
     }
