@@ -1,5 +1,6 @@
 use regex::Regex;
 use semver::Version;
+use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -92,13 +93,12 @@ impl BurnBenchCompareArgs {
 }
 
 /// Burn bench info.
-pub(crate) struct BurnBench<'a> {
+pub(crate) struct BurnBench {
     version: String,
     args: String,
-    log_file: Option<&'a mut LogFile>,
 }
 
-impl BurnBench<'_> {
+impl BurnBench {
     pub(crate) fn run_with_log(
         version: String,
         run_args: &BurnBenchRunArgs,
@@ -107,18 +107,40 @@ impl BurnBench<'_> {
         let bench = BurnBench {
             version,
             args: run_args.to_string(),
-            log_file: Some(log_file),
         };
-        bench.execute()
+        bench.execute(Some(log_file))
     }
 
-    fn execute(&self) -> anyhow::Result<()> {
+    fn execute(&self, log_file: Option<&mut LogFile>) -> anyhow::Result<()> {
         log::info!("Running burnbench for version: {}", self.version);
         run_bench(
             &self.args.split(" ").collect::<Vec<_>>(),
-            &self.log_file,
+            log_file,
             "backend comparison should run successfully",
         )
+    }
+}
+
+pub(crate) enum Dependency {
+    Local,
+    Crate(Version),
+    Git(String),
+}
+
+impl Dependency {
+    pub fn new(version: &str) -> Self {
+        if version == "local" {
+            Self::Local
+        } else if let Ok(version) = Version::parse(version) {
+            Self::Crate(version)
+        } else {
+            let git_ref = if is_commit_hash(version) {
+                format!("rev = \"{version}\"")
+            } else {
+                format!("branch = \"{version}\"")
+            };
+            Self::Git(git_ref)
+        }
     }
 }
 
@@ -152,20 +174,28 @@ impl BenchManifest {
     }
 
     pub(crate) fn update(&self, version: &str) -> Result<(), std::io::Error> {
-        let content = match Version::parse(version) {
-            Ok(version) => {
-                let content = self.read_content()?;
-                let mut content = self.update_burn_version(&content, &version)?;
+        let burn_dir = env::var("BURN_DIR").unwrap_or("../../burn".to_string());
+        let mut content = self.read_content()?;
 
+        match Dependency::new(version) {
+            Dependency::Local => {
+                content = self.update_burn_local(&content, &burn_dir)?;
+                log::warn!(
+                    "Assuming version >= 0.17 for local repo, you may need to manually check the cuda feature flag name."
+                );
+                content = self.replace_feature_flags_ge_17(&content);
+            }
+            Dependency::Crate(version) => {
+                content = self.update_burn_version(&content, &version)?;
                 if version < Version::new(0, 17, 0) {
                     log::info!("Version < 0.17.0 detected, changing feature flags");
                     content = self.replace_feature_flags_lt_0_17(content);
                     // Pin bincode pre-release (used in burn < 0.17)
                     if !content.contains("bincode = \"=2.0.0-rc.3\"") {
                         content = content.replace(
-                            "[dependencies]", 
-                            "[dependencies]\nbincode = \"=2.0.0-rc.3\"\nbincode_derive = \"=2.0.0-rc.3\""
-                        );
+                                "[dependencies]",
+                                "[dependencies]\nbincode = \"=2.0.0-rc.3\"\nbincode_derive = \"=2.0.0-rc.3\""
+                            );
                     }
                 } else {
                     log::info!(
@@ -173,23 +203,13 @@ impl BenchManifest {
                     );
                     content = self.replace_feature_flags_ge_17(&content);
                 }
-                content
             }
-            Err(err) => {
-                log::info!("Version::parse err {err}");
-                let content = self.read_content()?;
-
-                let git_ref = if is_commit_hash(&version) {
-                    format!("rev = \"{version}\"")
-                } else {
-                    format!("branch = \"{version}\"")
-                };
-
-                let content = self.update_burn_git(&content, &git_ref)?;
+            Dependency::Git(git_ref) => {
+                content = self.update_burn_git(&content, &git_ref)?;
                 log::warn!(
                     "Assuming version >= 0.17 for git commit, you may need to manually check the cuda feature flag name."
                 );
-                self.replace_feature_flags_ge_17(&content)
+                content = self.replace_feature_flags_ge_17(&content);
             }
         };
 
@@ -249,7 +269,7 @@ impl BenchManifest {
         let burn_re = Regex::new(r"burn = \{ .+, default-features = false \}").unwrap();
         let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
 
-        let content = burn_re.replace_all(&content,
+        let content = burn_re.replace_all(content,
             format!("burn = {{ git = \"https://github.com/tracel-ai/burn\", {}, default-features = false }}", reference)
         ).to_string();
 
@@ -259,6 +279,36 @@ impl BenchManifest {
                 format!(
                     "burn-common = {{ git = \"https://github.com/tracel-ai/burn\", {} }}",
                     reference
+                ),
+            )
+            .to_string();
+
+        Ok(content)
+    }
+
+    fn update_burn_local(&self, content: &str, repo_path: &str) -> Result<String, std::io::Error> {
+        log::info!("Applying Burn local: {repo_path}");
+
+        // Update burn and burn-common path
+        let burn_re = Regex::new(r"burn = \{ .+, default-features = false \}").unwrap();
+        let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
+
+        let content = burn_re
+            .replace_all(
+                content,
+                format!(
+                    "burn = {{ path = \"{}/crates/burn\", default-features = false }}",
+                    repo_path
+                ),
+            )
+            .to_string();
+
+        let content = burn_common_re
+            .replace_all(
+                &content,
+                format!(
+                    "burn-common = {{ path = \"{}/crates/burn-common\" }}",
+                    repo_path
                 ),
             )
             .to_string();
@@ -313,7 +363,7 @@ fn is_commit_hash(reference: &str) -> bool {
 
 pub(crate) fn run_bench(
     args: &[&str],
-    log_file: &Option<&mut LogFile>,
+    log_file: Option<&mut LogFile>,
     error_msg: &str,
 ) -> anyhow::Result<()> {
     let full_args = [&["bb", "run"], args].concat();
@@ -365,7 +415,6 @@ pub(crate) fn run_bench(
     if !status.success() {
         return Err(anyhow::anyhow!("{}", error_msg));
     }
-
     anyhow::Ok(())
 }
 

@@ -205,7 +205,7 @@ fn run_backend_comparison_benchmarks(
     };
     // Iterate through every combination of benchmark and backend
     let rev = crate::get_package_rev("burn");
-    println!("Benchmarking Burn @ {rev}");
+    println!("\nBenchmarking Burn @ {rev}");
     for bench in benches.iter() {
         for backend in backends.iter() {
             let bench_str = bench.to_string();
