@@ -1,4 +1,4 @@
-use colored::*;
+use comfy_table::{Cell, CellAlignment, Color, Table};
 use core::fmt;
 use std::{
     fmt::Display,
@@ -65,8 +65,6 @@ impl BenchmarkCollection {
                     println!("Cannot find the benchmark-record file: {}", file_path);
                 };
             }
-            self.successful_records
-                .sort_by(|a, b| a.results.computed.median.cmp(&b.results.computed.median));
         }
 
         self
@@ -115,88 +113,61 @@ impl Display for ShapeFmt<'_> {
 
 impl Display for BenchmarkCollection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Compute the max length for each column
-        let mut max_name_len = "Benchmark".len();
-        let mut max_shapes_len = "Shapes".len();
-        let mut max_backend_len = "Backend".len();
-        let mut max_device_len = "Device".len();
-        let mut max_feature_len = "Feature".len();
+        let mut records = self.successful_records.clone();
 
-        for record in self.successful_records.iter() {
-            max_name_len = max_name_len.max(record.results.name.len());
-            // + 2 because if the added backticks
-            max_shapes_len = max_shapes_len.max(
-                format!("{}", ShapeFmt::new(&record.results.shapes))
-                    .green()
-                    .len()
-                    + 2,
-            );
-            max_backend_len = max_backend_len.max(record.backend.len() + 2);
-            max_device_len = max_device_len.max(record.device.len());
-            max_feature_len = max_feature_len.max(record.feature.len());
+        // Sort by benchmark name, then shapes, then median
+        records.sort_by(|a, b| {
+            a.results.name.cmp(&b.results.name)
+                .then_with(|| a.results.shapes.cmp(&b.results.shapes))
+                .then_with(|| a.results.computed.median.partial_cmp(&b.results.computed.median).unwrap())
+        });
+
+        let mut table = Table::new();
+        table.load_preset(comfy_table::presets::ASCII_MARKDOWN);
+        table.set_header(vec!["Benchmark", "Shapes", "Feature", "Backend", "Device", "Median"]);
+
+        let mut prev_benchmark = "";
+        let mut prev_shapes = vec![];
+
+        // success benchmarks
+        for record in &records {
+            if prev_benchmark != record.results.name || prev_shapes != record.results.shapes {
+                if prev_benchmark != "" {
+                    table.add_row(vec![
+                        Cell::new("----").fg(Color::DarkGrey),
+                        Cell::new("----").fg(Color::DarkGrey),
+                        Cell::new("----").fg(Color::DarkGrey),
+                        Cell::new("----").fg(Color::DarkGrey),
+                        Cell::new("----").fg(Color::DarkGrey),
+                        Cell::new("----").fg(Color::DarkGrey),
+                    ]);
+                }
+                prev_benchmark = &record.results.name;
+                prev_shapes = record.results.shapes.clone();
+            }
+
+            table.add_row(vec![
+                Cell::new(&record.results.name).fg(Color::Green),
+                Cell::new(format!("{}", ShapeFmt::new(&record.results.shapes))).fg(Color::Green),
+                Cell::new(&record.feature).fg(Color::Green),
+                Cell::new(format!("`{}`", &record.backend)).fg(Color::Green),
+                Cell::new(&record.device).fg(Color::Green),
+                Cell::new(format!("{:.3?}", record.results.computed.median)).set_alignment(CellAlignment::Right),
+            ]);
         }
-        for benchmark in self.failed_benchmarks.iter() {
-            max_name_len = max_name_len.max(benchmark.bench.len());
-            // + 2 because if the added backticks
-            max_backend_len = max_backend_len.max(benchmark.backend.len() + 2);
+
+        // failed benchmarks
+        for benchmark in &self.failed_benchmarks {
+            table.add_row(vec![
+                Cell::new(&benchmark.bench).fg(Color::Red),
+                Cell::new("-"),
+                Cell::new("-"),
+                Cell::new(format!("`{}`", &benchmark.backend)).fg(Color::Red),
+                Cell::new("-"),
+                Cell::new("FAILED").fg(Color::Red),
+            ]);
         }
-        // Header
-        writeln!(
-            f,
-            "| {:<width_name$} | {:<width_shapes$} | {:<width_feature$} | {:<width_backend$} | {:<width_device$} | Median         |\n|{:->width_name$}--|{:->width_shapes$}--|{:->width_feature$}--|{:->width_backend$}--|{:->width_device$}--|----------------|",
-            "Benchmark",
-            "Shapes",
-            "Feature",
-            "Backend",
-            "Device",
-            "",
-            "",
-            "",
-            "",
-            "",
-            width_name = max_name_len,
-            width_shapes = max_shapes_len,
-            width_feature = max_feature_len,
-            width_backend = max_backend_len,
-            width_device = max_device_len
-        )?;
-        // Table entries
-        // Successful records
-        for record in self.successful_records.iter() {
-            writeln!(
-                f,
-                "| {:<width_name$} | {:<width_shapes$} | {:<width_feature$} | {:<width_backend$} | {:<width_device$} | {:<15.3?}|",
-                record.results.name.green(),
-                format!("{}", ShapeFmt::new(&record.results.shapes)).green(),
-                record.feature.green(),
-                format!("`{}`", record.backend).green(),
-                record.device.green(),
-                record.results.computed.median,
-                width_name = max_name_len,
-                width_shapes = max_shapes_len,
-                width_feature = max_feature_len,
-                width_backend = max_backend_len,
-                width_device = max_device_len
-            )?;
-        }
-        // Failed benchmarks
-        for benchmark in self.failed_benchmarks.iter() {
-            writeln!(
-                f,
-                "| {:<width_name$} | {:<width_shapes$} | {:<width_feature$} | {:<width_backend$} | {:<width_device$} | {:<15}|",
-                benchmark.bench.red(),
-                "-",
-                "-",
-                format!("`{}`", benchmark.backend).red(),
-                "-",
-                "FAILED",
-                width_name = max_name_len,
-                width_shapes = max_shapes_len,
-                width_feature = max_feature_len,
-                width_backend = max_backend_len,
-                width_device = max_device_len
-            )?;
-        }
-        Ok(())
+
+        write!(f, "{}", table)
     }
 }

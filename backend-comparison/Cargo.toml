@@ -38,7 +38,7 @@ burn-common = { git = "https://github.com/tracel-ai/burn" }
 arboard = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-colored = { workspace = true }
+comfy-table = { workspace = true }
 derive-new = { workspace = true }
 dirs = { workspace = true }
 indicatif = { workspace = true }
