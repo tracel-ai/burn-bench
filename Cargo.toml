@@ -20,7 +20,7 @@ readme = "README.md"
 arboard = "3.4.1"
 chrono = "0.4.39"
 clap = { version = "4.5.27" }
-colored = "2.1.0"
+comfy-table = "7.1.4"
 derive-new = { version = "0.7.0", default-features = false }
 dirs = "5.0.1"
 indicatif = "0.17.11"
