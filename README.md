@@ -28,7 +28,7 @@ cargo bb run -b unary -B wgpu-fusion
 To benchmark performance across version(s):
 
 ```sh
-cargo bench-versions 0.16.0 main local --benches unary --backends wgpu-fusion
+cargo bench-versions 0.16.1 main local --benches unary --backends wgpu-fusion
 ```
 
 You can specify one or more versions and provide custom `burnbench` arguments to benchmark them.
