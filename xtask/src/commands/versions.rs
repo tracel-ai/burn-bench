@@ -191,8 +191,10 @@ impl BenchManifest {
                 if version < Version::new(0, 17, 0) {
                     log::info!("Version < 0.17.0 detected, changing feature flags");
                     content = self.replace_feature_flags_lt_0_17(content);
-                    // Pin bincode pre-release (used in burn < 0.17)
-                    if !content.contains("bincode = \"=2.0.0-rc.3\"") {
+                    // Pin bincode pre-release (used in burn < 0.16.1)
+                    if (version < Version::new(0, 16, 1))
+                        & !content.contains("bincode = \"=2.0.0-rc.3\"")
+                    {
                         content = content.replace(
                                 "[dependencies]",
                                 "[dependencies]\nbincode = \"=2.0.0-rc.3\"\nbincode_derive = \"=2.0.0-rc.3\""
@@ -247,7 +249,7 @@ impl BenchManifest {
             .replace_all(
                 content,
                 format!(
-                    "burn = {{ version = \"{}\", default-features = false }}",
+                    "burn = {{ version = \"={}\", default-features = false }}",
                     version_str
                 ),
             )
@@ -256,7 +258,7 @@ impl BenchManifest {
         let content = burn_common_re
             .replace_all(
                 &content,
-                format!("burn-common = {{ version = \"{}\" }}", version_str),
+                format!("burn-common = {{ version = \"={}\" }}", version_str),
             )
             .to_string();
 
@@ -328,6 +330,10 @@ impl BenchManifest {
             .replace(
                 "ndarray-simd = [\"burn/ndarray\", \"burn/simd\"]",
                 "ndarray-simd = [\"burn/ndarray\"]",
+            )
+            .replace(
+                "candle-metal = [\"burn/candle\", \"burn/candle-metal\"]",
+                "candle-metal = [\"burn/candle\", \"burn/metal\"]",
             )
             // Use matching `rand` version (binary and data benchmarks)
             .replace(

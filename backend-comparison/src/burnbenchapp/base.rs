@@ -68,6 +68,8 @@ enum BackendValues {
     #[cfg(target_os = "linux")]
     #[strum(to_string = "hip")]
     Hip,
+    #[strum(to_string = "metal")]
+    Metal,
     #[strum(to_string = "ndarray")]
     Ndarray,
     #[strum(to_string = "ndarray-simd")]

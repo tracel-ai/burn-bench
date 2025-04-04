@@ -103,6 +103,8 @@ macro_rules! bench_on_backend {
         let feature_name = "candle-cuda";
         #[cfg(feature = "candle-metal")]
         let feature_name = "candle-metal";
+        #[cfg(feature = "metal")]
+        let feature_name = "metal";
         #[cfg(feature = "ndarray")]
         let feature_name = "ndarray";
         #[cfg(feature = "ndarray-simd")]
@@ -132,14 +134,23 @@ macro_rules! bench_on_backend {
         #[cfg(feature = "hip")]
         let feature_name = "hip";
 
-        #[cfg(any(feature = "wgpu"))]
+        #[cfg(feature = "wgpu")]
         {
             use burn::backend::wgpu::{Wgpu, WgpuDevice};
 
             $fn_name::<Wgpu<f32, i32>>(&WgpuDevice::default(), feature_name, url, token);
         }
 
-        #[cfg(any(feature = "wgpu-spirv"))]
+        #[cfg(feature = "wgpu-spirv")]
+        {
+            use burn::backend::wgpu::{Wgpu, WgpuDevice};
+            use burn::tensor::f16;
+
+            $fn_name::<Wgpu<f16, i32>>(&WgpuDevice::default(), feature_name, url, token);
+            $fn_name::<Wgpu<f32, i32>>(&WgpuDevice::default(), feature_name, url, token);
+        }
+
+        #[cfg(feature = "metal")]
         {
             use burn::backend::wgpu::{Wgpu, WgpuDevice};
             use burn::tensor::f16;
