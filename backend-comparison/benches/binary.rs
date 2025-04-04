@@ -51,7 +51,7 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
     type Args = (Tensor<B, D>, E);
 
     fn name(&self) -> String {
-        "binary_scalar".into()
+        format!("binary_scalar-{:?}", B::FloatElem::dtype()).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

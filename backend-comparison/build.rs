@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 struct DependencyInfo {
     name: String,
     req: String,
-    source: String,
+    source: Option<String>,
     kind: Option<String>,
+    path: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -334,7 +335,6 @@ fn capture_packages_info() {
             })
         })
         .expect("Should find direct dependencies");
-    // println!("cargo::warning={direct_dependencies:?}");
 
     let packages: HashMap<String, PackageInfo> = serde_json::from_value::<Vec<PackageInfo>>(
         metadata
@@ -359,7 +359,7 @@ fn capture_packages_info() {
     direct_dependencies.iter_mut().for_each(|dep| {
         if let Some(pkg) = packages.get(&dep.name) {
             // Overwrite dependency info with actual package info
-            dep.source = pkg.id.clone();
+            dep.source = Some(pkg.id.clone());
             dep.req = pkg.version.clone();
 
             // Cannot easily threshold based on git revision (commit hash), so
@@ -376,7 +376,9 @@ fn capture_packages_info() {
 
         let pkg_info = format!(
             "    \"{}\" => PackageInfo {{ version: \"{}\", source: \"{}\" }},\n",
-            dep.name, dep.req, dep.source
+            dep.name,
+            dep.req,
+            dep.source.as_ref().unwrap()
         );
 
         match &dep.kind {
@@ -395,7 +397,6 @@ fn capture_packages_info() {
     deps_str.push_str("};\n");
     deps_dev_str.push_str("};\n");
     deps_build_str.push_str("};\n");
-    // println!("cargo::warning={direct_dependencies:?}");
 
     code.push_str(&format!("{deps_str}\n{deps_dev_str}\n{deps_build_str}"));
 

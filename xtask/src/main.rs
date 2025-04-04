@@ -8,15 +8,15 @@ use tracel_xtask::prelude::*;
 
 #[macros::base_commands(Check)]
 enum Command {
-    /// Compare versions.
-    Compare(commands::compare::BurnBenchCompareArgs),
+    /// Benchmark one or more versions.
+    BenchVersions(commands::versions::BurnBenchVersionArgs),
 }
 
 fn main() -> anyhow::Result<()> {
     let start = Instant::now();
     let args = init_xtask::<Command>()?;
     match args.command {
-        Command::Compare(cmd_args) => cmd_args.parse(),
+        Command::BenchVersions(cmd_args) => cmd_args.parse(),
         _ => dispatch_base_commands(args),
     }?;
     let duration = start.elapsed();

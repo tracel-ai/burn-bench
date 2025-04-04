@@ -117,14 +117,29 @@ impl Display for BenchmarkCollection {
 
         // Sort by benchmark name, then shapes, then median
         records.sort_by(|a, b| {
-            a.results.name.cmp(&b.results.name)
+            a.results
+                .name
+                .cmp(&b.results.name)
                 .then_with(|| a.results.shapes.cmp(&b.results.shapes))
-                .then_with(|| a.results.computed.median.partial_cmp(&b.results.computed.median).unwrap())
+                .then_with(|| {
+                    a.results
+                        .computed
+                        .median
+                        .partial_cmp(&b.results.computed.median)
+                        .unwrap()
+                })
         });
 
         let mut table = Table::new();
         table.load_preset(comfy_table::presets::ASCII_MARKDOWN);
-        table.set_header(vec!["Benchmark", "Shapes", "Feature", "Backend", "Device", "Median"]);
+        table.set_header(vec![
+            "Benchmark",
+            "Shapes",
+            "Feature",
+            "Backend",
+            "Device",
+            "Median",
+        ]);
 
         let mut prev_benchmark = "";
         let mut prev_shapes = vec![];
@@ -132,7 +147,7 @@ impl Display for BenchmarkCollection {
         // success benchmarks
         for record in &records {
             if prev_benchmark != record.results.name || prev_shapes != record.results.shapes {
-                if prev_benchmark != "" {
+                if !prev_benchmark.is_empty() {
                     table.add_row(vec![
                         Cell::new("----").fg(Color::DarkGrey),
                         Cell::new("----").fg(Color::DarkGrey),
@@ -152,7 +167,8 @@ impl Display for BenchmarkCollection {
                 Cell::new(&record.feature).fg(Color::Green),
                 Cell::new(format!("`{}`", &record.backend)).fg(Color::Green),
                 Cell::new(&record.device).fg(Color::Green),
-                Cell::new(format!("{:.3?}", record.results.computed.median)).set_alignment(CellAlignment::Right),
+                Cell::new(format!("{:.3?}", record.results.computed.median))
+                    .set_alignment(CellAlignment::Right),
             ]);
         }
 
