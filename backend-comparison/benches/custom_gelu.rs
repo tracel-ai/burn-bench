@@ -1,9 +1,11 @@
 use backend_comparison::persistence::save;
 use burn::backend::Autodiff;
+use burn::backend::autodiff::checkpoint::strategy::{
+    BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
+};
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, run_benchmark};
 use core::f64::consts::SQRT_2;
-use derive_new::new;
 
 #[derive(Debug)]
 enum GeluKind {
@@ -14,24 +16,60 @@ enum GeluKind {
 
 /// Benchmark how well a backend executes a custom activation function with a lot of basic tensor
 /// operations.
-#[derive(new)]
 struct CustomGeluBenchmark<B: Backend, const D: usize> {
     shape: Shape,
     device: B::Device,
     kind: GeluKind,
-    autodiff: bool,
+    mode: Mode,
+}
+
+#[derive(Clone, Copy)]
+enum Mode {
+    Autodiff { gradient_checkpointing: bool },
+    Inference,
+}
+
+impl core::fmt::Debug for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Mode::Autodiff {
+                gradient_checkpointing,
+            } => {
+                if *gradient_checkpointing {
+                    f.write_str("autodiff-checkpointing")
+                } else {
+                    f.write_str("autodiff")
+                }
+            }
+            Mode::Inference => Ok(()),
+        }
+    }
+}
+
+impl<B: Backend, const D: usize> CustomGeluBenchmark<B, D> {
+    fn execute_autodiff<C: CheckpointStrategy>(&self, tensor: Tensor<B, D>) {
+        let tensor: Tensor<Autodiff<B, C>, D> = Tensor::from_inner(tensor).require_grad();
+        let output = match self.kind {
+            GeluKind::Reference => burn::tensor::activation::gelu(tensor.clone()),
+            GeluKind::WithReferenceErf => gelu_custom(tensor.clone(), Tensor::erf),
+            GeluKind::WithCustomErf => gelu_custom(tensor.clone(), erf_custom),
+        };
+        let mut gradients = output.sum().backward();
+        let _tmp = tensor.grad_remove(&mut gradients).unwrap();
+    }
 }
 
 impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
     type Args = Tensor<B, D>;
 
     fn name(&self) -> String {
-        match self.autodiff {
-            true => {
-                format!("gelu-autodiff-{:?}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase()
-            }
-            false => format!("gelu-{:?}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase(),
-        }
+        format!(
+            "gelu-{:?}-{:?}-{:?}",
+            self.kind,
+            self.mode,
+            B::FloatElem::dtype()
+        )
+        .to_lowercase()
     }
 
     fn options(&self) -> Option<String> {
@@ -43,26 +81,24 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
     }
 
     fn execute(&self, tensor: Self::Args) {
-        match self.autodiff {
-            true => {
-                let tensor: Tensor<Autodiff<B>, D> = Tensor::from_inner(tensor).require_grad();
-                let output = match self.kind {
-                    GeluKind::Reference => burn::tensor::activation::gelu(tensor.clone()),
-                    GeluKind::WithReferenceErf => gelu_custom(tensor.clone(), Tensor::erf),
-                    GeluKind::WithCustomErf => gelu_custom(tensor.clone(), erf_custom),
-                };
-                let mut gradients = output.sum().backward();
-                let _tmp = tensor.grad_remove(&mut gradients).unwrap();
+        match self.mode {
+            Mode::Autodiff {
+                gradient_checkpointing,
+            } => {
+                if gradient_checkpointing {
+                    self.execute_autodiff::<BalancedCheckpointing>(tensor)
+                } else {
+                    self.execute_autodiff::<NoCheckpointing>(tensor)
+                }
             }
-
-            false => {
+            Mode::Inference => {
                 match self.kind {
                     GeluKind::Reference => burn::tensor::activation::gelu(tensor),
                     GeluKind::WithReferenceErf => gelu_custom(tensor, Tensor::erf),
                     GeluKind::WithCustomErf => gelu_custom(tensor, erf_custom),
                 };
             }
-        };
+        }
     }
 
     fn prepare(&self) -> Self::Args {
@@ -124,25 +160,25 @@ fn bench<B: Backend>(
     const D: usize = 3;
     let shape: Shape = [32, 512, 2048].into();
 
-    let run = |autodiff: bool| {
-        let reference_gelu = CustomGeluBenchmark::<B, D>::new(
-            shape.clone(),
-            device.clone(),
-            GeluKind::Reference,
-            autodiff,
-        );
-        let reference_erf_gelu = CustomGeluBenchmark::<B, D>::new(
-            shape.clone(),
-            device.clone(),
-            GeluKind::WithReferenceErf,
-            autodiff,
-        );
-        let custom_erf_gelu = CustomGeluBenchmark::<B, D>::new(
-            shape.clone(),
-            device.clone(),
-            GeluKind::WithCustomErf,
-            autodiff,
-        );
+    let run = |mode: Mode| {
+        let reference_gelu = CustomGeluBenchmark::<B, D> {
+            shape: shape.clone(),
+            device: device.clone(),
+            kind: GeluKind::Reference,
+            mode,
+        };
+        let reference_erf_gelu = CustomGeluBenchmark::<B, D> {
+            shape: shape.clone(),
+            device: device.clone(),
+            kind: GeluKind::WithReferenceErf,
+            mode,
+        };
+        let custom_erf_gelu = CustomGeluBenchmark::<B, D> {
+            shape: shape.clone(),
+            device: device.clone(),
+            kind: GeluKind::WithCustomErf,
+            mode,
+        };
 
         save::<B>(
             vec![
@@ -157,9 +193,13 @@ fn bench<B: Backend>(
         )
         .unwrap();
     };
-
-    run(false);
-    run(true);
+    run(Mode::Inference);
+    run(Mode::Autodiff {
+        gradient_checkpointing: false,
+    });
+    run(Mode::Autodiff {
+        gradient_checkpointing: true,
+    });
 }
 
 fn main() {

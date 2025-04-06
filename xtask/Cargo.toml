@@ -9,3 +9,5 @@ log = { workspace = true }
 regex = { workspace = true }
 semver = { workspace = true }
 tracel-xtask = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+glob = "0.3.1"

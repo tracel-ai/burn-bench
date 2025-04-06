@@ -1,6 +1,6 @@
 use backend_comparison::persistence::save;
 use burn::{
-    backend::Autodiff,
+    backend::{Autodiff, autodiff::checkpoint::strategy::BalancedCheckpointing},
     nn::{
         Embedding, EmbeddingConfig, Linear, LinearConfig,
         loss::CrossEntropyLossConfig,
@@ -211,9 +211,9 @@ fn bench<B: Backend>(
 ) {
     // Something similar to RoBERTa-base.
     let config = ModelConfig::new(
-        TransformerEncoderConfig::new(768, 3072, 12, 12).with_norm_first(true),
+        TransformerEncoderConfig::new(512, 2048, 8, 8).with_norm_first(true),
         10,
-        50_265,
+        30000,
         512,
     );
 
@@ -225,11 +225,13 @@ fn bench<B: Backend>(
         device: device.clone(),
         config: config.clone(),
     };
-    let benchmark_training = TransformerEncoderBenchmark::<Autodiff<B>, true> {
-        shape: shape.into(),
-        device: device.clone(),
-        config,
-    };
+    let benchmark_training =
+        TransformerEncoderBenchmark::<Autodiff<B, BalancedCheckpointing>, true> {
+            // TransformerEncoderBenchmark::<Autodiff<B>, true> {
+            shape: shape.into(),
+            device: device.clone(),
+            config,
+        };
 
     save::<B>(
         vec![

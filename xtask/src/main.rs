@@ -9,14 +9,17 @@ use tracel_xtask::prelude::*;
 #[macros::base_commands(Check)]
 enum Command {
     /// Benchmark one or more versions.
-    BenchVersions(commands::versions::BurnBenchVersionArgs),
+    Bench(commands::bench::BurnBenchVersionArgs),
+    /// Profile kernels.
+    Profile(commands::profile::ProfileArgs),
 }
 
 fn main() -> anyhow::Result<()> {
     let start = Instant::now();
     let args = init_xtask::<Command>()?;
     match args.command {
-        Command::BenchVersions(cmd_args) => cmd_args.parse(),
+        Command::Bench(cmd_args) => cmd_args.parse(),
+        Command::Profile(cmd_args) => cmd_args.run(),
         _ => dispatch_base_commands(args),
     }?;
     let duration = start.elapsed();

@@ -33,8 +33,8 @@ wgpu-spirv = ["burn/vulkan", "burn/autotune"]
 wgpu-spirv-fusion = ["wgpu-spirv", "burn/fusion"]
 
 [dependencies]
-burn = { git = "https://github.com/tracel-ai/burn", default-features = false }
-burn-common = { git = "https://github.com/tracel-ai/burn" }
+burn = { path = "../../burn/crates/burn", default-features = false }
+burn-common = { path = "../../burn/crates/burn-common" }
 
 arboard = { workspace = true }
 chrono = { workspace = true }
