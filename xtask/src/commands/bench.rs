@@ -11,7 +11,9 @@ use tracel_xtask::prelude::*;
 #[command(about = "Benchmark one or more Burn versions using burnbench")]
 pub struct BurnBenchVersionArgs {
     /// One or more Burn versions, git branches, or commit hashes
-    #[arg(required = true)]
+    ///
+    /// Default using @main.
+    #[clap(short = 'V', long = "versions", num_args(0..))]
     pub versions: Vec<String>,
 
     /// The burn bench run arguments.
@@ -47,7 +49,11 @@ impl std::fmt::Display for BurnBenchRunArgs {
 }
 
 impl BurnBenchVersionArgs {
-    pub(crate) fn parse(self) -> anyhow::Result<()> {
+    pub(crate) fn parse(mut self) -> anyhow::Result<()> {
+        if self.versions.is_empty() {
+            self.versions.push("main".to_string());
+        }
+
         let mut log_file = LogFile::new()?;
 
         // Log execution summary to file & log output
@@ -63,6 +69,7 @@ impl BurnBenchVersionArgs {
         log_both("Running burnbench with:")?;
         log_both(&format!("  {}", self.run_args))?;
         log_both("Version to benchmark:")?;
+
         for (i, version) in self.versions.iter().enumerate() {
             log_both(&format!("  {}. {}", i + 1, version))?;
         }
