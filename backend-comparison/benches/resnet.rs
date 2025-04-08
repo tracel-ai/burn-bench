@@ -1,8 +1,6 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use burnbench;
-
-burnbench::define_types!();
 
 // Files retrieved during build to avoid reimplementing ResNet for benchmarks
 mod block {
@@ -48,19 +46,15 @@ impl<B: Backend> Benchmark for ResNetBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> BenchResult {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let benchmark = ResNetBenchmark::<B> {
         shape: [1, 3, 224, 224].into(),
         device: device.clone(),
     };
 
-    BenchResult {
-        benches: vec![run_benchmark(benchmark)],
-        backend_name: B::name(device),
-        device: format!("{:?}", device),
-    }
+    vec![run_benchmark(benchmark)]
 }
 
 fn main() {
-    burnbench::bench_on_backend!(bench);
+    burnbench::bench_on_backend!();
 }

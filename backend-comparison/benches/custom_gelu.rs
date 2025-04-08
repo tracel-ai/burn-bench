@@ -1,10 +1,9 @@
-use backend_comparison::persistence::save;
 use burn::backend::Autodiff;
 use burn::backend::autodiff::checkpoint::strategy::{
     BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
 };
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use core::f64::consts::SQRT_2;
 
 #[derive(Debug)]
@@ -151,16 +150,12 @@ fn erf_positive<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     const D: usize = 3;
     let shape: Shape = [32, 512, 2048].into();
 
-    let run = |mode: Mode| {
+    let mut benches = Vec::new();
+    let mut run = |mode: Mode| {
         let reference_gelu = CustomGeluBenchmark::<B, D> {
             shape: shape.clone(),
             device: device.clone(),
@@ -180,19 +175,11 @@ fn bench<B: Backend>(
             mode,
         };
 
-        save::<B>(
-            vec![
-                run_benchmark(reference_gelu),
-                run_benchmark(reference_erf_gelu),
-                run_benchmark(custom_erf_gelu),
-            ],
-            device,
-            feature_name,
-            url,
-            token,
-        )
-        .unwrap();
+        benches.push(run_benchmark(reference_gelu));
+        benches.push(run_benchmark(reference_erf_gelu));
+        benches.push(run_benchmark(custom_erf_gelu));
     };
+
     run(Mode::Inference);
     run(Mode::Autodiff {
         gradient_checkpointing: false,
@@ -200,8 +187,10 @@ fn bench<B: Backend>(
     run(Mode::Autodiff {
         gradient_checkpointing: true,
     });
+
+    benches
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

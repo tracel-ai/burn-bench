@@ -1,6 +1,5 @@
-use backend_comparison::persistence::save;
 use burn::tensor::{Distribution, Element, Shape, Tensor, TensorData, backend::Backend};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[cfg(not(burn_version_lt_0170))]
@@ -76,28 +75,16 @@ impl<B: Backend, const D: usize> Benchmark for FromDataBenchmark<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     const D: usize = 3;
     let shape: Shape = [32, 512, 1024].into();
 
     let to_benchmark = ToDataBenchmark::<B, D>::new(shape.clone(), device.clone());
     let from_benchmark = FromDataBenchmark::<B, D>::new(shape, device.clone());
 
-    save::<B>(
-        vec![run_benchmark(to_benchmark), run_benchmark(from_benchmark)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    vec![run_benchmark(to_benchmark), run_benchmark(from_benchmark)]
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

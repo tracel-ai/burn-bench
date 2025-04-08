@@ -1,8 +1,6 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
-
-burnbench::define_types!();
 
 #[derive(new)]
 struct MatmulBenchmark<B: Backend, const D: usize> {
@@ -43,8 +41,8 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> BenchResult {
-    let benchmarks = [
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+    [
         (2, 4096, 4096, 4096),
         (1, 6144, 6144, 6144),
         (4, 2048, 2048, 2048),
@@ -59,15 +57,9 @@ fn bench<B: Backend>(device: &B::Device) -> BenchResult {
         MatmulBenchmark::<B, 3>::new(shape_lhs, shape_rhs, device.clone())
     })
     .map(run_benchmark)
-    .collect();
-
-    BenchResult {
-        benches: benchmarks,
-        backend_name: B::name(device),
-        device: format!("{:?}", device),
-    }
+    .collect()
 }
 
 fn main() {
-    burnbench::bench_on_backend!(bench);
+    burnbench::bench_on_backend!();
 }

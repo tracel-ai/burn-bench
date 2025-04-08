@@ -1,5 +1,5 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend, module::max_pool2d};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 
 burnbench::define_types!();
 
@@ -46,7 +46,7 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> BenchResult {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let benchmark = MaxPool2dBenchmark::<B> {
         name: "default",
         shape: [32, 128, 512, 512].into(),
@@ -66,13 +66,9 @@ fn bench<B: Backend>(device: &B::Device) -> BenchResult {
         device: device.clone(),
     };
 
-    BenchResult {
-        benches: vec![run_benchmark(benchmark), run_benchmark(benchmark2)],
-        backend_name: B::name(device),
-        device: format!("{:?}", device),
-    }
+    vec![run_benchmark(benchmark), run_benchmark(benchmark2)]
 }
 
 fn main() {
-    burnbench::bench_on_backend!(bench);
+    burnbench::bench_on_backend!();
 }

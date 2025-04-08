@@ -1,10 +1,8 @@
-use std::hint::black_box;
-
-use backend_comparison::persistence::save;
 use burn::tensor::{
     Distribution, Element, Shape, Tensor, backend::Backend, module::conv2d, ops::ConvOptions,
 };
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use std::hint::black_box;
 
 pub struct Conv2dBenchmark<B: Backend> {
     suffix: &'static str,
@@ -60,12 +58,7 @@ impl<B: Backend> Benchmark for Conv2dBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     // Shapes
     let batch_size = 16;
     let channels_in = 16;
@@ -225,9 +218,9 @@ fn bench<B: Backend>(
         results.push(result);
     }
 
-    save::<B>(results, device, feature_name, url, token).unwrap();
+    results
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }
