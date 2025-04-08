@@ -44,11 +44,11 @@ struct RunArgs {
     verbose: bool,
 
     /// Space separated list of backends to include
-    #[clap(short = 'B', long = "backends", value_name = "BACKEND BACKEND ...", num_args(1..), required = true)]
+    #[clap(short = 'B', long = "backends", num_args(1..), required = true)]
     backends: Vec<BackendValues>,
 
     /// Space separated list of benches to run
-    #[clap(short = 'b', long = "benches", value_name = "BENCH BENCH ...", num_args(1..), required = true)]
+    #[clap(short = 'b', long = "benches", num_args(0..))]
     benches: Vec<String>,
 
     /// One or more Burn versions, git branches, or commit hashes
@@ -56,6 +56,19 @@ struct RunArgs {
     /// Default using @main.
     #[clap(short = 'V', long = "versions", num_args(0..))]
     pub versions: Vec<String>,
+
+    #[clap(short = 'd', long = "dtypes", num_args(0..))]
+    pub dtypes: Vec<BenchDType>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Display, EnumIter)]
+enum BenchDType {
+    #[strum(to_string = "f32")]
+    F32,
+    #[strum(to_string = "f16")]
+    F16,
+    #[strum(to_string = "bf16")]
+    BF16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Display, EnumIter)]
@@ -75,8 +88,6 @@ enum BackendValues {
     #[cfg(target_os = "linux")]
     #[strum(to_string = "hip")]
     Hip,
-    #[strum(to_string = "metal")]
-    Metal,
     #[strum(to_string = "ndarray")]
     Ndarray,
     #[strum(to_string = "ndarray-simd")]
@@ -89,16 +100,22 @@ enum BackendValues {
     NdarrayBlasOpenblas,
     #[strum(to_string = "tch-cpu")]
     TchCpu,
-    #[strum(to_string = "tch-gpu")]
-    TchGpu,
+    #[strum(to_string = "tch-cuda")]
+    TchCuda,
+    #[strum(to_string = "tch-metal")]
+    TchMetal,
     #[strum(to_string = "wgpu")]
     Wgpu,
     #[strum(to_string = "wgpu-fusion")]
     WgpuFusion,
-    #[strum(to_string = "wgpu-spirv")]
-    WgpuSpirv,
-    #[strum(to_string = "wgpu-spirv-fusion")]
-    WgpuSpirvFusion,
+    #[strum(to_string = "vulkan")]
+    Vulkan,
+    #[strum(to_string = "vulkan-fusion")]
+    VulkanFusion,
+    #[strum(to_string = "metal")]
+    Metal,
+    #[strum(to_string = "metal-fusion")]
+    MetalFusion,
 }
 
 pub fn execute() {
@@ -130,7 +147,7 @@ fn command_list() {
     }
 }
 
-fn command_run(run_args: RunArgs) {
+fn command_run(mut run_args: RunArgs) {
     let mut tokens: Option<Tokens> = None;
     if run_args.share {
         tokens = get_tokens();
@@ -144,10 +161,18 @@ fn command_run(run_args: RunArgs) {
     }
     let access_token = tokens.map(|t| t.access_token);
 
+    if run_args.dtypes.is_empty() {
+        run_args.dtypes.push(BenchDType::F32);
+    }
+    if run_args.benches.is_empty() {
+        run_args.benches.push("all".to_string());
+    }
+
     run_backend_comparison_benchmarks(
-        &run_args.benches.clone(),
+        &run_args.benches,
         &backends,
         &run_args.versions,
+        &run_args.dtypes,
         access_token.as_deref(),
         run_args.verbose,
     );
@@ -157,6 +182,7 @@ fn run_backend_comparison_benchmarks(
     benches: &[String],
     backends: &[BackendValues],
     versions: &[String],
+    dtypes: &[BenchDType],
     token: Option<&str>,
     verbose: bool,
 ) {
@@ -171,35 +197,47 @@ fn run_backend_comparison_benchmarks(
     };
     // Iterate through every combination of benchmark and backend
     println!("\nBenchmarking Burn @ {versions:?}");
-    for bench in benches.iter() {
-        for backend in backends.iter() {
-            for version in versions.iter() {
-                let bench_str = bench.to_string();
-                let backend_str = backend.to_string();
-                let url = format!("{}benchmarks", crate::USER_BENCHMARK_SERVER_URL);
+    for dtype in dtypes.iter() {
+        for bench in benches.iter() {
+            for backend in backends.iter() {
+                for version in versions.iter() {
+                    let bench_str = bench.to_string();
+                    let backend_str = backend.to_string();
+                    let url = format!("{}benchmarks", crate::USER_BENCHMARK_SERVER_URL);
 
-                let status = run_cargo(&bench_str, &backend_str, &url, token, &runner_pb, &version);
-                let success = status.unwrap().success();
+                    let status = run_cargo(
+                        &bench_str,
+                        &backend_str,
+                        dtype,
+                        &url,
+                        token,
+                        &runner_pb,
+                        &version,
+                    );
+                    let success = status.unwrap().success();
 
-                if success {
-                    if let Some(ref pb) = runner_pb {
-                        pb.lock().unwrap().succeeded_inc();
+                    if success {
+                        if let Some(ref pb) = runner_pb {
+                            pb.lock().unwrap().succeeded_inc();
+                        }
+                    } else {
+                        if let Some(ref pb) = runner_pb {
+                            pb.lock().unwrap().failed_inc();
+                        }
+                        report_collection.push_failed_benchmark(FailedBenchmark {
+                            bench: bench_str.clone(),
+                            backend: backend_str.clone(),
+                        })
                     }
-                } else {
-                    if let Some(ref pb) = runner_pb {
-                        pb.lock().unwrap().failed_inc();
-                    }
-                    report_collection.push_failed_benchmark(FailedBenchmark {
-                        bench: bench_str.clone(),
-                        backend: backend_str.clone(),
-                    })
                 }
             }
         }
     }
+
     if let Some(pb) = runner_pb.clone() {
         pb.lock().unwrap().finish();
     }
+
     println!("{}", report_collection.load_records());
     if let Some(url) = web_results_url(token) {
         println!("📊 Browse results at {}", url);
@@ -209,6 +247,7 @@ fn run_backend_comparison_benchmarks(
 fn run_cargo(
     bench: &str,
     backend: &str,
+    dtype: &BenchDType,
     url: &str,
     token: Option<&str>,
     progress_bar: &Option<Arc<Mutex<RunnerProgressBar>>>,
@@ -225,15 +264,26 @@ fn run_cargo(
     };
     let dependency = Dependency::new(version);
     let guard = dependency.patch().unwrap();
+    let features = format!("{backend},{dtype}");
 
-    let mut args = vec![
-        "--bench",
-        bench,
-        "--features",
-        backend,
-        "--target-dir",
-        crate::BENCHMARKS_TARGET_DIR,
-    ];
+    let mut args = if bench == "all" {
+        vec![
+            "--benches",
+            "--features",
+            &features,
+            "--target-dir",
+            crate::BENCHMARKS_TARGET_DIR,
+        ]
+    } else {
+        vec![
+            "--bench",
+            bench,
+            "--features",
+            &features,
+            "--target-dir",
+            crate::BENCHMARKS_TARGET_DIR,
+        ]
+    };
 
     if let Some(t) = token {
         args.push("--");

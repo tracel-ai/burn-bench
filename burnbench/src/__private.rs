@@ -115,124 +115,105 @@ macro_rules! bench_on_backend {
     () => {{
         $crate::define_types!();
 
-        $crate::bench_on_backend!(bench)
+        #[cfg(feature = "f32")]
+        {
+            $crate::bench_on_backend!(bench, f32)
+        }
+
+        #[cfg(feature = "f16")]
+        {
+            $crate::bench_on_backend!(bench, burn::tensor::f16)
+        }
+
+        #[cfg(feature = "bf16")]
+        {
+            $crate::bench_on_backend!(bench, burn::tensor::bf16)
+        }
     }};
 
-    ($fn_name:ident) => {{
+    ($fn_name:ident, $dtype:ty) => {{
         $crate::__private::init_log().unwrap();
         use std::env;
 
         #[cfg(feature = "cuda")]
         {
-            use burn::backend::cuda::{Cuda, CudaDevice};
-            use burn::tensor::f16;
+            use burn::backend::Cuda;
 
-            let device = CudaDevice::default();
-            $crate::bench_on_backend!($fn_name, Cuda<f16>, device);
-            $crate::bench_on_backend!($fn_name, Cuda<f32>, device);
+            let device = Default::default();
+            $crate::bench_on_backend!($fn_name, Cuda<$dtype>, device);
         }
 
-        // #[cfg(feature = "wgpu")]
-        // {
-        //     use burn::backend::wgpu::{Wgpu, WgpuDevice};
+        #[cfg(any(feature = "wgpu", feature = "vulkan"))]
+        {
+            use burn::backend::Wgpu;
 
-        //     $fn_name::<Wgpu<f32, i32>>(&WgpuDevice::default(), feature_name, url, token);
-        // }
+            let device = Default::default();
+            $crate::bench_on_backend!($fn_name, Wgpu<$dtype>, device);
+        }
 
-        // #[cfg(feature = "wgpu-spirv")]
-        // {
-        //     use burn::backend::wgpu::{Wgpu, WgpuDevice};
-        //     use burn::tensor::f16;
+        #[cfg(feature = "ndarray")]
+        {
+            use burn::backend::NdArray;
 
-        //     $fn_name::<Wgpu<f16, i32>>(&WgpuDevice::default(), feature_name, url, token);
-        //     $fn_name::<Wgpu<f32, i32>>(&WgpuDevice::default(), feature_name, url, token);
-        // }
+            let device = Default::default();
+            $crate::bench_on_backend!($fn_name, NdArray<$dtype>, device);
+        }
 
-        // #[cfg(feature = "metal")]
-        // {
-        //     use burn::backend::wgpu::{Wgpu, WgpuDevice};
-        //     use burn::tensor::f16;
+        #[cfg(feature = "tch-cpu")]
+        {
+            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
 
-        //     $fn_name::<Wgpu<f16, i32>>(&WgpuDevice::default(), feature_name, url, token);
-        //     $fn_name::<Wgpu<f32, i32>>(&WgpuDevice::default(), feature_name, url, token);
-        // }
+            let device = LibTorchDevice::Cpu;
+            $crate::bench_on_backend!($fn_name, LibTorch<$dtype>, device);
+        }
 
-        // #[cfg(feature = "tch-gpu")]
-        // {
-        //     use burn::backend::{LibTorch, libtorch::LibTorchDevice};
-        //     use burn::tensor::f16;
+        #[cfg(feature = "tch-cuda")]
+        {
+            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
 
-        //     #[cfg(not(target_os = "macos"))]
-        //     let device = LibTorchDevice::Cuda(0);
-        //     #[cfg(target_os = "macos")]
-        //     let device = LibTorchDevice::Mps;
+            let device = LibTorchDevice::Cuda(0);
+            $crate::bench_on_backend!($fn_name, LibTorch<$dtype>, device);
+        }
 
-        //     let device: format!("{:?}", device),
-        //     let result = $fn_name::<LibTorch<f16>>(&device);
-        //     save_result(result, url, token, feature_name);
-        // }
+        #[cfg(feature = "tch-metal")]
+        {
+            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
 
-        // #[cfg(feature = "tch-cpu")]
-        // {
-        //     use burn::backend::{LibTorch, libtorch::LibTorchDevice};
+            let device = LibTorchDevice::Mps;
+            $crate::bench_on_backend!($fn_name, LibTorch<$dtype>, device);
+        }
 
-        //     let device = LibTorchDevice::Cpu;
-        //     $fn_name::<LibTorch>(&device, feature_name, url, token);
-        // }
+        #[cfg(feature = "candle-cpu")]
+        {
+            use burn::backend::candle::{Candle, CandleDevice};
 
-        // #[cfg(any(
-        //     feature = "ndarray",
-        //     feature = "ndarray-simd",
-        //     feature = "ndarray-blas-netlib",
-        //     feature = "ndarray-blas-openblas",
-        //     feature = "ndarray-blas-accelerate",
-        // ))]
-        // {
-        //     use burn::backend::NdArray;
-        //     use burn::backend::ndarray::NdArrayDevice;
+            let device = CandleDevice::Cpu;
+            $crate::bench_on_backend!($fn_name, Candle<$dtype>, device);
+        }
 
-        //     let device = NdArrayDevice::Cpu;
-        //     $fn_name::<NdArray>(&device, feature_name, url, token);
-        // }
+        #[cfg(feature = "candle-cuda")]
+        {
+            use burn::backend::candle::{Candle, CandleDevice};
 
-        // #[cfg(feature = "candle-cpu")]
-        // {
-        //     use burn::backend::Candle;
-        //     use burn::backend::candle::CandleDevice;
+            let device = CandleDevice::cuda(0);
+            $crate::bench_on_backend!($fn_name, Candle<$dtype>, device);
+        }
 
-        //     let device = CandleDevice::Cpu;
-        //     $fn_name::<Candle>(&device, feature_name, url, token);
-        // }
+        #[cfg(feature = "candle-metal")]
+        {
+            use burn::backend::candle::{Candle, CandleDevice};
 
-        // #[cfg(feature = "candle-cuda")]
-        // {
-        //     use burn::backend::Candle;
-        //     use burn::backend::candle::CandleDevice;
+            let device = CandleDevice::metal(0);
+            $crate::bench_on_backend!($fn_name, Candle<$dtype>, device);
+        }
 
-        //     let device = CandleDevice::cuda(0);
-        //     $fn_name::<Candle>(&device, feature_name, url, token);
-        // }
+        #[cfg(feature = "hip")]
+        {
+            use burn::backend::Hip;
 
-        // #[cfg(feature = "candle-metal")]
-        // {
-        //     use burn::backend::Candle;
-        //     use burn::backend::candle::CandleDevice;
-
-        //     let device = CandleDevice::metal(0);
-        //     $fn_name::<Candle>(&device, feature_name, url, token);
-        // }
-
-        // #[cfg(feature = "hip")]
-        // {
-        //     #[cfg(not(burn_version_lt_0170))]
-        //     use burn::backend::hip::{Hip, HipDevice};
-        //     #[cfg(burn_version_lt_0170)]
-        //     use burn::backend::hip_jit::{Hip, HipDevice};
-        //     use burn::tensor::f16;
-
-        //     $fn_name::<Hip<f16>>(&HipDevice::default(), feature_name, url, token);
-        //     $fn_name::<Hip<f32>>(&HipDevice::default(), feature_name, url, token);
-        // }
+            let device = Default::default();
+            $crate::bench_on_backend!($fn_name, Hip<$dtype>, device);
+        }
     }};
 
     ($fn_name:ident, $backend:ty, $device:ident) => {
@@ -248,8 +229,6 @@ macro_rules! bench_on_backend {
         let feature_name = "candle-cuda";
         #[cfg(feature = "candle-metal")]
         let feature_name = "candle-metal";
-        #[cfg(feature = "metal")]
-        let feature_name = "metal";
         #[cfg(feature = "ndarray")]
         let feature_name = "ndarray";
         #[cfg(feature = "ndarray-simd")]
@@ -262,16 +241,22 @@ macro_rules! bench_on_backend {
         let feature_name = "ndarray-blas-openblas";
         #[cfg(feature = "tch-cpu")]
         let feature_name = "tch-cpu";
-        #[cfg(feature = "tch-gpu")]
-        let feature_name = "tch-gpu";
+        #[cfg(feature = "tch-cuda")]
+        let feature_name = "tch-cuda";
+        #[cfg(feature = "tch-metal")]
+        let feature_name = "tch-metal";
         #[cfg(feature = "wgpu")]
         let feature_name = "wgpu";
         #[cfg(feature = "wgpu-fusion")]
         let feature_name = "wgpu-fusion";
-        #[cfg(feature = "wgpu-spirv")]
-        let feature_name = "wgpu-spirv";
-        #[cfg(feature = "wgpu-spirv-fusion")]
-        let feature_name = "wgpu-spirv-fusion";
+        #[cfg(feature = "vulkan")]
+        let feature_name = "vulkan";
+        #[cfg(feature = "vulkan-fusion")]
+        let feature_name = "vulkan-fusion";
+        #[cfg(feature = "metal")]
+        let feature_name = "metal";
+        #[cfg(feature = "metal-fusion")]
+        let feature_name = "metal-fusion";
         #[cfg(feature = "cuda")]
         let feature_name = "cuda";
         #[cfg(feature = "cuda-fusion")]
