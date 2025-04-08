@@ -1,4 +1,4 @@
-use backend_comparison::persistence::save;
+use backend_comparison::save;
 use burn::{
     module::Module,
     nn,

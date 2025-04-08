@@ -1,10 +1,12 @@
-mod runner;
+pub mod __private;
 mod persistence;
+mod runner;
 
 pub(crate) mod system_info;
 
-pub use runner::*;
 pub use persistence::*;
+pub use runner::*;
+pub use system_info::*;
 
 const BENCHMARKS_TARGET_DIR: &str = "target/benchmarks";
 const USER_BENCHMARK_SERVER_URL: &str = if cfg!(debug_assertions) {

@@ -1,6 +1,7 @@
-use backend_comparison::persistence::save;
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend, module::max_pool2d};
 use burn_common::benchmark::{Benchmark, run_benchmark};
+
+burnbench::define_types!();
 
 pub struct MaxPool2dBenchmark<B: Backend> {
     shape: Shape,
@@ -45,12 +46,7 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> BenchResult {
     let benchmark = MaxPool2dBenchmark::<B> {
         name: "default",
         shape: [32, 128, 512, 512].into(),
@@ -70,16 +66,13 @@ fn bench<B: Backend>(
         device: device.clone(),
     };
 
-    save::<B>(
-        vec![run_benchmark(benchmark), run_benchmark(benchmark2)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    BenchResult {
+        benches: vec![run_benchmark(benchmark), run_benchmark(benchmark2)],
+        backend_name: B::name(device),
+        device: format!("{:?}", device),
+    }
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!(bench);
 }

@@ -36,7 +36,7 @@ impl Default for BenchmarkCollection {
             .expect("Home directory should exist")
             .join(".cache")
             .join("burn")
-            .join("backend-comparison")
+            .join("burnbench")
             .join("benchmark_results.txt");
         fs::remove_file(results_file.clone()).ok();
         Self {

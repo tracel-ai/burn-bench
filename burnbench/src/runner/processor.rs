@@ -118,7 +118,6 @@ impl<'a> CargoRunner<'a> {
     }
 
     pub fn run(&mut self) -> io::Result<ExitStatus> {
-        println!("{:?}", self.params);
         let mut cargo = Command::new("cargo")
             .env("CARGO_TERM_COLOR", "always")
             .envs(self.envs.iter().map(|(k, v)| (k, v)))

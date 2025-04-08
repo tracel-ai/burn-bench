@@ -33,8 +33,9 @@ wgpu-spirv = ["burn/vulkan", "burn/autotune"]
 wgpu-spirv-fusion = ["wgpu-spirv", "burn/fusion"]
 
 [dependencies]
-burn = { workspace =  true }
+burn = { workspace =  true, features = ["std"]}
 burn-common = { workspace =  true }
+burnbench = { path = "../burnbench" }
 
 semver = { workspace = true }
 arboard = { workspace = true }
@@ -141,7 +142,3 @@ name = "autodiff"
 [[bench]]
 harness = false
 name = "reduce"
-
-[[bin]]
-name = "burnbench"
-path = "src/bin/burnbench.rs"

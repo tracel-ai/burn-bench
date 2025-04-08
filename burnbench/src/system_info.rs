@@ -27,7 +27,7 @@ impl From<os_info::Info> for BenchmarkOSInfo {
 }
 
 impl BenchmarkSystemInfo {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             cpus: BenchmarkSystemInfo::enumerate_cpus(),
             gpus: BenchmarkSystemInfo::enumerate_gpus(),

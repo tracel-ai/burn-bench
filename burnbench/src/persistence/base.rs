@@ -97,45 +97,20 @@ pub struct BenchmarkRecord {
 ///    { ... }
 /// ]
 /// ```
-pub fn save<R: serde::Serialize>(
-    benches: Vec<R>,
-    backend_name: String,
-    device: String,
-    feature: &str,
+pub fn save_records(
+    records: Vec<BenchmarkRecord>,
     url: Option<&str>,
     token: Option<&str>,
 ) -> Result<(), std::io::Error> {
-    let benches: Vec<BenchmarkResult> = benches
-        .into_iter()
-        .map(|bench| {
-            let data = serde_json::to_string(&bench).unwrap();
-            serde_json::from_str(&data).unwrap()
-        })
-        .collect();
     let cache_dir = dirs::home_dir()
         .expect("Home directory should exist")
         .join(".cache")
         .join("burn")
-        .join("backend-comparison");
+        .join("burnbench");
 
     if !cache_dir.exists() {
         fs::create_dir_all(&cache_dir)?;
     }
-
-    let burn_version =
-        std::env::var("BURN_BENCH_BURN_VERSION").unwrap_or_else(|_| "main".to_string());
-
-    let records: Vec<BenchmarkRecord> = benches
-        .into_iter()
-        .map(|bench| BenchmarkRecord {
-            backend: backend_name.clone(),
-            device: format!("{:?}", device),
-            feature: feature.to_string(),
-            burn_version: burn_version.clone(),
-            system_info: BenchmarkSystemInfo::new(),
-            results: bench,
-        })
-        .collect();
 
     for record in records {
         let file_name = format!(

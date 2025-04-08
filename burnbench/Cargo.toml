@@ -42,3 +42,7 @@ tempfile = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }
 serial_test = { workspace = true }
+
+[[bin]]
+name = "burnbench"
+path = "src/bin/burnbench.rs"

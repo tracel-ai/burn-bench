@@ -49,7 +49,7 @@ struct RunArgs {
 
     /// Space separated list of benches to run
     #[clap(short = 'b', long = "benches", value_name = "BENCH BENCH ...", num_args(1..), required = true)]
-    benches: Vec<BenchmarkValues>,
+    benches: Vec<String>,
 
     /// One or more Burn versions, git branches, or commit hashes
     ///
@@ -101,44 +101,6 @@ enum BackendValues {
     WgpuSpirvFusion,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Display, EnumIter)]
-enum BenchmarkValues {
-    #[strum(to_string = "all")]
-    All,
-    #[strum(to_string = "binary")]
-    Binary,
-    #[strum(to_string = "custom-gelu")]
-    CustomGelu,
-    #[strum(to_string = "transformer-encoder")]
-    TransformerEncoder,
-    #[strum(to_string = "data")]
-    Data,
-    #[strum(to_string = "matmul")]
-    Matmul,
-    #[strum(to_string = "matmul-fused")]
-    MatmulFused,
-    #[strum(to_string = "unary")]
-    Unary,
-    #[strum(to_string = "max-pool2d")]
-    MaxPool2d,
-    #[strum(to_string = "resnet50")]
-    Resnet50,
-    #[strum(to_string = "load-record")]
-    LoadRecord,
-    #[strum(to_string = "autodiff")]
-    Autodiff,
-    #[strum(to_string = "conv-transpose2d")]
-    ConvTranspose2d,
-    #[strum(to_string = "conv-transpose3d")]
-    ConvTranspose3d,
-    #[strum(to_string = "conv2d")]
-    Conv2d,
-    #[strum(to_string = "conv3d")]
-    Conv3d,
-    #[strum(to_string = "reduce")]
-    Reduce,
-}
-
 pub fn execute() {
     let args = Args::parse();
     match args.command {
@@ -166,10 +128,6 @@ fn command_list() {
     for backend in BackendValues::iter() {
         println!("- {}", backend);
     }
-    println!("\nAvailable Benchmarks:");
-    for bench in BenchmarkValues::iter() {
-        println!("- {}", bench);
-    }
 }
 
 fn command_run(run_args: RunArgs) {
@@ -184,15 +142,10 @@ fn command_run(run_args: RunArgs) {
             .filter(|b| b != &BackendValues::All)
             .collect();
     }
-    let mut benches = run_args.benches.clone();
-    if benches.contains(&BenchmarkValues::All) {
-        benches = BenchmarkValues::iter()
-            .filter(|b| b != &BenchmarkValues::All)
-            .collect();
-    }
     let access_token = tokens.map(|t| t.access_token);
+
     run_backend_comparison_benchmarks(
-        &benches,
+        &run_args.benches.clone(),
         &backends,
         &run_args.versions,
         access_token.as_deref(),
@@ -201,7 +154,7 @@ fn command_run(run_args: RunArgs) {
 }
 
 fn run_backend_comparison_benchmarks(
-    benches: &[BenchmarkValues],
+    benches: &[String],
     backends: &[BackendValues],
     versions: &[String],
     token: Option<&str>,
@@ -274,8 +227,6 @@ fn run_cargo(
     let guard = dependency.patch().unwrap();
 
     let mut args = vec![
-        "-p",
-        "backend-comparison",
         "--bench",
         bench,
         "--features",

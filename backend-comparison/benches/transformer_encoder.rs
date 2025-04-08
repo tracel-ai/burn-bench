@@ -1,4 +1,3 @@
-use backend_comparison::persistence::save;
 use burn::{
     backend::Autodiff,
     nn::{
@@ -9,7 +8,7 @@ use burn::{
     prelude::*,
     tensor::{Element, activation::softmax, backend::AutodiffBackend},
 };
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 
 #[derive(Debug, Clone)]
 pub struct TrainingBatch<B: Backend> {
@@ -203,12 +202,7 @@ impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     // Something similar to RoBERTa-base.
     let config = ModelConfig::new(
         TransformerEncoderConfig::new(768, 3072, 12, 12).with_norm_first(true),
@@ -231,19 +225,12 @@ fn bench<B: Backend>(
         config,
     };
 
-    save::<B>(
-        vec![
-            run_benchmark(benchmark_inference),
-            run_benchmark(benchmark_training),
-        ],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    vec![
+        run_benchmark(benchmark_inference),
+        run_benchmark(benchmark_training),
+    ]
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }
