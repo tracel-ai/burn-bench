@@ -1,6 +1,10 @@
-use std::error::Error;
-
-use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::{
+    Layer,
+    filter::{LevelFilter, filter_fn},
+    layer::SubscriberExt,
+    registry,
+    util::SubscriberInitExt,
+};
 
 pub mod burnbenchapp;
 pub mod persistence;
@@ -35,16 +39,26 @@ pub fn get_sharing_url(args: &[String]) -> Option<&str> {
     get_argument(args, "--sharing-url")
 }
 
-pub fn init_log() -> Result<(), Box<dyn Error + Send + Sync>> {
-    let result = tracing_subscriber::fmt()
-        .with_max_level(LevelFilter::DEBUG)
-        .without_time()
-        .try_init();
+pub fn init_log() -> Result<(), String> {
+    let layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_filter(LevelFilter::INFO)
+        .with_filter(filter_fn(|m| {
+            if let Some(path) = m.module_path() {
+                if path.starts_with("wgpu") {
+                    return false;
+                }
+            }
+            true
+        }));
 
-    if result.is_ok() {
+    let result = registry().with(layer).try_init();
+
+    if result.is_err() {
         update_panic_hook();
     }
-    result
+
+    result.map_err(|err| format!("{err:?}"))
 }
 
 fn update_panic_hook() {
@@ -54,33 +68,6 @@ fn update_panic_hook() {
         log::error!("PANIC => {}", info);
         hook(info);
     }));
-}
-
-pub fn get_package_rev(package: &str) -> String {
-    // Benchmarks are written as examples so their dependencies (e.g., Burn) marked as dev
-    let dep = crate::build_info::DEPENDENCIES
-        .get("burn")
-        .unwrap_or_else(|| panic!("Could not find dependency '{package}'"));
-
-    let revision = if dep.source.starts_with("git+") {
-        let rev = if dep.source.contains("?rev=") {
-            dep.source.rsplit("?rev=").collect::<Vec<_>>()[0]
-        } else {
-            dep.version // no specific revision, just latest git
-        };
-        format!("git+{rev}")
-    } else if dep.source.starts_with("path+") {
-        String::from("local")
-    } else if dep.source.starts_with("registry+") {
-        dep.version.into()
-    } else {
-        panic!(
-            "Unexpected source for dependency '{}': {}",
-            package, dep.source
-        );
-    };
-
-    revision
 }
 
 #[macro_export]

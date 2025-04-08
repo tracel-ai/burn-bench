@@ -1,5 +1,6 @@
 mod auth;
 mod base;
+mod dependency;
 mod progressbar;
 mod reports;
 mod runner;

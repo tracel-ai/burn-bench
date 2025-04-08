@@ -100,17 +100,28 @@ impl OutputProcessor for NiceProcessor {
 /// Benchmark runner using cargo bench.
 pub struct CargoRunner<'a> {
     params: &'a [&'a str],
+    envs: Vec<(String, String)>,
     processor: Arc<dyn OutputProcessor>,
 }
 
 impl<'a> CargoRunner<'a> {
-    pub fn new(params: &'a [&'a str], processor: Arc<dyn OutputProcessor>) -> Self {
-        Self { params, processor }
+    pub fn new(
+        params: &'a [&'a str],
+        envs: Vec<(String, String)>,
+        processor: Arc<dyn OutputProcessor>,
+    ) -> Self {
+        Self {
+            params,
+            envs,
+            processor,
+        }
     }
 
     pub fn run(&mut self) -> io::Result<ExitStatus> {
+        println!("{:?}", self.params);
         let mut cargo = Command::new("cargo")
             .env("CARGO_TERM_COLOR", "always")
+            .envs(self.envs.iter().map(|(k, v)| (k, v)))
             .arg("bench")
             .args(self.params)
             .stdout(Stdio::piped())

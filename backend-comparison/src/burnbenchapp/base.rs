@@ -11,6 +11,7 @@ use crate::persistence::system_info::BenchmarkSystemInfo;
 use super::USER_BENCHMARK_WEBSITE_URL;
 use super::auth::get_tokens;
 use super::auth::get_username;
+use super::dependency::Dependency;
 use super::progressbar::RunnerProgressBar;
 use super::reports::{BenchmarkCollection, FailedBenchmark};
 use super::runner::{CargoRunner, NiceProcessor, OutputProcessor, VerboseProcessor};
@@ -49,6 +50,12 @@ struct RunArgs {
     /// Space separated list of benches to run
     #[clap(short = 'b', long = "benches", value_name = "BENCH BENCH ...", num_args(1..), required = true)]
     benches: Vec<BenchmarkValues>,
+
+    /// One or more Burn versions, git branches, or commit hashes
+    ///
+    /// Default using @main.
+    #[clap(short = 'V', long = "versions", num_args(0..))]
+    pub versions: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Display, EnumIter)]
@@ -187,6 +194,7 @@ fn command_run(run_args: RunArgs) {
     run_backend_comparison_benchmarks(
         &benches,
         &backends,
+        &run_args.versions,
         access_token.as_deref(),
         run_args.verbose,
     );
@@ -195,40 +203,44 @@ fn command_run(run_args: RunArgs) {
 fn run_backend_comparison_benchmarks(
     benches: &[BenchmarkValues],
     backends: &[BackendValues],
+    versions: &[String],
     token: Option<&str>,
     verbose: bool,
 ) {
     let mut report_collection = BenchmarkCollection::default();
-    let total_count: u64 = (backends.len() * benches.len()).try_into().unwrap();
+    let total_count: u64 = (backends.len() * benches.len() * versions.len())
+        .try_into()
+        .unwrap();
     let runner_pb: Option<Arc<Mutex<RunnerProgressBar>>> = if verbose {
         None
     } else {
         Some(Arc::new(Mutex::new(RunnerProgressBar::new(total_count))))
     };
     // Iterate through every combination of benchmark and backend
-    let rev = crate::get_package_rev("burn");
-    println!("\nBenchmarking Burn @ {rev}");
+    println!("\nBenchmarking Burn @ {versions:?}");
     for bench in benches.iter() {
         for backend in backends.iter() {
-            let bench_str = bench.to_string();
-            let backend_str = backend.to_string();
-            let url = format!("{}benchmarks", super::USER_BENCHMARK_SERVER_URL);
+            for version in versions.iter() {
+                let bench_str = bench.to_string();
+                let backend_str = backend.to_string();
+                let url = format!("{}benchmarks", super::USER_BENCHMARK_SERVER_URL);
 
-            let status = run_cargo(&bench_str, &backend_str, &url, token, &runner_pb);
-            let success = status.unwrap().success();
+                let status = run_cargo(&bench_str, &backend_str, &url, token, &runner_pb, &version);
+                let success = status.unwrap().success();
 
-            if success {
-                if let Some(ref pb) = runner_pb {
-                    pb.lock().unwrap().succeeded_inc();
+                if success {
+                    if let Some(ref pb) = runner_pb {
+                        pb.lock().unwrap().succeeded_inc();
+                    }
+                } else {
+                    if let Some(ref pb) = runner_pb {
+                        pb.lock().unwrap().failed_inc();
+                    }
+                    report_collection.push_failed_benchmark(FailedBenchmark {
+                        bench: bench_str.clone(),
+                        backend: backend_str.clone(),
+                    })
                 }
-            } else {
-                if let Some(ref pb) = runner_pb {
-                    pb.lock().unwrap().failed_inc();
-                }
-                report_collection.push_failed_benchmark(FailedBenchmark {
-                    bench: bench_str.clone(),
-                    backend: backend_str.clone(),
-                })
             }
         }
     }
@@ -247,6 +259,7 @@ fn run_cargo(
     url: &str,
     token: Option<&str>,
     progress_bar: &Option<Arc<Mutex<RunnerProgressBar>>>,
+    version: &str,
 ) -> io::Result<ExitStatus> {
     let processor: Arc<dyn OutputProcessor> = if let Some(pb) = progress_bar {
         Arc::new(NiceProcessor::new(
@@ -257,6 +270,9 @@ fn run_cargo(
     } else {
         Arc::new(VerboseProcessor)
     };
+    let dependency = Dependency::new(version);
+    let guard = dependency.patch().unwrap();
+
     let mut args = vec![
         "-p",
         "backend-comparison",
@@ -267,6 +283,7 @@ fn run_cargo(
         "--target-dir",
         super::BENCHMARKS_TARGET_DIR,
     ];
+
     if let Some(t) = token {
         args.push("--");
         args.push("--sharing-url");
@@ -274,8 +291,16 @@ fn run_cargo(
         args.push("--sharing-token");
         args.push(t);
     }
-    let mut runner = CargoRunner::new(&args, processor);
-    runner.run()
+    let mut runner = CargoRunner::new(
+        &args,
+        vec![("BURN_BENCH_BURN_VERSION".to_string(), version.to_string())],
+        processor,
+    );
+    let status = runner.run();
+
+    core::mem::drop(guard);
+
+    status
 }
 
 fn web_results_url(token: Option<&str>) -> Option<String> {
