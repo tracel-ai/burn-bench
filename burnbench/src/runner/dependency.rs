@@ -1,6 +1,7 @@
 use regex::Regex;
 use semver::Version;
 use std::io::Write;
+use std::time::Duration;
 use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
@@ -42,17 +43,19 @@ impl Drop for CargoDependencyGuard {
             .unwrap();
         cargo_file.set_len(0).unwrap();
         write!(cargo_file, "{}", self.original_content).unwrap();
+        println!("Reset original cargo file");
+        std::thread::sleep(Duration::from_millis(200));
     }
 }
 
 impl Dependency {
     pub fn patch(&self) -> std::io::Result<CargoDependencyGuard> {
-        let cargo_file_path = Path::new("Cargo.toml");
+        let cargo_file_path = Path::new("backend-comparison").join("Cargo.toml");
 
         let original_content = std::fs::read_to_string(&cargo_file_path)?;
 
         let content = match self {
-            Dependency::Local => self.update_burn_local(&original_content, "../burn/"),
+            Dependency::Local => self.update_burn_local(&original_content, "../../burn/"),
             Dependency::Crate(version) => self.update_burn_version(&original_content, version),
             Dependency::Git(version) => self.update_burn_git(&original_content, version),
         }?;
@@ -66,6 +69,50 @@ impl Dependency {
         Ok(guard)
     }
 
+    fn update_feature_flags(version: &Version, content: String) -> String {
+        if version < &Version::new(0, 17, 0) {
+            let content = content
+                .replace("cuda = [\"burn/cuda\"]", "cuda = [\"burn/cuda-jit\"]")
+                .replace("hip = [\"burn/hip\"]", "hip = [\"burn/hip-jit\"]")
+                .replace(
+                    "ndarray-simd = [\"ndarray\", \"burn/simd\"]",
+                    "ndarray-simd = [\"ndarray\"]",
+                )
+                .replace(
+                    "vulkan = [\"burn/vulkan\", \"burn/autotune\"]",
+                    "vulkan = [\"burn/wgpu-spirv\", \"burn/autotune\"]",
+                )
+                .replace(
+                    "metal = [\"burn/vulkan\", \"burn/autotune\"]",
+                    "metal = [\"burn/wgpu\", \"burn/autotune\"]",
+                )
+                .replace(
+                    "ndarray-simd = [\"burn/ndarray\", \"burn/simd\"]",
+                    "ndarray-simd = [\"burn/ndarray\"]",
+                )
+                .replace(
+                    "candle-metal = [\"burn/candle\", \"burn/candle-metal\"]",
+                    "candle-metal = [\"burn/candle\", \"burn/metal\"]",
+                )
+                // Use matching `rand` version (binary and data benchmarks)
+                .replace(
+                    "rand = { version = \"0.9.0\" }",
+                    "rand = { version = \"0.8.5\" }",
+                );
+
+            if (version < &Version::new(0, 16, 1)) & !content.contains("bincode = \"=2.0.0-rc.3\"")
+            {
+                content.replace(
+                    "[dependencies]",
+                    "[dependencies]\nbincode = \"=2.0.0-rc.3\"\nbincode_derive = \"=2.0.0-rc.3\"",
+                )
+            } else {
+                content
+            }
+        } else {
+            content
+        }
+    }
     fn update_burn_version(
         &self,
         content: &str,
@@ -95,6 +142,7 @@ impl Dependency {
             )
             .to_string();
 
+        let content = Self::update_feature_flags(version, content);
         Ok(content)
     }
 

@@ -264,7 +264,11 @@ fn run_cargo(
     };
     let dependency = Dependency::new(version);
     let guard = dependency.patch().unwrap();
-    let features = format!("{backend},{dtype}");
+    let mut features = format!("{backend},{dtype}");
+
+    if version.starts_with("0.16") {
+        features += ",legacy-v16";
+    }
 
     let mut args = if bench == "all" {
         vec![

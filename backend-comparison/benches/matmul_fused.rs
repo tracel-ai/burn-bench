@@ -49,9 +49,9 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     [
         (2, 4096, 4096, 4096),
-        (32, 2048, 2048, 2048),
-        (256, 1024, 1024, 1024),
-        (1024, 256, 256, 256),
+        (16, 2048, 2048, 2048),
+        (32, 1024, 1024, 1024),
+        (256, 256, 256, 256),
     ]
     .into_iter()
     .map(|(b, m, n, k)| {

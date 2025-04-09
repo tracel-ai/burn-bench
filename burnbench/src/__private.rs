@@ -137,7 +137,10 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "cuda")]
         {
+            #[cfg(not(feature = "legacy-v16"))]
             use burn::backend::Cuda;
+            #[cfg(feature = "legacy-v16")]
+            use burn::backend::CudaJit as Cuda;
 
             let device = Default::default();
             $crate::bench_on_backend!($fn_name, Cuda<$dtype>, device);
@@ -209,7 +212,10 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "hip")]
         {
+            #[cfg(not(feature = "legacy-v16"))]
             use burn::backend::Hip;
+            #[cfg(feature = "legacy-v16")]
+            use burn::backend::HipJit as Cuda;
 
             let device = Default::default();
             $crate::bench_on_backend!($fn_name, Hip<$dtype>, device);
@@ -265,7 +271,10 @@ macro_rules! bench_on_backend {
         let feature_name = "hip";
 
         let device_name = format!("{:?}", &$device);
+        #[cfg(not(feature = "legacy-v16"))]
         let backend_name = <$backend as Backend>::name(&$device);
+        #[cfg(feature = "legacy-v16")]
+        let backend_name = <$backend as Backend>::name();
         let benches = $fn_name::<$backend>(&$device);
         __save_result(benches, backend_name, device_name, url, token, feature_name);
     };
