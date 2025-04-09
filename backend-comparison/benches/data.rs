@@ -2,9 +2,9 @@ use burn::tensor::{Distribution, Element, Shape, Tensor, TensorData, backend::Ba
 use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
-#[cfg(not(burn_version_lt_0170))]
+#[cfg(not(feature = "legacy-v16"))]
 use rand::rng;
-#[cfg(burn_version_lt_0170)]
+#[cfg(feature = "legacy-v16")]
 use rand::thread_rng as rng;
 
 #[derive(new)]

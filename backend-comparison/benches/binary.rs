@@ -2,9 +2,9 @@ use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use std::marker::PhantomData;
 
-#[cfg(not(burn_version_lt_0170))]
+#[cfg(not(feature = "legacy-v16"))]
 use rand::rng;
-#[cfg(burn_version_lt_0170)]
+#[cfg(feature = "legacy-v16")]
 use rand::thread_rng as rng;
 
 pub struct BinaryBenchmark<B: Backend, const D: usize> {
