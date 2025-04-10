@@ -1,6 +1,5 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
-use burnbench;
 
 // Files retrieved during build to avoid reimplementing ResNet for benchmarks
 mod block {

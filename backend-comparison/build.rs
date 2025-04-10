@@ -276,8 +276,6 @@ fn clone_resnet_source() {
 }
 
 fn main() {
-    println!("cargo::rustc-check-cfg=cfg(burn_version_lt_0170)");
-
     // For the ResNet benchmark we need to clone the source since we want it to use the selected burn version or revision
     clone_resnet_source();
 }

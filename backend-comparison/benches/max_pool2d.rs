@@ -1,8 +1,6 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend, module::max_pool2d};
 use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 
-burnbench::define_types!();
-
 pub struct MaxPool2dBenchmark<B: Backend> {
     shape: Shape,
     kernel_size: [usize; 2],

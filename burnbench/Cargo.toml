@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 name = "burnbench"
 readme = "README.md"
-repository = "https://github.com/tracel-ai/burn-bench/tree/main/backend-comparison"
+repository = "https://github.com/tracel-ai/burn-bench/"
 version = "0.1.0"
 
 [features]
@@ -14,6 +14,7 @@ persistence = []
 runner = []
 
 [dependencies]
+glob = "0.3.1"
 cfg-if = { workspace = true }
 semver = { workspace = true }
 arboard = { workspace = true }

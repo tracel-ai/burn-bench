@@ -11,7 +11,7 @@ use crate::system_info::BenchmarkSystemInfo;
 use super::auth::get_tokens;
 use super::auth::get_username;
 use super::dependency::Dependency;
-use super::processor::{CargoRunner, NiceProcessor, OutputProcessor, VerboseProcessor};
+use super::processor::{CargoRunner, NiceProcessor, OutputProcessor, Profiling, VerboseProcessor};
 use super::progressbar::RunnerProgressBar;
 use super::reports::{BenchmarkCollection, FailedBenchmark};
 use crate::USER_BENCHMARK_WEBSITE_URL;
@@ -59,6 +59,14 @@ struct RunArgs {
 
     #[clap(short = 'd', long = "dtypes", num_args(0..))]
     pub dtypes: Vec<BenchDType>,
+
+    #[clap(short = 'p', long = "profile", default_value = "false")]
+    pub profile: bool,
+
+    #[arg(long, default_value = "ncu")]
+    pub ncu_path: String,
+    #[arg(long, default_value = "ncu-ui")]
+    pub ncu_ui_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Display, EnumIter)]
@@ -161,13 +169,25 @@ fn command_run(mut run_args: RunArgs) {
     }
     let access_token = tokens.map(|t| t.access_token);
 
+    // Set the defaults
     if run_args.dtypes.is_empty() {
         run_args.dtypes.push(BenchDType::F32);
     }
     if run_args.benches.is_empty() {
         run_args.benches.push("all".to_string());
     }
+    if run_args.versions.is_empty() {
+        run_args.versions.push("main".to_string());
+    }
 
+    let profiling = if run_args.profile {
+        Profiling::Activated {
+            ncu_path: run_args.ncu_path,
+            ncu_ui_path: run_args.ncu_ui_path,
+        }
+    } else {
+        Profiling::Deactivated
+    };
     run_backend_comparison_benchmarks(
         &run_args.benches,
         &backends,
@@ -175,6 +195,7 @@ fn command_run(mut run_args: RunArgs) {
         &run_args.dtypes,
         access_token.as_deref(),
         run_args.verbose,
+        &profiling,
     );
 }
 
@@ -185,6 +206,7 @@ fn run_backend_comparison_benchmarks(
     dtypes: &[BenchDType],
     token: Option<&str>,
     verbose: bool,
+    profiling: &Profiling,
 ) {
     let mut report_collection = BenchmarkCollection::default();
     let total_count: u64 = (backends.len() * benches.len() * versions.len())
@@ -197,10 +219,10 @@ fn run_backend_comparison_benchmarks(
     };
     // Iterate through every combination of benchmark and backend
     println!("\nBenchmarking Burn @ {versions:?}");
-    for dtype in dtypes.iter() {
-        for bench in benches.iter() {
-            for backend in backends.iter() {
-                for version in versions.iter() {
+    for version in versions.iter() {
+        for backend in backends.iter() {
+            for bench in benches.iter() {
+                for dtype in dtypes.iter() {
                     let bench_str = bench.to_string();
                     let backend_str = backend.to_string();
                     let url = format!("{}benchmarks", crate::USER_BENCHMARK_SERVER_URL);
@@ -213,6 +235,7 @@ fn run_backend_comparison_benchmarks(
                         token,
                         &runner_pb,
                         &version,
+                        profiling,
                     );
                     let success = status.unwrap().success();
 
@@ -252,6 +275,7 @@ fn run_cargo(
     token: Option<&str>,
     progress_bar: &Option<Arc<Mutex<RunnerProgressBar>>>,
     version: &str,
+    profile: &Profiling,
 ) -> io::Result<ExitStatus> {
     let processor: Arc<dyn OutputProcessor> = if let Some(pb) = progress_bar {
         Arc::new(NiceProcessor::new(
@@ -296,10 +320,11 @@ fn run_cargo(
         args.push("--sharing-token");
         args.push(t);
     }
-    let mut runner = CargoRunner::new(
+    let runner = CargoRunner::new(
         &args,
         vec![("BURN_BENCH_BURN_VERSION".to_string(), version.to_string())],
         processor,
+        profile.clone(),
     );
     let status = runner.run();
 

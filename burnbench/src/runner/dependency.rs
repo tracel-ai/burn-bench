@@ -43,7 +43,7 @@ impl Drop for CargoDependencyGuard {
             .unwrap();
         cargo_file.set_len(0).unwrap();
         write!(cargo_file, "{}", self.original_content).unwrap();
-        println!("Reset original cargo file");
+        log::info!("Reset original cargo file");
         std::thread::sleep(Duration::from_millis(200));
     }
 }
