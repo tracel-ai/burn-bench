@@ -209,7 +209,7 @@ fn run_backend_comparison_benchmarks(
     profiling: &Profiling,
 ) {
     let mut report_collection = BenchmarkCollection::default();
-    let total_count: u64 = (backends.len() * benches.len() * versions.len())
+    let total_count: u64 = (backends.len() * benches.len() * versions.len() * dtypes.len())
         .try_into()
         .unwrap();
     let runner_pb: Option<Arc<Mutex<RunnerProgressBar>>> = if verbose {
