@@ -51,11 +51,12 @@ impl Drop for CargoDependencyGuard {
 impl Dependency {
     pub fn patch(&self) -> std::io::Result<CargoDependencyGuard> {
         let cargo_file_path = Path::new("backend-comparison").join("Cargo.toml");
+        let burn_dir = std::env::var("BURN_BENCH_BURN_DIR").unwrap_or("../../burn/".into());
 
         let original_content = std::fs::read_to_string(&cargo_file_path)?;
 
         let content = match self {
-            Dependency::Local => self.update_burn_local(&original_content, "../../burn/"),
+            Dependency::Local => self.update_burn_local(&original_content, &burn_dir),
             Dependency::Crate(version) => self.update_burn_version(&original_content, version),
             Dependency::Git(version) => self.update_burn_git(&original_content, version),
         }?;

@@ -8,6 +8,8 @@ identify regressions, improvements, and the best backend for a given workload.
 
 - **`backend-comparison/`**: Benchmarks for backend performance, ranging from individual tensor
   operations to full forward and backward passes for a given model.
+- **`burnbench/`**: The core benchmarking crate and CLI. Can be used as a standalone tool or
+  integrated as a library to define and run custom benchmark suites.
 - **(Future)** **`integration-tests/`**: TBD. We'd like to add more tests to capture more complex
   workloads, including evaluation of model convergence, metrics, and overall training performance.
 
@@ -25,20 +27,15 @@ Or use the shorthand alias:
 cargo bb run -b unary -B wgpu-fusion
 ```
 
+This will use the main branch of Burn by default.
+
 To benchmark performance across version(s):
 
 ```sh
-cargo xtask bench 0.16.1 main local --benches unary --backends wgpu-fusion
+cargo bb run -b unary --B wgpu-fusion -V 0.16.1 main local
 ```
 
 You can specify one or more versions and provide custom `burnbench` arguments to benchmark them.
-
-```sh
-cargo xtask bench <version1> [version2...] <burnbench_args>
-```
-
-This will run benchmarks on the specified versions and log the results in a timestamped file,
-allowing you to compare their performance.
 
 The versions can be one of:
 
@@ -48,19 +45,11 @@ The versions can be one of:
 - `local`
 
 By default, the `local` version points to a relative path for the Burn repo directory (`../../burn`
-relative to `backend-comparison/`). This can be modified via the `BURN_DIR` environment variable.
+relative to `backend-comparison/`). This can be modified via the `BURN_BENCH_BURN_DIR` environment
+variable.
 
-> **Note:** this might not work out of the box for previous versions with unspecified breaking
-> changes to the API or feature flag names. We currently handle changes after the 0.16 release.  
-> To handle feature flag changes, you probably want to modify
-> [`compare.rs`](./xtask/src/commands/compare.rs) to overwrite the `Cargo.toml` based on some
-> condition. See for example
-> [`replace_feature_flags_lt_0_17`](./xtask/src/commands/compare.rs#318).  
-> For breaking API changes, this can be handled in the build script to add a cfg. See for example
-> [`burn_version_lt_0170`](./backend-comparison/build.rs#L372) and how it is
-> [used for conditional compilation](./backend-comparison/src/persistence/base.rs#L71).
-
-For detailed instructions, see the [`backend-comparison/README.md`](./backend-comparison/README.md).
+For detailed instructions, see [`burnbench/README.md`](./burnbench/README.md) and
+[`backend-comparison/README.md`](./backend-comparison/README.md).
 
 ## Community Benchmarks
 
