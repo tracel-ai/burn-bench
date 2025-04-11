@@ -147,3 +147,7 @@ name = "autodiff"
 [[bench]]
 harness = false
 name = "reduce"
+
+[[bench]]
+harness = false
+name = "softmax"
