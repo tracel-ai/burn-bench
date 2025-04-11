@@ -1,8 +1,4 @@
-#[cfg(not(burn_version_lt_0170))]
-use burn::backend::wgpu::graphics::{AutoGraphicsApi, GraphicsApi};
-#[cfg(burn_version_lt_0170)]
-use burn::backend::wgpu::{AutoGraphicsApi, GraphicsApi};
-use burn::serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use sysinfo;
 use wgpu::{self, Backends};
@@ -31,7 +27,7 @@ impl From<os_info::Info> for BenchmarkOSInfo {
 }
 
 impl BenchmarkSystemInfo {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             cpus: BenchmarkSystemInfo::enumerate_cpus(),
             gpus: BenchmarkSystemInfo::enumerate_gpus(),
@@ -55,7 +51,16 @@ impl BenchmarkSystemInfo {
         let instance = wgpu::Instance::default();
         let adapters: Vec<wgpu::Adapter> = instance
             .enumerate_adapters({
-                let backend = AutoGraphicsApi::backend();
+                let backend;
+                cfg_if::cfg_if! {
+                    if #[cfg(target_family = "wasm")] {
+                        backend = wgpu::Backend::BrowserWebGpu;
+                    } else if #[cfg(target_os = "macos")] {
+                         backend = wgpu::Backend::Metal;
+                    } else {
+                        backend = wgpu::Backend::Vulkan;
+                    }
+                };
                 Backends::from_bits(1 << backend as u32).unwrap()
             })
             .into_iter()

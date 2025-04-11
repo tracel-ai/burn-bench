@@ -1,12 +1,10 @@
+use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use std::marker::PhantomData;
 
-use backend_comparison::persistence::save;
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, run_benchmark};
-
-#[cfg(not(burn_version_lt_0170))]
+#[cfg(not(feature = "legacy-v16"))]
 use rand::rng;
-#[cfg(burn_version_lt_0170)]
+#[cfg(feature = "legacy-v16")]
 use rand::thread_rng as rng;
 
 pub struct BinaryBenchmark<B: Backend, const D: usize> {
@@ -75,12 +73,7 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let benchmark = BinaryBenchmark::<B, 3> {
         shape: [512, 512, 1024].into(),
         device: device.clone(),
@@ -91,16 +84,9 @@ fn bench<B: Backend>(
         _ty: PhantomData,
     };
 
-    save::<B>(
-        vec![run_benchmark(benchmark), run_benchmark(benchmark_scalar)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    vec![run_benchmark(benchmark), run_benchmark(benchmark_scalar)]
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

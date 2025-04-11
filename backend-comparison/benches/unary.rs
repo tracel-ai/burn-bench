@@ -1,6 +1,5 @@
-use backend_comparison::persistence::save;
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
@@ -35,27 +34,15 @@ impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     const D: usize = 3;
     let shape: Shape = [32, 512, 1024].into();
 
     let benchmark = UnaryBenchmark::<B, D>::new(shape, device.clone());
 
-    save::<B>(
-        vec![run_benchmark(benchmark)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    vec![run_benchmark(benchmark)]
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

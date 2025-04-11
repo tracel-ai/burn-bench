@@ -1,4 +1,3 @@
-use backend_comparison::persistence::save;
 use burn::{
     module::Module,
     nn,
@@ -7,7 +6,7 @@ use burn::{
         backend::{AutodiffBackend, Backend},
     },
 };
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 
 pub struct AutodiffOverheadBenchmark<B: AutodiffBackend> {
     config: nn::LstmConfig,
@@ -52,12 +51,7 @@ impl<B: AutodiffBackend> Benchmark for AutodiffOverheadBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let config = nn::LstmConfig::new(3, 3, true);
     let lstm = config.init(device);
     let benchmark = AutodiffOverheadBenchmark::<burn::backend::Autodiff<B>> {
@@ -66,16 +60,9 @@ fn bench<B: Backend>(
         device: device.clone(),
     };
 
-    save::<B>(
-        vec![run_benchmark(benchmark)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    vec![run_benchmark(benchmark)]
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

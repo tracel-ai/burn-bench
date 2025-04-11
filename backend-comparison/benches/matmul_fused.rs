@@ -1,10 +1,9 @@
-use backend_comparison::persistence::save;
 use burn::tensor::{
     Distribution, Element, Shape, Tensor,
     activation::{gelu, relu},
     backend::Backend,
 };
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
@@ -47,17 +46,12 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
-    let benchmarks = [
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+    [
         (2, 4096, 4096, 4096),
-        (32, 2048, 2048, 2048),
-        (256, 1024, 1024, 1024),
-        (1024, 256, 256, 256),
+        (16, 2048, 2048, 2048),
+        (32, 1024, 1024, 1024),
+        (256, 256, 256, 256),
     ]
     .into_iter()
     .map(|(b, m, n, k)| {
@@ -67,11 +61,9 @@ fn bench<B: Backend>(
         MatmulBenchmark::<B, 3>::new(shape_lhs, shape_rhs, device.clone())
     })
     .map(run_benchmark)
-    .collect();
-
-    save::<B>(benchmarks, device, feature_name, url, token).unwrap();
+    .collect()
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

@@ -1,8 +1,7 @@
-use backend_comparison::persistence::save;
 use burn::tensor::{
     Distribution, Element, Shape, Tensor, backend::Backend, module::conv3d, ops::ConvOptions,
 };
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 
 pub struct Conv3dBenchmark<B: Backend> {
     input_shape: Shape,
@@ -53,12 +52,7 @@ impl<B: Backend> Benchmark for Conv3dBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     // Shapes
     let batch_size = 16;
     let channels_in = 16;
@@ -91,16 +85,9 @@ fn bench<B: Backend>(
         device: device.clone(),
     };
 
-    save::<B>(
-        vec![run_benchmark(benchmark)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    vec![run_benchmark(benchmark)]
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

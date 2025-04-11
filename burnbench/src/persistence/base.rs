@@ -1,20 +1,70 @@
-use super::system_info::BenchmarkSystemInfo;
-use burn::{
-    serde::{Deserialize, Serialize, Serializer, de::Visitor, ser::SerializeStruct},
-    tensor::backend::Backend,
-};
-use burn_common::benchmark::BenchmarkResult;
+use crate::system_info::BenchmarkSystemInfo;
+
 use dirs;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, USER_AGENT};
+use serde::{Deserialize, Serialize, Serializer, de::Visitor, ser::SerializeStruct};
 use serde_json;
 use std::time::Duration;
 use std::{fs, io::Write};
+
+/// Result of a benchmark run, with metadata
+#[derive(Default, Clone, Serialize, Deserialize)]
+pub struct BenchmarkResult {
+    /// Individual raw results of the run
+    pub raw: BenchmarkDurations,
+    /// Computed values for the run
+    pub computed: BenchmarkComputations,
+    /// Git commit hash of the commit in which the run occurred
+    pub git_hash: String,
+    /// Name of the benchmark
+    pub name: String,
+    /// Options passed to the benchmark
+    pub options: Option<String>,
+    /// Shape dimensions
+    pub shapes: Vec<Vec<usize>>,
+    /// Time just before the run
+    pub timestamp: u128,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct BenchmarkComputations {
+    /// Mean of all the durations.
+    pub mean: Duration,
+    /// Median of all the durations.
+    pub median: Duration,
+    /// Variance of all the durations.
+    pub variance: Duration,
+    /// Minimum duration amongst all durations.
+    pub min: Duration,
+    /// Maximum duration amongst all durations.
+    pub max: Duration,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct BenchmarkDurations {
+    /// How these durations were measured.
+    pub timing_method: TimingMethod,
+    /// All durations of the run, in the order they were benchmarked
+    pub durations: Vec<Duration>,
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+pub enum TimingMethod {
+    /// Time measurements come from full timing of execution + sync
+    /// calls.
+    #[default]
+    Full,
+    /// Time measurements come from hardware reported timestamps
+    /// coming from a sync call.
+    DeviceOnly,
+}
 
 #[derive(Default, Clone)]
 pub struct BenchmarkRecord {
     pub backend: String,
     pub device: String,
     pub feature: String,
+    pub burn_version: String,
     pub system_info: BenchmarkSystemInfo,
     pub results: BenchmarkResult,
 }
@@ -47,45 +97,22 @@ pub struct BenchmarkRecord {
 ///    { ... }
 /// ]
 /// ```
-pub fn save<B: Backend>(
-    benches: Vec<BenchmarkResult>,
-    device: &B::Device,
-    feature: &str,
+pub fn save_records(
+    records: Vec<BenchmarkRecord>,
     url: Option<&str>,
     token: Option<&str>,
-) -> Result<Vec<BenchmarkRecord>, std::io::Error> {
+) -> Result<(), std::io::Error> {
     let cache_dir = dirs::home_dir()
         .expect("Home directory should exist")
         .join(".cache")
         .join("burn")
-        .join("backend-comparison");
-
-    for bench in benches.iter() {
-        println!("{bench}");
-    }
+        .join("burnbench");
 
     if !cache_dir.exists() {
         fs::create_dir_all(&cache_dir)?;
     }
 
-    // Previous versions of burn did not require a device to be specified for the backend name
-    #[cfg(burn_version_lt_0170)]
-    let backend_name = B::name().to_string();
-    #[cfg(not(burn_version_lt_0170))]
-    let backend_name = B::name(device).to_string();
-
-    let records: Vec<BenchmarkRecord> = benches
-        .into_iter()
-        .map(|bench| BenchmarkRecord {
-            backend: backend_name.clone(),
-            device: format!("{:?}", device),
-            feature: feature.to_string(),
-            system_info: BenchmarkSystemInfo::new(),
-            results: bench,
-        })
-        .collect();
-
-    for record in records.clone() {
+    for record in records {
         let file_name = format!(
             "bench_{}_{}.json",
             record.results.name, record.results.timestamp
@@ -117,7 +144,7 @@ pub fn save<B: Backend>(
         }
     }
 
-    Ok(records)
+    Ok(())
 }
 
 fn upload_record(record: &BenchmarkRecord, token: &str, url: &str) {
@@ -168,6 +195,7 @@ impl Serialize for BenchmarkRecord {
             ("device", &self.device),
             ("feature", &self.feature),
             ("gitHash", &self.results.git_hash),
+            ("burn_version", &self.burn_version),
             ("max", &self.results.computed.max.as_micros()),
             ("mean", &self.results.computed.mean.as_micros()),
             ("median", &self.results.computed.median.as_micros()),
@@ -193,7 +221,7 @@ impl<'de> Visitor<'de> for BenchmarkRecordVisitor {
     }
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
-        A: burn::serde::de::MapAccess<'de>,
+        A: serde::de::MapAccess<'de>,
     {
         let mut br = BenchmarkRecord::default();
         while let Some(key) = map.next_key::<String>()? {
@@ -201,6 +229,7 @@ impl<'de> Visitor<'de> for BenchmarkRecordVisitor {
                 "backend" => br.backend = map.next_value::<String>()?,
                 "device" => br.device = map.next_value::<String>()?,
                 "feature" => br.feature = map.next_value::<String>()?,
+                "burn_version" => br.burn_version = map.next_value::<String>()?,
                 "gitHash" => br.results.git_hash = map.next_value::<String>()?,
                 "name" => br.results.name = map.next_value::<String>()?,
                 "max" => {
@@ -240,7 +269,7 @@ impl<'de> Visitor<'de> for BenchmarkRecordVisitor {
 impl<'de> Deserialize<'de> for BenchmarkRecord {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: burn::serde::Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_map(BenchmarkRecordVisitor)
     }

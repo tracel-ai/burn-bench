@@ -36,7 +36,7 @@ impl Default for BenchmarkCollection {
             .expect("Home directory should exist")
             .join(".cache")
             .join("burn")
-            .join("backend-comparison")
+            .join("burnbench")
             .join("benchmark_results.txt");
         fs::remove_file(results_file.clone()).ok();
         Self {
@@ -134,6 +134,7 @@ impl Display for BenchmarkCollection {
         table.load_preset(comfy_table::presets::ASCII_MARKDOWN);
         table.set_header(vec![
             "Benchmark",
+            "Burn Version",
             "Shapes",
             "Feature",
             "Backend",
@@ -155,6 +156,7 @@ impl Display for BenchmarkCollection {
                         Cell::new("----").fg(Color::DarkGrey),
                         Cell::new("----").fg(Color::DarkGrey),
                         Cell::new("----").fg(Color::DarkGrey),
+                        Cell::new("----").fg(Color::DarkGrey),
                     ]);
                 }
                 prev_benchmark = &record.results.name;
@@ -163,6 +165,7 @@ impl Display for BenchmarkCollection {
 
             table.add_row(vec![
                 Cell::new(&record.results.name).fg(Color::Green),
+                Cell::new(&record.burn_version).fg(Color::Green),
                 Cell::new(format!("{}", ShapeFmt::new(&record.results.shapes))).fg(Color::Green),
                 Cell::new(&record.feature).fg(Color::Green),
                 Cell::new(format!("`{}`", &record.backend)).fg(Color::Green),
@@ -176,6 +179,7 @@ impl Display for BenchmarkCollection {
         for benchmark in &self.failed_benchmarks {
             table.add_row(vec![
                 Cell::new(&benchmark.bench).fg(Color::Red),
+                Cell::new("-"),
                 Cell::new("-"),
                 Cell::new("-"),
                 Cell::new(format!("`{}`", &benchmark.backend)).fg(Color::Red),

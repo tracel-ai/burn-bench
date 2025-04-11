@@ -1,8 +1,7 @@
-use backend_comparison::persistence::save;
 use burn::tensor::backend::Backend;
 use burn::tensor::{Device, Element};
 use burn::{config::Config, module::Module, nn};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(Module, Debug)]
@@ -98,45 +97,16 @@ impl<B: Backend> Benchmark for LoadRecordBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let config = BenchmarkConfig::new(nn::LinearConfig::new(2048, 2048), 12);
 
-    let benchmark_lazy = LoadRecordBenchmark::<B>::new(config.clone(), device.clone(), Kind::Lazy);
-    let benchmark_sync = LoadRecordBenchmark::<B>::new(config.clone(), device.clone(), Kind::Sync);
-    let benchmark_manual =
-        LoadRecordBenchmark::<B>::new(config.clone(), device.clone(), Kind::Manual);
-
-    save::<B>(
-        vec![run_benchmark(benchmark_lazy)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
-    save::<B>(
-        vec![run_benchmark(benchmark_manual)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
-    save::<B>(
-        vec![run_benchmark(benchmark_sync)],
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    [Kind::Lazy, Kind::Sync, Kind::Manual]
+        .into_iter()
+        .map(|kind| LoadRecordBenchmark::<B>::new(config.clone(), device.clone(), kind))
+        .map(run_benchmark)
+        .collect()
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!();
 }

@@ -1,6 +1,6 @@
 use arboard::Clipboard;
-use burn::serde::{Deserialize, Serialize};
 use reqwest;
+use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::{
@@ -187,7 +187,7 @@ fn save_tokens(tokens: &Tokens) {
 #[cfg(test)]
 use serial_test::serial;
 
-use crate::burnbenchapp::{USER_BENCHMARK_SERVER_URL, auth::github_device_flow::DeviceFlow};
+use crate::{USER_BENCHMARK_SERVER_URL, runner::auth::github_device_flow::DeviceFlow};
 
 #[cfg(test)]
 mod tests {

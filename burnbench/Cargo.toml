@@ -1,0 +1,49 @@
+[package]
+authors = ["Tracel Technologies Inc."]
+categories = ["science"]
+description = "This crate is used to time the execution of various computations, from operation kernels to complex model scenarios."
+edition.workspace = true
+license.workspace = true
+name = "burnbench"
+readme = "README.md"
+repository = "https://github.com/tracel-ai/burn-bench/"
+version = "0.1.0"
+
+[features]
+persistence = []
+runner = []
+
+[dependencies]
+glob = "0.3.1"
+cfg-if = { workspace = true }
+semver = { workspace = true }
+arboard = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+comfy-table = { workspace = true }
+derive-new = { workspace = true }
+dirs = { workspace = true }
+indicatif = { workspace = true }
+log = { workspace = true }
+os_info = { workspace = true }
+phf = { workspace = true }
+percent-encoding = { workspace = true }
+rand = { version = "0.9.0" }                          # pull the same version as burn
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["std"] }
+strum = { workspace = true, features = ["derive"] }
+sysinfo = { workspace = true }
+tracing-subscriber = { workspace = true }
+regex = { workspace = true }
+wgpu = { workspace = true }
+wsl = { workspace = true }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+serial_test = { workspace = true }
+
+[[bin]]
+name = "burnbench"
+path = "src/bin/burnbench.rs"

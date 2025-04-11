@@ -1,6 +1,6 @@
-use backend_comparison::persistence::save;
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, run_benchmark};
+use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench;
 
 enum Instruction {
     ArgMin(usize),
@@ -19,7 +19,7 @@ struct ReduceBenchmark<B: Backend> {
 
 impl<B: Backend> ReduceBenchmark<B> {
     pub fn new(instruction: Instruction, device: B::Device) -> Self {
-        let shape = Shape::new([4096, 512, 64]);
+        let shape = Shape::new([2048, 256, 64]);
         let tensor = Tensor::random(shape.clone(), Distribution::Default, &device);
         Self {
             instruction,
@@ -90,12 +90,7 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(
-    device: &B::Device,
-    feature_name: &str,
-    url: Option<&str>,
-    token: Option<&str>,
-) {
+fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let mut benchmarks = Vec::new();
 
     for axis in 0..3 {
@@ -119,17 +114,9 @@ fn bench<B: Backend>(
     }
 
     benchmarks.push(ReduceBenchmark::<B>::new(Instruction::Sum, device.clone()));
-
-    save::<B>(
-        benchmarks.into_iter().map(run_benchmark).collect(),
-        device,
-        feature_name,
-        url,
-        token,
-    )
-    .unwrap();
+    benchmarks.into_iter().map(run_benchmark).collect()
 }
 
 fn main() {
-    backend_comparison::bench_on_backend!();
+    burnbench::bench_on_backend!()
 }

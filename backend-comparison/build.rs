@@ -1,26 +1,7 @@
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Debug)]
-struct DependencyInfo {
-    name: String,
-    req: String,
-    source: Option<String>,
-    kind: Option<String>,
-    path: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PackageInfo {
-    name: String,
-    version: String,
-    id: String,
-}
 
 const MODELS_REPO: &str = "https://github.com/tracel-ai/models.git";
 
@@ -294,124 +275,7 @@ fn clone_resnet_source() {
     }
 }
 
-fn capture_packages_info() {
-    let package_name = env!("CARGO_PKG_NAME");
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=Cargo.toml");
-    println!("cargo:rerun-if-env-changed=CARGO_PKG_NAME");
-
-    let output = Command::new("cargo")
-        .args(["metadata", "--format-version", "1"])
-        .output()
-        .expect("Failed to execute cargo metadata");
-
-    let metadata: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("Invalid JSON from cargo metadata");
-
-    // Start generating Rust code
-    let mut code = String::new();
-    code.push_str("use phf::phf_map;\n\n");
-
-    // Define the PackageInfo struct
-    code.push_str("#[derive(Debug)]\n");
-    code.push_str("pub struct PackageInfo {\n");
-    code.push_str("    pub version: &'static str,\n");
-    code.push_str("    pub source: &'static str,\n");
-    code.push_str("}\n\n");
-
-    // Extract dependencies, versions, and sources
-    let dependencies = metadata
-        .get("packages")
-        .and_then(|p| p.as_array())
-        .expect("Should parse dependencies");
-
-    // Find the direct dependencies of this package
-    let mut direct_dependencies: Vec<DependencyInfo> = dependencies
-        .iter()
-        .find(|p| p.get("name").and_then(|v| v.as_str()) == Some(package_name))
-        .and_then(|p| {
-            p.get("dependencies").map(|deps| {
-                serde_json::from_value(deps.clone()).expect("Should parse direct dependencies")
-            })
-        })
-        .expect("Should find direct dependencies");
-
-    let packages: HashMap<String, PackageInfo> = serde_json::from_value::<Vec<PackageInfo>>(
-        metadata
-            .get("packages")
-            .expect("Should parse packages")
-            .clone(),
-    )
-    .unwrap()
-    .into_iter()
-    .map(|pkg| (pkg.name.clone(), pkg))
-    .collect();
-
-    let mut deps_str =
-        String::from("pub static DEPENDENCIES: phf::Map<&'static str, PackageInfo> = phf_map! {\n");
-    let mut deps_dev_str = String::from(
-        "pub static DEPENDENCIES_DEV: phf::Map<&'static str, PackageInfo> = phf_map! {\n",
-    );
-    let mut deps_build_str = String::from(
-        "pub static DEPENDENCIES_BUILD: phf::Map<&'static str, PackageInfo> = phf_map! {\n",
-    );
-    // println!("cargo::warning={direct_dependencies:?}");
-    direct_dependencies.iter_mut().for_each(|dep| {
-        if let Some(pkg) = packages.get(&dep.name) {
-            // Overwrite dependency info with actual package info
-            dep.source = Some(pkg.id.clone());
-            dep.req = pkg.version.clone();
-
-            // Cannot easily threshold based on git revision (commit hash), so
-            // we only check for version 0.17.0 to set `burn_version_lt_0170`
-            // since it is the lowest comparison point at this point
-            if dep.name == "burn" {
-                let pkg_version =
-                    semver::Version::parse(&pkg.version).expect("Invalid version format");
-                if pkg_version < semver::Version::new(0, 17, 0) {
-                    println!("cargo:rustc-cfg=burn_version_lt_0170");
-                }
-            }
-        }
-
-        let pkg_info = format!(
-            "    \"{}\" => PackageInfo {{ version: \"{}\", source: \"{}\" }},\n",
-            dep.name,
-            dep.req,
-            dep.source.as_ref().unwrap()
-        );
-
-        match &dep.kind {
-            Some(kind) => {
-                if kind == "dev" {
-                    deps_dev_str.push_str(&pkg_info);
-                } else if kind == "build" {
-                    deps_build_str.push_str(&pkg_info);
-                } else {
-                    unreachable!("Unexpexted dependency kind {kind}")
-                }
-            }
-            None => deps_str.push_str(&pkg_info),
-        }
-    });
-    deps_str.push_str("};\n");
-    deps_dev_str.push_str("};\n");
-    deps_build_str.push_str("};\n");
-
-    code.push_str(&format!("{deps_str}\n{deps_dev_str}\n{deps_build_str}"));
-
-    // Write the generated code to `OUT_DIR`
-    let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
-    let dest_path = Path::new(&out_dir).join("metadata.rs");
-    fs::write(dest_path, code).expect("Failed to write metadata.rs");
-}
-
 fn main() {
-    println!("cargo::rustc-check-cfg=cfg(burn_version_lt_0170)");
-
     // For the ResNet benchmark we need to clone the source since we want it to use the selected burn version or revision
     clone_resnet_source();
-
-    // Capture the burn version used
-    capture_packages_info();
 }
