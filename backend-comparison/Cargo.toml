@@ -38,8 +38,8 @@ bf16 = []
 legacy-v16 = []
 
 [dependencies]
-burn = { path = "../../burn//crates/burn", default-features = false }
-burn-common = { path = "../../burn//crates/burn-common" }
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
+burn-common = { git = "https://github.com/tracel-ai/burn", branch = "main" }
 burnbench = { path = "../burnbench" }
 
 semver = { workspace = true }
