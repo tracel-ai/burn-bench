@@ -159,10 +159,18 @@ impl<'a> CargoRunner<'a> {
             .and_then(|output| String::from_utf8(output.stdout).map_err(|_| ()))
             .expect("Can't find ncu. Make sure it is installed and in your PATH.");
 
+        let libtorch = std::env::var("LIBTORCH").unwrap_or_default();
+        let ld = std::env::var("LD_LIBRARY_PATH").unwrap_or_default();
+
+        let libtorch_env = format!("LIBTORCH={libtorch}");
+        let ld_env = format!("LD_LIBRARY_PATH={ld}");
+
         run_process(
             "sudo",
             &[
                 "BENCH_NUM_SAMPLES=1",
+                &libtorch_env,
+                &ld_env,
                 ncu_bin_path.trim(),
                 "--nvtx",
                 "--set=full",
