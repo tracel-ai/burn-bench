@@ -146,6 +146,14 @@ macro_rules! bench_on_backend {
             $crate::bench_on_backend!($fn_name, Cuda<$dtype>, device);
         }
 
+        #[cfg(feature = "metal")]
+        {
+            use burn::backend::Metal;
+
+            let device = Default::default();
+            $crate::bench_on_backend!($fn_name, Metal<$dtype>, device);
+        }
+
         #[cfg(any(feature = "wgpu", feature = "vulkan"))]
         {
             use burn::backend::Wgpu;
