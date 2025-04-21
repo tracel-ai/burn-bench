@@ -75,6 +75,8 @@ enum BenchDType {
     F32,
     #[strum(to_string = "f16")]
     F16,
+    #[strum(to_string = "flex32")]
+    FLEX32,
     #[strum(to_string = "bf16")]
     BF16,
 }

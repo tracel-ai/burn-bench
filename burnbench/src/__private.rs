@@ -129,6 +129,11 @@ macro_rules! bench_on_backend {
         {
             $crate::bench_on_backend!(bench, burn::tensor::bf16)
         }
+
+        #[cfg(feature = "flex32")]
+        {
+            $crate::bench_on_backend!(bench, burn::tensor::flex32)
+        }
     }};
 
     ($fn_name:ident, $dtype:ty) => {{

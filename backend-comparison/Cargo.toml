@@ -35,6 +35,7 @@ metal-fusion = ["metal", "burn/fusion"]
 f32 = []
 f16 = []
 bf16 = []
+flex32 = []
 legacy-v16 = []
 
 [dependencies]
