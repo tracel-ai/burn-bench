@@ -34,7 +34,7 @@ Available Backends:
 - candle-metal
 - cuda
 - cuda-fusion
-- hip
+- rocm
 - ndarray
 - ndarray-simd
 - ndarray-blas-accelerate
