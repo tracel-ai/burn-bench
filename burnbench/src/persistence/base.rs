@@ -195,7 +195,7 @@ impl Serialize for BenchmarkRecord {
             ("device", &self.device),
             ("feature", &self.feature),
             ("gitHash", &self.results.git_hash),
-            ("burn_version", &self.burn_version),
+            ("burnVersion", &self.burn_version),
             ("max", &self.results.computed.max.as_micros()),
             ("mean", &self.results.computed.mean.as_micros()),
             ("median", &self.results.computed.median.as_micros()),
@@ -229,7 +229,7 @@ impl<'de> Visitor<'de> for BenchmarkRecordVisitor {
                 "backend" => br.backend = map.next_value::<String>()?,
                 "device" => br.device = map.next_value::<String>()?,
                 "feature" => br.feature = map.next_value::<String>()?,
-                "burn_version" => br.burn_version = map.next_value::<String>()?,
+                "burnVersion" => br.burn_version = map.next_value::<String>()?,
                 "gitHash" => br.results.git_hash = map.next_value::<String>()?,
                 "name" => br.results.name = map.next_value::<String>()?,
                 "max" => {
