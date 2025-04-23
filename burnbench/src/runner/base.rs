@@ -96,8 +96,8 @@ enum BackendValues {
     #[strum(to_string = "cuda-fusion")]
     CudaFusion,
     #[cfg(target_os = "linux")]
-    #[strum(to_string = "hip")]
-    Hip,
+    #[strum(to_string = "rocm")]
+    Rocm,
     #[strum(to_string = "ndarray")]
     Ndarray,
     #[strum(to_string = "ndarray-simd")]
