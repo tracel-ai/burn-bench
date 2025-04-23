@@ -27,7 +27,7 @@ struct Args {
 enum Commands {
     /// Authenticate using GitHub
     Auth,
-    /// List all available benchmarks and backends
+    /// List all available backends
     List,
     /// Runs benchmarks
     Run(RunArgs),
