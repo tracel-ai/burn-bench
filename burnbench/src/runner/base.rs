@@ -98,6 +98,9 @@ enum BackendValues {
     #[cfg(target_os = "linux")]
     #[strum(to_string = "rocm")]
     Rocm,
+    #[cfg(target_os = "linux")]
+    #[strum(to_string = "rocm-fusion")]
+    RocmFusion,
     #[strum(to_string = "ndarray")]
     Ndarray,
     #[strum(to_string = "ndarray-simd")]

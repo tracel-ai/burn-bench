@@ -35,6 +35,7 @@ Available Backends:
 - cuda
 - cuda-fusion
 - rocm
+- rocm-fusion
 - ndarray
 - ndarray-simd
 - ndarray-blas-accelerate
