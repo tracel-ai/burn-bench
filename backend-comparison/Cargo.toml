@@ -18,6 +18,7 @@ cuda = ["burn/cuda"]
 cuda-fusion = ["cuda", "burn/fusion"]
 default = ["burn/std", "burn/autodiff", "burn/autotune"]
 rocm = ["burn/rocm"]
+rocm-fusion = ["rocm", "burn/fusion"]
 ndarray = ["burn/ndarray"]
 ndarray-blas-accelerate = ["ndarray", "burn/accelerate"]
 ndarray-blas-netlib = ["ndarray", "burn/blas-netlib"]
@@ -39,8 +40,8 @@ flex32 = []
 legacy-v16 = []
 
 [dependencies]
-burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
-burn-common = { git = "https://github.com/tracel-ai/burn", branch = "main" }
+burn = { version = "0.17.0", default-features = false }
+burn-common = { version = "0.17.0" }
 burnbench = { path = "../burnbench" }
 
 semver = { workspace = true }

@@ -225,10 +225,10 @@ macro_rules! bench_on_backend {
 
         #[cfg(feature = "rocm")]
         {
-            #[cfg(not(feature = "legacy-v16"))]
-            use burn::backend::Rocm;
             #[cfg(feature = "legacy-v16")]
             use burn::backend::HipJit as Hip;
+            #[cfg(not(feature = "legacy-v16"))]
+            use burn::backend::Rocm;
 
             let device = Default::default();
             $crate::bench_on_backend!($fn_name, Rocm<$dtype>, device);
@@ -282,6 +282,8 @@ macro_rules! bench_on_backend {
         let feature_name = "cuda-fusion";
         #[cfg(feature = "rocm")]
         let feature_name = "rocm";
+        #[cfg(feature = "rocm-fusion")]
+        let feature_name = "rocm-fusion";
 
         let device_name = format!("{:?}", &$device);
         #[cfg(not(feature = "legacy-v16"))]

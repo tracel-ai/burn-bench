@@ -74,7 +74,7 @@ impl Dependency {
         if version < &Version::new(0, 17, 0) {
             let content = content
                 .replace("cuda = [\"burn/cuda\"]", "cuda = [\"burn/cuda-jit\"]")
-                .replace("rocm = [\"burn/rocm\"]", "hip = [\"burn/hip-jit\"]")
+                .replace("rocm = [\"burn/rocm\"]", "rocm = [\"burn/hip-jit\"]")
                 .replace(
                     "ndarray-simd = [\"ndarray\", \"burn/simd\"]",
                     "ndarray-simd = [\"ndarray\"]",
