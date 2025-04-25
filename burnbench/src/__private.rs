@@ -159,6 +159,11 @@ macro_rules! bench_on_backend {
             $crate::bench_on_backend!($fn_name, Metal<$dtype>, device);
         }
 
+        #[cfg(all(target_os = "macos", feature = "vulkan"))]
+        {
+            panic!("vulkan benchmarks are not supported on macOS, use the wgpu backend instead.");
+        }
+
         #[cfg(any(feature = "wgpu", feature = "vulkan"))]
         {
             use burn::backend::Wgpu;
