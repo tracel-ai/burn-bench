@@ -3,8 +3,8 @@ use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use std::hint::black_box;
 
 pub struct RandomBenchmark<B: Backend> {
-    suffix: &'static str,
     shape: Shape,
+    distribution: Distribution,
     device: B::Device,
 }
 
@@ -12,11 +12,17 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
     type Args = ();
 
     fn name(&self) -> String {
-        format!("random-default-{}-{:?}", self.suffix, B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "random-{:?}-{:?}-{:?}",
+            self.distribution,
+            B::FloatElem::dtype(),
+            self.shape
+        )
+        .to_lowercase()
     }
 
     fn execute(&self, (): Self::Args) {
-        Tensor::<B, 4, Float>::random(self.shape.clone(), Distribution::Default, &self.device);
+        Tensor::<B, 3, Float>::random(self.shape.clone(), self.distribution, &self.device);
     }
 
     fn prepare(&self) -> Self::Args {
@@ -35,8 +41,8 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
 #[allow(dead_code)]
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let rand0 = RandomBenchmark::<B> {
-        suffix: "rand_128x128",
         shape: [1, 512, 512, 512].into(),
+        distribution: Distribution::Default,
         device: device.clone(),
     };
 
@@ -49,7 +55,29 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         results.push(result);
     }
 
-    results
+    [
+        (1, 256, Distribution::Default),
+        (1, 512, Distribution::Default),
+        (1, 2048, Distribution::Default),
+        (4, 512, Distribution::Default),
+        (4, 2048, Distribution::Default),
+        (16, 512, Distribution::Default),
+        (16, 2048, Distribution::Default),
+        (1, 512, Distribution::Bernoulli(0.45)),
+        (1, 2048, Distribution::Bernoulli(0.45)),
+        (1, 512, Distribution::Normal(10., 5.)),
+        (1, 2048, Distribution::Normal(10., 5.)),
+        (1, 512, Distribution::Uniform(5., 12.)),
+        (1, 2048, Distribution::Uniform(5., 12.)),
+    ]
+    .into_iter()
+    .map(|(batch_num, shape, distribution)| RandomBenchmark::<B> {
+        shape: [batch_num, shape, shape].into(),
+        distribution,
+        device: device.clone(),
+    })
+    .map(run_benchmark)
+    .collect()
 }
 
 fn main() {
