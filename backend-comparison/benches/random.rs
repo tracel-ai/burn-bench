@@ -1,4 +1,4 @@
-use burn::tensor::{backend::Backend, Distribution, Element, Float, Shape, Tensor};
+use burn::tensor::{Distribution, Element, Float, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use std::hint::black_box;
 
@@ -40,9 +40,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         device: device.clone(),
     };
 
-    let benches = vec![
-        rand0
-    ];
+    let benches = vec![rand0];
     let mut results = Vec::new();
 
     for bench in benches {
