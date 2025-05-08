@@ -12,13 +12,11 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
     type Args = ();
 
     fn name(&self) -> String {
-        format!(
-            "random-{:?}-{:?}-{:?}",
-            self.distribution,
-            B::FloatElem::dtype(),
-            self.shape
-        )
-        .to_lowercase()
+        format!("random-{:?}-{:?}", self.distribution, B::FloatElem::dtype(),).to_lowercase()
+    }
+
+    fn shapes(&self) -> Vec<Vec<usize>> {
+        vec![self.shape.dims.clone()]
     }
 
     fn execute(&self, (): Self::Args) {
