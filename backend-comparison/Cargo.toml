@@ -152,4 +152,8 @@ name = "reduce"
 
 [[bench]]
 harness = false
+name = "random"
+
+[[bench]]
+harness = false
 name = "softmax"
