@@ -1,5 +1,5 @@
 use burnbench;
 
 fn main() {
-    burnbench::execute();
+    burnbench::execute("backend-comparison", ".");
 }
