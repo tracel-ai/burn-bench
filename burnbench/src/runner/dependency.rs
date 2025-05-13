@@ -49,8 +49,8 @@ impl Drop for CargoDependencyGuard {
 }
 
 impl Dependency {
-    pub fn patch(&self) -> std::io::Result<CargoDependencyGuard> {
-        let cargo_file_path = Path::new("backend-comparison").join("Cargo.toml");
+    pub fn patch(&self, base_path: &Path) -> std::io::Result<CargoDependencyGuard> {
+        let cargo_file_path = Path::new(base_path).join("Cargo.toml");
         let burn_dir = std::env::var("BURN_BENCH_BURN_DIR").unwrap_or("../../burn/".into());
 
         let original_content = std::fs::read_to_string(&cargo_file_path)?;
@@ -150,55 +150,29 @@ impl Dependency {
     fn update_burn_git(&self, content: &str, reference: &str) -> Result<String, std::io::Error> {
         log::info!("Applying Burn git: {reference}");
 
-        // Update burn and burn-common git reference
-        let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
-        let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
+        Ok(format!(
+            r#"
+{content}
 
-        let content = burn_re.replace_all(content,
-            format!("burn = {{ git = \"https://github.com/tracel-ai/burn\", {}, default-features = false }}", reference)
-        ).to_string();
-
-        let content = burn_common_re
-            .replace_all(
-                &content,
-                format!(
-                    "burn-common = {{ git = \"https://github.com/tracel-ai/burn\", {} }}",
-                    reference
-                ),
-            )
-            .to_string();
-
-        Ok(content)
+[patch.crates-io]
+burn = {{ git = "https://github.com/tracel-ai/burn", {reference} }}
+burn-common = {{ git = "https://github.com/tracel-ai/burn", {reference} }}
+"#
+        ))
     }
 
     fn update_burn_local(&self, content: &str, repo_path: &str) -> Result<String, std::io::Error> {
         log::info!("Applying Burn local: {repo_path}");
 
-        // Update burn and burn-common path
-        let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
-        let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
+        Ok(format!(
+            r#"
+{content}
 
-        let content = burn_re
-            .replace_all(
-                content,
-                format!(
-                    "burn = {{ path = \"{}/crates/burn\", default-features = false }}",
-                    repo_path
-                ),
-            )
-            .to_string();
-
-        let content = burn_common_re
-            .replace_all(
-                &content,
-                format!(
-                    "burn-common = {{ path = \"{}/crates/burn-common\" }}",
-                    repo_path
-                ),
-            )
-            .to_string();
-
-        Ok(content)
+[patch.crates-io]
+burn = {{ path = "{repo_path}/crates/burn", default-features = false }}
+burn-common = {{ path = "{repo_path}/crates/burn/crates/burn-common", default-features = false }}
+"#
+        ))
     }
 }
 
