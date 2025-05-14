@@ -39,6 +39,7 @@ regex = { workspace = true }
 wgpu = { workspace = true }
 wsl = { workspace = true }
 tempfile = { workspace = true }
+toml = "0.8"
 
 [dev-dependencies]
 rstest = { workspace = true }
