@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
@@ -33,6 +33,14 @@ enum Commands {
     List,
     /// Runs benchmarks
     Run(RunArgs),
+}
+
+/// Information about the crate to benchmark.
+struct CrateInfo {
+    /// The name of the crate that contains the benchmarks.
+    name: String,
+    /// The path from which the command burnbench will be run.
+    path: PathBuf,
 }
 
 #[derive(Parser, Debug)]
@@ -133,12 +141,18 @@ enum BackendValues {
     MetalFusion,
 }
 
-pub fn execute() {
+/// Execute burnbench on the provided crate localted at the provided path.
+pub fn execute<P: AsRef<Path>>(name: &str, path: P) {
+    let path: &Path = path.as_ref();
+    let info = CrateInfo {
+        name: name.to_string(),
+        path: path.join(name),
+    };
     let args = Args::parse();
     match args.command {
         Commands::Auth => command_auth(),
         Commands::List => command_list(),
-        Commands::Run(run_args) => command_run(run_args),
+        Commands::Run(run_args) => command_run(&info, run_args),
     }
 }
 
@@ -162,7 +176,7 @@ fn command_list() {
     }
 }
 
-fn command_run(mut run_args: RunArgs) {
+fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
     let mut tokens: Option<Tokens> = None;
     if run_args.share {
         tokens = get_tokens();
@@ -196,6 +210,7 @@ fn command_run(mut run_args: RunArgs) {
         Profiling::Deactivated
     };
     run_backend_comparison_benchmarks(
+        info,
         &run_args.benches,
         &backends,
         &run_args.versions,
@@ -207,6 +222,7 @@ fn command_run(mut run_args: RunArgs) {
 }
 
 fn run_backend_comparison_benchmarks(
+    info: &CrateInfo,
     benches: &[String],
     backends: &[BackendValues],
     versions: &[String],
@@ -235,6 +251,7 @@ fn run_backend_comparison_benchmarks(
                     let url = format!("{}benchmarks", crate::USER_BENCHMARK_SERVER_URL);
 
                     let status = run_cargo(
+                        info,
                         &bench_str,
                         &backend_str,
                         dtype,
@@ -304,6 +321,7 @@ fn get_required_features(target_bench: &str) -> Vec<String> {
 }
 
 fn run_cargo(
+    info: &CrateInfo,
     bench: &str,
     backend: &str,
     dtype: &BenchDType,
@@ -323,8 +341,9 @@ fn run_cargo(
         Arc::new(VerboseProcessor)
     };
     let dependency = Dependency::new(version);
-    let guard = dependency.patch().unwrap();
-    let mut features = format!("{backend},{dtype}");
+    let guard = dependency.patch(info.path.as_path()).unwrap();
+    let name = &info.name;
+    let mut features = format!("{name}/{backend},{name}/{dtype}");
 
     if version.starts_with("0.16") {
         features += ",legacy-v16";
