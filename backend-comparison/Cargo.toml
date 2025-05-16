@@ -38,10 +38,15 @@ f16 = []
 bf16 = []
 flex32 = []
 legacy-v16 = []
+legacy-v17 = []
+server = ["burn/server"]
+remote = ["burn/remote"]
+test-remote = ["server", "remote"]
 
 [dependencies]
-burn = { version = "0.17.0", default-features = false }
-burn-common = { version = "0.17.0" }
+burn = { path = "../../burn//crates/burn", default-features = false }
+burn-common = { path = "../../burn//crates/burn-common" }
+
 burnbench = { path = "../burnbench" }
 
 semver = { workspace = true }
@@ -67,6 +72,7 @@ regex = { workspace = true }
 wgpu = { workspace = true }
 wsl = { workspace = true }
 tempfile = { workspace = true }
+tokio = { version = "1.44", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
@@ -153,6 +159,11 @@ name = "reduce"
 [[bench]]
 harness = false
 name = "random"
+
+[[bench]]
+harness = false
+name = "remote"
+required-features = ["test-remote"]
 
 [[bench]]
 harness = false

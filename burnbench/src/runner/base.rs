@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
@@ -290,6 +291,35 @@ fn run_backend_comparison_benchmarks(
     }
 }
 
+fn get_required_features(target_bench: &str) -> Vec<String> {
+    let cargo_file_path = Path::new("backend-comparison").join("Cargo.toml");
+
+    let content = fs::read_to_string(&cargo_file_path).expect("Failed to read Cargo.toml");
+    let parsed: toml::Value = content.parse().expect("Invalid TOML");
+
+    let benches = parsed.get("bench").and_then(|b| b.as_array()).unwrap();
+
+    for bench in benches {
+        let name = bench
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
+        if name == target_bench {
+            if let Some(features) = bench.get("required-features").and_then(|f| f.as_array()) {
+                let feature_list: Vec<String> = features
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .map(String::from)
+                    .collect();
+                return feature_list;
+            }
+            return vec![];
+        }
+    }
+
+    vec![]
+}
+
 fn run_cargo(
     info: &CrateInfo,
     bench: &str,
@@ -317,6 +347,12 @@ fn run_cargo(
 
     if version.starts_with("0.16") {
         features += ",legacy-v16";
+    } else if version.starts_with("0.17") {
+        features += ",legacy-v17";
+    }
+
+    for req_feature in get_required_features(bench) {
+        features += &format!(",{}", req_feature);
     }
 
     let mut args = if bench == "all" {
