@@ -9,7 +9,8 @@ struct UnaryBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
-    type Args = Tensor<B, D>;
+    type Input = Tensor<B, D>;
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!("unary-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -19,12 +20,11 @@ impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, args: Self::Args) {
-        // Choice of tanh is arbitrary
-        B::float_tanh(args.clone().into_primitive().tensor());
+    fn execute(&self, tensor: Self::Input) -> Self::Output {
+        tensor.tanh()
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Output {
         Tensor::random(self.shape.clone(), Distribution::Default, &self.device)
     }
 

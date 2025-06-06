@@ -10,7 +10,8 @@ struct MatmulBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
-    type Args = (Tensor<B, D>, Tensor<B, D>);
+    type Input = (Tensor<B, D>, Tensor<B, D>);
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!("matmul-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -24,11 +25,11 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
         }
     }
 
-    fn execute(&self, (lhs, rhs): Self::Args) {
-        lhs.matmul(rhs);
+    fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
+        lhs.matmul(rhs)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         let lhs = Tensor::random(self.shape_lhs.clone(), Distribution::Default, &self.device);
         let rhs = Tensor::random(self.shape_rhs.clone(), Distribution::Default, &self.device);
 

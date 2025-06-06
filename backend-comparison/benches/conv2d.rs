@@ -14,7 +14,8 @@ pub struct Conv2dBenchmark<B: Backend> {
 }
 
 impl<B: Backend> Benchmark for Conv2dBenchmark<B> {
-    type Args = (Tensor<B, 4>, Tensor<B, 4>, Tensor<B, 1>);
+    type Input = (Tensor<B, 4>, Tensor<B, 4>, Tensor<B, 1>);
+    type Output = Tensor<B, 4>;
 
     fn name(&self) -> String {
         format!("conv2d-{}-{:?}", self.suffix, B::FloatElem::dtype()).to_lowercase()
@@ -28,11 +29,11 @@ impl<B: Backend> Benchmark for Conv2dBenchmark<B> {
         ]
     }
 
-    fn execute(&self, (x, w, b): Self::Args) {
-        conv2d(x, w, Some(b), self.options.clone());
+    fn execute(&self, (x, w, b): Self::Input) -> Self::Output {
+        conv2d(x, w, Some(b), self.options.clone())
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         (
             Tensor::random(
                 self.input_shape.clone(),

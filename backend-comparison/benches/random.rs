@@ -9,7 +9,8 @@ pub struct RandomBenchmark<B: Backend> {
 }
 
 impl<B: Backend> Benchmark for RandomBenchmark<B> {
-    type Args = ();
+    type Input = ();
+    type Output = Tensor<B, 3>;
 
     fn name(&self) -> String {
         format!("random-{:?}-{:?}", self.distribution, B::FloatElem::dtype(),).to_lowercase()
@@ -19,11 +20,11 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, (): Self::Args) {
-        Tensor::<B, 3, Float>::random(self.shape.clone(), self.distribution, &self.device);
+    fn execute(&self, (): Self::Input) -> Self::Output {
+        Tensor::<B, 3, Float>::random(self.shape.clone(), self.distribution, &self.device)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         ()
     }
 

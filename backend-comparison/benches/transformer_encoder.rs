@@ -138,7 +138,8 @@ pub struct TransformerEncoderBenchmark<B: Backend, const AD: bool> {
 }
 
 impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
-    type Args = (Model<B>, TrainingBatch<B>);
+    type Input = (Model<B>, TrainingBatch<B>);
+    type Output = B::Gradients;
 
     fn name(&self) -> String {
         format!("transformer-encoder-training-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -148,12 +149,12 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, (model, input): Self::Args) {
+    fn execute(&self, (model, input): Self::Input) -> Self::Output {
         let (loss, ..) = model.forward(input);
-        let _grad = loss.backward();
+        loss.backward()
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         (
             self.config.init(&self.device),
             TrainingBatch {
@@ -171,7 +172,8 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
 }
 
 impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
-    type Args = (Model<B>, InferenceBatch<B>);
+    type Input = (Model<B>, InferenceBatch<B>);
+    type Output = Tensor<B, 2>;
 
     fn name(&self) -> String {
         format!("transformer-encoder-inference-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -181,11 +183,11 @@ impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, (model, input): Self::Args) {
-        let _out = model.infer(input);
+    fn execute(&self, (model, input): Self::Input) -> Self::Output {
+        model.infer(input)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         (
             self.config.init(&self.device),
             InferenceBatch {

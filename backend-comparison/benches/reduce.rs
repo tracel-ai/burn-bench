@@ -1,4 +1,4 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Distribution, Element, Int, Shape, Tensor, backend::Backend};
 use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use burnbench;
 
@@ -30,36 +30,37 @@ impl<B: Backend> ReduceBenchmark<B> {
     }
 }
 
+pub enum Output<B: Backend> {
+    Arg(Tensor<B, 3, Int>),
+    FloatDim(Tensor<B, 3>),
+    Float(Tensor<B, 1>),
+}
+
 impl<B: Backend> Benchmark for ReduceBenchmark<B> {
-    type Args = ();
+    type Input = ();
+    type Output = Output<B>;
 
-    fn prepare(&self) -> Self::Args {}
+    fn prepare(&self) -> Self::Input {}
 
-    fn execute(&self, _: Self::Args) {
+    fn execute(&self, _: Self::Input) -> Self::Output {
         match self.instruction {
-            Instruction::ArgMin(axis) => {
-                self.tensor.clone().argmin(axis);
-            }
-            Instruction::SumDim(axis) => {
-                self.tensor.clone().sum_dim(axis);
-            }
+            Instruction::ArgMin(axis) => Output::Arg(self.tensor.clone().argmin(axis)),
+            Instruction::SumDim(axis) => Output::FloatDim(self.tensor.clone().sum_dim(axis)),
             Instruction::SumDimFused(axis) => {
                 let tensor = self.tensor.clone() + 5;
                 let tensor = tensor.log();
                 let tensor = tensor.tanh();
                 let tensor = tensor * 3;
-                tensor.sum_dim(axis);
+                Output::FloatDim(tensor.sum_dim(axis))
             }
             Instruction::ArgMinFused(axis) => {
                 let tensor = self.tensor.clone() + 5;
                 let tensor = tensor.log();
                 let tensor = tensor.tanh();
                 let tensor = tensor * 3;
-                tensor.argmin(axis);
+                Output::Arg(tensor.argmin(axis))
             }
-            Instruction::Sum => {
-                self.tensor.clone().sum();
-            }
+            Instruction::Sum => Output::Float(self.tensor.clone().sum()),
         }
     }
 

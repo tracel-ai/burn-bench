@@ -12,7 +12,8 @@ pub struct MaxPool2dBenchmark<B: Backend> {
 }
 
 impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
-    type Args = Tensor<B, 4>;
+    type Input = Tensor<B, 4>;
+    type Output = Tensor<B, 4>;
 
     fn name(&self) -> String {
         format!("max_pool2d_{}-{:?}", self.name, B::FloatElem::dtype()).to_lowercase()
@@ -22,17 +23,17 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, x: Self::Args) {
+    fn execute(&self, x: Self::Input) -> Self::Output {
         max_pool2d(
             x,
             self.kernel_size,
             self.stride,
             self.padding,
             self.dilation,
-        );
+        )
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         let [batches, ch, h, w] = self.shape.dims();
         Tensor::random([batches, h, w, ch], Distribution::Default, &self.device)
             .permute([0, 3, 1, 2])

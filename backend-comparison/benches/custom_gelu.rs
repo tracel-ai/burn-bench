@@ -46,7 +46,7 @@ impl core::fmt::Debug for Mode {
 }
 
 impl<B: Backend, const D: usize> CustomGeluBenchmark<B, D> {
-    fn execute_autodiff<C: CheckpointStrategy>(&self, tensor: Tensor<B, D>) {
+    fn execute_autodiff<C: CheckpointStrategy>(&self, tensor: Tensor<B, D>) -> Tensor<B, D> {
         let tensor: Tensor<Autodiff<B, C>, D> = Tensor::from_inner(tensor).require_grad();
         let output = match self.kind {
             GeluKind::Reference => burn::tensor::activation::gelu(tensor.clone()),
@@ -54,12 +54,14 @@ impl<B: Backend, const D: usize> CustomGeluBenchmark<B, D> {
             GeluKind::WithCustomErf => gelu_custom(tensor.clone(), erf_custom),
         };
         let mut gradients = output.sum().backward();
-        let _tmp = tensor.grad_remove(&mut gradients).unwrap();
+        let result = tensor.grad_remove(&mut gradients).unwrap();
+        result
     }
 }
 
 impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
-    type Args = Tensor<B, D>;
+    type Input = Tensor<B, D>;
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!(
@@ -79,7 +81,7 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, tensor: Self::Args) {
+    fn execute(&self, tensor: Self::Input) -> Self::Output {
         match self.mode {
             Mode::Autodiff {
                 gradient_checkpointing,
@@ -90,17 +92,15 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
                     self.execute_autodiff::<NoCheckpointing>(tensor)
                 }
             }
-            Mode::Inference => {
-                match self.kind {
-                    GeluKind::Reference => burn::tensor::activation::gelu(tensor),
-                    GeluKind::WithReferenceErf => gelu_custom(tensor, Tensor::erf),
-                    GeluKind::WithCustomErf => gelu_custom(tensor, erf_custom),
-                };
-            }
+            Mode::Inference => match self.kind {
+                GeluKind::Reference => burn::tensor::activation::gelu(tensor),
+                GeluKind::WithReferenceErf => gelu_custom(tensor, Tensor::erf),
+                GeluKind::WithCustomErf => gelu_custom(tensor, erf_custom),
+            },
         }
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         Tensor::random(self.shape.clone(), Distribution::Default, &self.device)
     }
 
@@ -118,7 +118,11 @@ where
     B: Backend,
     Erf: Fn(Tensor<B, D>) -> Tensor<B, D>,
 {
-    let x = x.clone() * (erf(x / SQRT_2) + 1);
+    let device = x.device();
+    let aa = x.clone();
+    let bb = erf(x / SQRT_2) + 1;
+    Tensor::<B, 4>::zeros([2, 2, 2, 2], &device);
+    let x = aa * bb;
     x / 2
 }
 
@@ -142,9 +146,13 @@ fn erf_positive<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
     let a4 = -1.453152027;
     let a5 = 1.061405429;
 
+    let device = x.device();
+
     let x1 = x.clone().abs() * p + 1;
     let t = x1.recip();
     let tmp = (((((t.clone() * a5) + a4) * t.clone()) + a3) * t.clone() + a2) * t.clone() + a1;
+
+    Tensor::<B, 4>::zeros([2, 2, 2, 2], &device);
 
     -(tmp * t * (-x.clone() * x).exp()) + 1.0
 }
@@ -188,6 +196,9 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         gradient_checkpointing: true,
     });
 
+    for b in benches.iter() {
+        println!("{b}");
+    }
     benches
 }
 

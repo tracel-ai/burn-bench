@@ -17,7 +17,8 @@ pub struct ResNetBenchmark<B: Backend> {
 }
 
 impl<B: Backend> Benchmark for ResNetBenchmark<B> {
-    type Args = (model::ResNet<B>, Tensor<B, 4>);
+    type Input = (model::ResNet<B>, Tensor<B, 4>);
+    type Output = Tensor<B, 2>;
 
     fn name(&self) -> String {
         format!("resnet50-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -27,11 +28,11 @@ impl<B: Backend> Benchmark for ResNetBenchmark<B> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, (model, input): Self::Args) {
-        let _out = model.forward(input);
+    fn execute(&self, (model, input): Self::Input) -> Self::Output {
+        model.forward(input)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         // 1k classes like ImageNet
         let model = model::ResNet::resnet50(1000, &self.device);
         let input = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);

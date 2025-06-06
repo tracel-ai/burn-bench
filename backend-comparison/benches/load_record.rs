@@ -52,7 +52,8 @@ struct LoadRecordBenchmark<B: Backend> {
 }
 
 impl<B: Backend> Benchmark for LoadRecordBenchmark<B> {
-    type Args = BenchmarkModule<B>;
+    type Input = BenchmarkModule<B>;
+    type Output = BenchmarkModule<B>;
 
     fn name(&self) -> String {
         format!("load_record_{:?}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase()
@@ -66,10 +67,10 @@ impl<B: Backend> Benchmark for LoadRecordBenchmark<B> {
         10
     }
 
-    fn execute(&self, module: Self::Args) {
+    fn execute(&self, module: Self::Input) -> Self::Output {
         let record = module.into_record();
 
-        let _ = match self.kind {
+        match self.kind {
             Kind::Lazy => {
                 let module = self.config.init(&self.device);
                 module.load_record(record)
@@ -81,10 +82,10 @@ impl<B: Backend> Benchmark for LoadRecordBenchmark<B> {
                 module.load_record(record)
             }
             Kind::Manual => self.config.init_with(record),
-        };
+        }
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         let module = self.config.init(&self.device);
         // Force sync.
 
