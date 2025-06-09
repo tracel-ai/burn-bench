@@ -341,9 +341,14 @@ fn run_cargo(
         Arc::new(VerboseProcessor)
     };
     let dependency = Dependency::new(version);
+    let mut features = String::new();
+    for req_feature in get_required_features(info, bench) {
+        features += &format!(",{}", req_feature);
+    }
     let guard = dependency.patch(info.path.as_path()).unwrap();
     let name = &info.name;
-    let mut features = format!("{name}/{backend},{name}/{dtype}");
+
+    features += &format!("{name}/{backend},{name}/{dtype}");
 
     if version.starts_with("0.16") {
         features += ",legacy-v16";

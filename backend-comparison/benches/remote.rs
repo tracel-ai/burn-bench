@@ -2,7 +2,6 @@ use burn::tensor::backend::Backend;
 use burn_common::benchmark::BenchmarkResult;
 use burnbench;
 
-
 // cargo bb run -b remote --backends wgpu -V local
 
 #[cfg(all(
