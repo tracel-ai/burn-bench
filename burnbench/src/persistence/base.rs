@@ -1,9 +1,7 @@
 use crate::system_info::BenchmarkSystemInfo;
 
-use dirs;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, USER_AGENT};
 use serde::{Deserialize, Serialize, Serializer, de::Visitor, ser::SerializeStruct};
-use serde_json;
 use std::time::Duration;
 use std::{fs, io::Write};
 
