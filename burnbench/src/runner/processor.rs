@@ -148,7 +148,7 @@ impl<'a> CargoRunner<'a> {
 
         self.run_command(cargo)?;
 
-        let bins = get_benches(&bench);
+        let bins = get_benches(bench);
         let bin = bins.first().unwrap().as_path().to_str().unwrap();
         let file = format!("target/{}", bench);
 
@@ -208,7 +208,7 @@ impl<'a> CargoRunner<'a> {
             Profiling::Activated {
                 ncu_path,
                 ncu_ui_path,
-            } => self.run_profile(&ncu_path, &ncu_ui_path),
+            } => self.run_profile(ncu_path, ncu_ui_path),
         }
     }
 

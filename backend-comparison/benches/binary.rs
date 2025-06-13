@@ -1,5 +1,5 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use std::marker::PhantomData;
 
 #[cfg(not(feature = "legacy-v16"))]
@@ -13,7 +13,8 @@ pub struct BinaryBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for BinaryBenchmark<B, D> {
-    type Args = (Tensor<B, D>, Tensor<B, D>);
+    type Input = (Tensor<B, D>, Tensor<B, D>);
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!("binary-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -23,11 +24,11 @@ impl<B: Backend, const D: usize> Benchmark for BinaryBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, (lhs, rhs): Self::Args) {
-        let _ = lhs.greater(rhs);
+    fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
+        lhs.mul(rhs)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         let lhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
         let rhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
 
@@ -46,7 +47,8 @@ pub struct BinaryScalarBenchmark<B: Backend, const D: usize, E: Element> {
 }
 
 impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark<B, D, E> {
-    type Args = (Tensor<B, D>, E);
+    type Input = (Tensor<B, D>, E);
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!("binary_scalar-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -56,11 +58,11 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, (lhs, rhs): Self::Args) {
-        let _ = lhs.equal_elem(rhs);
+    fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
+        lhs.mul_scalar(rhs)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         let lhs = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);
         let rhs = E::random(Distribution::Default, &mut rng());
 

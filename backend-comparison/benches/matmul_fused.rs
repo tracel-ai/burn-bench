@@ -3,7 +3,7 @@ use burn::tensor::{
     activation::{gelu, relu},
     backend::Backend,
 };
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
@@ -14,7 +14,8 @@ struct MatmulBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
-    type Args = (Tensor<B, D>, Tensor<B, D>, Tensor<B, 1>);
+    type Input = (Tensor<B, D>, Tensor<B, D>, Tensor<B, 1>);
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!("matmul_relu_bias_gelu-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -24,11 +25,11 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
         vec![self.shape_lhs.dims.clone(), self.shape_rhs.dims.clone()]
     }
 
-    fn execute(&self, (lhs, rhs, bias): Self::Args) {
-        let _output = gelu(relu(lhs.matmul(rhs)) + bias.unsqueeze());
+    fn execute(&self, (lhs, rhs, bias): Self::Input) -> Self::Output {
+        gelu(relu(lhs.matmul(rhs)) + bias.unsqueeze())
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         let lhs = Tensor::random(self.shape_lhs.clone(), Distribution::Default, &self.device);
         let rhs = Tensor::random(self.shape_rhs.clone(), Distribution::Default, &self.device);
         let bias = Tensor::random(

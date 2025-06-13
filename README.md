@@ -32,14 +32,14 @@ This will use the main branch of Burn by default.
 To benchmark performance across version(s):
 
 ```sh
-cargo bb run -b unary --B wgpu-fusion -V 0.16.1 main local
+cargo bb run -b unary -B wgpu-fusion -V 0.17.1 main local
 ```
 
 You can specify one or more versions and provide custom `burnbench` arguments to benchmark them.
 
 The versions can be one of:
 
-- Published version (e.g., `0.16.0`)
+- Published version (e.g., `0.17.1`)
 - Git branch (e.g., `main`)
 - Git commit hash
 - `local`

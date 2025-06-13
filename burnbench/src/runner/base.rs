@@ -258,7 +258,7 @@ fn run_backend_comparison_benchmarks(
                         &url,
                         token,
                         &runner_pb,
-                        &version,
+                        version,
                         profiling,
                     );
                     let success = status.unwrap().success();

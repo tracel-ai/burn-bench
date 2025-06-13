@@ -19,6 +19,7 @@ clap = { version = "4.5.27" }
 comfy-table = "7.1.4"
 derive-new = { version = "0.7.0", default-features = false }
 dirs = "5.0.1"
+futures-lite = { version = "2.3.0", default-features = false }
 indicatif = "0.17.11"
 log = { version = "0.4.25", default-features = false }
 os_info = "3.10.0"
@@ -48,9 +49,6 @@ serial_test = "3.2.0"
 semver = "1.0.26"
 cfg-if = "1.0.0"
 tempfile = "3.17.1"
-
-### For xtask crate ###
-tracel-xtask = { version = "=1.1.8" }
 
 [profile.dev]
 debug = 0 # Speed up compilation time and not necessary.

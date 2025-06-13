@@ -23,6 +23,7 @@ clap = { workspace = true, features = ["derive"] }
 comfy-table = { workspace = true }
 derive-new = { workspace = true }
 dirs = { workspace = true }
+futures-lite = { workspace = true, features = ["std"] }
 indicatif = { workspace = true }
 log = { workspace = true }
 os_info = { workspace = true }

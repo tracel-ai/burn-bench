@@ -122,9 +122,8 @@ impl Dependency {
         let version_str = version.to_string();
         log::info!("Applying Burn version: {version_str}");
 
-        // Update burn and burn-common versions
+        // Update burn versions
         let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
-        let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
 
         let content = burn_re
             .replace_all(
@@ -136,43 +135,43 @@ impl Dependency {
             )
             .to_string();
 
-        let content = burn_common_re
-            .replace_all(
-                &content,
-                format!("burn-common = {{ version = \"={}\" }}", version_str),
-            )
-            .to_string();
-
         let content = Self::update_feature_flags(version, content);
         Ok(content)
     }
 
+    // NOTE: [patch] can only be applied at the root of the workspace
+    // https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html#the-patch-section
+    // Therefore, we apply the change directly to the dependency
     fn update_burn_git(&self, content: &str, reference: &str) -> Result<String, std::io::Error> {
         log::info!("Applying Burn git: {reference}");
 
-        Ok(format!(
-            r#"
-{content}
+        // Update burn git reference
+        let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
 
-[patch.crates-io]
-burn = {{ git = "https://github.com/tracel-ai/burn", {reference} }}
-burn-common = {{ git = "https://github.com/tracel-ai/burn", {reference} }}
-"#
-        ))
+        let content = burn_re.replace_all(content,
+            format!("burn = {{ git = \"https://github.com/tracel-ai/burn\", {}, default-features = false }}", reference)
+        ).to_string();
+
+        Ok(content)
     }
 
     fn update_burn_local(&self, content: &str, repo_path: &str) -> Result<String, std::io::Error> {
         log::info!("Applying Burn local: {repo_path}");
 
-        Ok(format!(
-            r#"
-{content}
+        // Update burn path
+        let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
 
-[patch.crates-io]
-burn = {{ path = "{repo_path}/crates/burn", default-features = false }}
-burn-common = {{ path = "{repo_path}/crates/burn/crates/burn-common", default-features = false }}
-"#
-        ))
+        let content = burn_re
+            .replace_all(
+                content,
+                format!(
+                    "burn = {{ path = \"{}/crates/burn\", default-features = false }}",
+                    repo_path
+                ),
+            )
+            .to_string();
+
+        Ok(content)
     }
 }
 

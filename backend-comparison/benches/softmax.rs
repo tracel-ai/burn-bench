@@ -1,5 +1,5 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, activation::softmax, backend::Backend};
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
@@ -10,7 +10,8 @@ struct SoftmaxBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for SoftmaxBenchmark<B, D> {
-    type Args = Tensor<B, D>;
+    type Input = Tensor<B, D>;
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!("softmax-{:?}-{:?}", self.dim, B::FloatElem::dtype()).to_lowercase()
@@ -20,11 +21,11 @@ impl<B: Backend, const D: usize> Benchmark for SoftmaxBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, tensor: Self::Args) {
-        softmax(tensor, self.dim);
+    fn execute(&self, tensor: Self::Input) -> Self::Output {
+        softmax(tensor, self.dim)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         Tensor::random(self.shape.clone(), Distribution::Default, &self.device)
     }
 

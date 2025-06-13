@@ -1,6 +1,7 @@
+use burn::tensor::Int;
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
 use burnbench;
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
 enum Instruction {
     ArgMin(usize),
@@ -30,36 +31,37 @@ impl<B: Backend> ReduceBenchmark<B> {
     }
 }
 
+pub enum ReduceOutput<B: Backend, const D: usize> {
+    Arg(Tensor<B, D, Int>),
+    Dim(Tensor<B, D>),
+    Full(Tensor<B, 1>),
+}
+
 impl<B: Backend> Benchmark for ReduceBenchmark<B> {
-    type Args = ();
+    type Input = ();
+    type Output = ReduceOutput<B, 3>;
 
-    fn prepare(&self) -> Self::Args {}
+    fn prepare(&self) -> Self::Input {}
 
-    fn execute(&self, _: Self::Args) {
+    fn execute(&self, _: Self::Input) -> Self::Output {
         match self.instruction {
-            Instruction::ArgMin(axis) => {
-                self.tensor.clone().argmin(axis);
-            }
-            Instruction::SumDim(axis) => {
-                self.tensor.clone().sum_dim(axis);
-            }
+            Instruction::ArgMin(axis) => ReduceOutput::Arg(self.tensor.clone().argmin(axis)),
+            Instruction::SumDim(axis) => ReduceOutput::Dim(self.tensor.clone().sum_dim(axis)),
             Instruction::SumDimFused(axis) => {
                 let tensor = self.tensor.clone() + 5;
                 let tensor = tensor.log();
                 let tensor = tensor.tanh();
                 let tensor = tensor * 3;
-                tensor.sum_dim(axis);
+                ReduceOutput::Dim(tensor.sum_dim(axis))
             }
             Instruction::ArgMinFused(axis) => {
                 let tensor = self.tensor.clone() + 5;
                 let tensor = tensor.log();
                 let tensor = tensor.tanh();
                 let tensor = tensor * 3;
-                tensor.argmin(axis);
+                ReduceOutput::Arg(tensor.argmin(axis))
             }
-            Instruction::Sum => {
-                self.tensor.clone().sum();
-            }
+            Instruction::Sum => ReduceOutput::Full(self.tensor.clone().sum()),
         }
     }
 
