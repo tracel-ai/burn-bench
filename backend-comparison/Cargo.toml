@@ -44,8 +44,8 @@ remote = ["burn/remote"]
 test-remote = ["server", "remote"]
 
 [dependencies]
-burn = { path = "../../burn//crates/burn", default-features = false }
-burn-common = { path = "../../burn//crates/burn-common" }
+burn = { path = "../../burn/crates/burn", default-features = false }
+burn-common = { path = "../../burn/crates/burn-common" }
 
 burnbench = { path = "../burnbench" }
 

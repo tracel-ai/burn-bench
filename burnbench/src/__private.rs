@@ -66,7 +66,7 @@ fn update_panic_hook() {
 macro_rules! define_types {
     () => {
         pub fn __save_result(
-            benches: Vec<burn_common::benchmark::BenchmarkResult>,
+            benches: Vec<$crate::BenchmarkResult>,
             backend_name: String,
             device: String,
             url: Option<&str>,
