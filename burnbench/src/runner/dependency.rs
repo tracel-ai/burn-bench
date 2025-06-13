@@ -122,9 +122,8 @@ impl Dependency {
         let version_str = version.to_string();
         log::info!("Applying Burn version: {version_str}");
 
-        // Update burn and burn-common versions
+        // Update burn versions
         let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
-        let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
 
         let content = burn_re
             .replace_all(
@@ -133,13 +132,6 @@ impl Dependency {
                     "burn = {{ version = \"={}\", default-features = false }}",
                     version_str
                 ),
-            )
-            .to_string();
-
-        let content = burn_common_re
-            .replace_all(
-                &content,
-                format!("burn-common = {{ version = \"={}\" }}", version_str),
             )
             .to_string();
 
@@ -153,48 +145,27 @@ impl Dependency {
     fn update_burn_git(&self, content: &str, reference: &str) -> Result<String, std::io::Error> {
         log::info!("Applying Burn git: {reference}");
 
-        // Update burn and burn-common git reference
+        // Update burn git reference
         let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
-        let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
 
         let content = burn_re.replace_all(content,
             format!("burn = {{ git = \"https://github.com/tracel-ai/burn\", {}, default-features = false }}", reference)
         ).to_string();
 
-        let content = burn_common_re
-            .replace_all(
-                &content,
-                format!(
-                    "burn-common = {{ git = \"https://github.com/tracel-ai/burn\", {} }}",
-                    reference
-                ),
-            )
-            .to_string();
         Ok(content)
     }
 
     fn update_burn_local(&self, content: &str, repo_path: &str) -> Result<String, std::io::Error> {
         log::info!("Applying Burn local: {repo_path}");
 
-        // Update burn and burn-common path
+        // Update burn path
         let burn_re = Regex::new(r"burn = \{ .+ \}").unwrap();
-        let burn_common_re = Regex::new(r"burn-common = \{ .+ \}").unwrap();
 
         let content = burn_re
             .replace_all(
                 content,
                 format!(
                     "burn = {{ path = \"{}/crates/burn\", default-features = false }}",
-                    repo_path
-                ),
-            )
-            .to_string();
-
-        let content = burn_common_re
-            .replace_all(
-                &content,
-                format!(
-                    "burn-common = {{ path = \"{}/crates/burn-common\" }}",
                     repo_path
                 ),
             )

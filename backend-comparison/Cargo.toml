@@ -46,7 +46,6 @@ test-remote = ["server", "remote"]
 [dependencies]
 # Use the last released version to avoid possible breaking changes
 burn = { version = "0.17", default-features = false }
-burn-common = { version = "0.17" }
 
 burnbench = { path = "../burnbench" }
 
