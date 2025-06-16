@@ -1,9 +1,7 @@
 use crate::system_info::BenchmarkSystemInfo;
 
-use dirs;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, USER_AGENT};
 use serde::{Deserialize, Serialize, Serializer, de::Visitor, ser::SerializeStruct};
-use serde_json;
 use std::time::Duration;
 use std::{fs, io::Write};
 
@@ -40,6 +38,21 @@ pub struct BenchmarkComputations {
     pub max: Duration,
 }
 
+impl BenchmarkComputations {
+    /// Compute duration values and return a BenchmarkComputations struct
+    pub fn new(durations: &BenchmarkDurations) -> Self {
+        let mean = durations.mean_duration();
+        let (min, max, median) = durations.min_max_median_durations();
+        Self {
+            mean,
+            median,
+            min,
+            max,
+            variance: durations.variance_duration(mean),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct BenchmarkDurations {
     /// How these durations were measured.
@@ -48,15 +61,44 @@ pub struct BenchmarkDurations {
     pub durations: Vec<Duration>,
 }
 
+impl BenchmarkDurations {
+    /// Returns a tuple of durations: (min, max, median)
+    fn min_max_median_durations(&self) -> (Duration, Duration, Duration) {
+        let mut sorted = self.durations.clone();
+        sorted.sort();
+        let min = *sorted.first().unwrap();
+        let max = *sorted.last().unwrap();
+        let median = *sorted.get(sorted.len() / 2).unwrap();
+        (min, max, median)
+    }
+
+    /// Returns the median duration among all durations
+    pub(crate) fn mean_duration(&self) -> Duration {
+        self.durations.iter().sum::<Duration>() / self.durations.len() as u32
+    }
+
+    /// Returns the variance durations for the durations
+    pub(crate) fn variance_duration(&self, mean: Duration) -> Duration {
+        self.durations
+            .iter()
+            .map(|duration| {
+                let tmp = duration.as_secs_f64() - mean.as_secs_f64();
+                Duration::from_secs_f64(tmp * tmp)
+            })
+            .sum::<Duration>()
+            / self.durations.len() as u32
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub enum TimingMethod {
     /// Time measurements come from full timing of execution + sync
     /// calls.
     #[default]
-    Full,
+    System,
     /// Time measurements come from hardware reported timestamps
     /// coming from a sync call.
-    DeviceOnly,
+    Device,
 }
 
 #[derive(Default, Clone)]
@@ -371,5 +413,72 @@ mod tests {
         assert!(record.results.raw.durations[7] == Duration::from_nanos(8506627));
         assert!(record.results.raw.durations[8] == Duration::from_nanos(8521615));
         assert!(record.results.raw.durations[9] == Duration::from_nanos(8511474));
+    }
+
+    #[test]
+    fn test_min_max_median_durations_even_number_of_samples() {
+        let durations = BenchmarkDurations {
+            timing_method: TimingMethod::System,
+            durations: vec![
+                Duration::new(10, 0),
+                Duration::new(20, 0),
+                Duration::new(30, 0),
+                Duration::new(40, 0),
+                Duration::new(50, 0),
+            ],
+        };
+        let (min, max, median) = durations.min_max_median_durations();
+        assert_eq!(min, Duration::from_secs(10));
+        assert_eq!(max, Duration::from_secs(50));
+        assert_eq!(median, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn test_min_max_median_durations_odd_number_of_samples() {
+        let durations = BenchmarkDurations {
+            timing_method: TimingMethod::System,
+            durations: vec![
+                Duration::new(18, 5),
+                Duration::new(20, 0),
+                Duration::new(30, 0),
+                Duration::new(40, 0),
+            ],
+        };
+        let (min, max, median) = durations.min_max_median_durations();
+        assert_eq!(min, Duration::from_nanos(18000000005_u64));
+        assert_eq!(max, Duration::from_secs(40));
+        assert_eq!(median, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn test_mean_duration() {
+        let durations = BenchmarkDurations {
+            timing_method: TimingMethod::System,
+            durations: vec![
+                Duration::new(10, 0),
+                Duration::new(20, 0),
+                Duration::new(30, 0),
+                Duration::new(40, 0),
+            ],
+        };
+        let mean = durations.mean_duration();
+        assert_eq!(mean, Duration::from_secs(25));
+    }
+
+    #[test]
+    fn test_variance_duration() {
+        let durations = BenchmarkDurations {
+            timing_method: TimingMethod::System,
+            durations: vec![
+                Duration::new(10, 0),
+                Duration::new(20, 0),
+                Duration::new(30, 0),
+                Duration::new(40, 0),
+                Duration::new(50, 0),
+            ],
+        };
+        let mean = durations.mean_duration();
+        let variance = durations.variance_duration(mean);
+        assert_eq!(variance, Duration::from_secs(200));
     }
 }

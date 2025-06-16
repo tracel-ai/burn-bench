@@ -1,5 +1,5 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, TensorData, backend::Backend};
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[cfg(not(feature = "legacy-v16"))]
@@ -14,7 +14,8 @@ struct ToDataBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
-    type Args = Tensor<B, D>;
+    type Input = Tensor<B, D>;
+    type Output = TensorData;
 
     fn name(&self) -> String {
         format!("to_data-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -24,11 +25,11 @@ impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, args: Self::Args) {
-        let _data = args.to_data();
+    fn execute(&self, args: Self::Input) -> Self::Output {
+        args.to_data()
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         Tensor::random(self.shape.clone(), Distribution::Default, &self.device)
     }
 
@@ -44,7 +45,8 @@ struct FromDataBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for FromDataBenchmark<B, D> {
-    type Args = (TensorData, B::Device);
+    type Input = (TensorData, B::Device);
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         "from_data".into()
@@ -54,11 +56,11 @@ impl<B: Backend, const D: usize> Benchmark for FromDataBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, (data, device): Self::Args) {
-        let _data = Tensor::<B, D>::from_data(data.clone(), &device);
+    fn execute(&self, (data, device): Self::Input) -> Self::Output {
+        Tensor::<B, D>::from_data(data.clone(), &device)
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         (
             TensorData::random::<B::FloatElem, _, _>(
                 self.shape.clone(),
