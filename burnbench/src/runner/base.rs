@@ -342,13 +342,14 @@ fn run_cargo(
     };
     let dependency = Dependency::new(version);
     let mut features = String::new();
+
+    let guard = dependency.patch(info.path.as_path()).unwrap();
+    let name = &info.name;
+    features += &format!("{name}/{backend},{name}/{dtype}");
+
     for req_feature in get_required_features(info, bench) {
         features += &format!(",{}", req_feature);
     }
-    let guard = dependency.patch(info.path.as_path()).unwrap();
-    let name = &info.name;
-
-    features += &format!("{name}/{backend},{name}/{dtype}");
 
     if version.starts_with("0.16") {
         features += ",legacy-v16";
@@ -359,7 +360,7 @@ fn run_cargo(
     for req_feature in get_required_features(info, bench) {
         features += &format!(",{name}/{req_feature}");
     }
-
+    
     let mut args = if bench == "all" {
         vec![
             "--benches",

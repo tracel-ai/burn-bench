@@ -67,7 +67,7 @@ mod remote_benchmarks {
         }
     }
 
-    impl<'a, B: burn::backend::BackendIr> Benchmark for RemoteBenchmark<'a, B> {
+    impl<'a, B: burn::backend::ir::BackendIr> Benchmark for RemoteBenchmark<'a, B> {
         type Args = ();
 
         fn prepare(&self) -> Self::Args {}
@@ -107,7 +107,7 @@ mod remote_benchmarks {
     }
 
     #[allow(dead_code)]
-    pub fn bench<B: burn::backend::BackendIr>(_device: &B::Device) -> Vec<BenchmarkResult> {
+    pub fn bench<B: burn::backend::ir::BackendIr>(_device: &B::Device) -> Vec<BenchmarkResult> {
         let server_a = LocalServer::<B>::new(3000);
         let server_b = LocalServer::<B>::new(3001);
 
@@ -149,7 +149,7 @@ mod remote_benchmarks {
     not(feature = "legacy-v17")
 ))]
 #[allow(dead_code)]
-fn bench<B: burn::backend::BackendIr>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench<B: burn::backend::ir::BackendIr>(device: &B::Device) -> Vec<BenchmarkResult> {
     remote_benchmarks::bench::<B>(device)
 }
 
