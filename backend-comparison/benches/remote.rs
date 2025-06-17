@@ -2,8 +2,10 @@ use burn::tensor::backend::Backend;
 use burnbench;
 use burnbench::BenchmarkResult;
 
+// cargo bb run -b remote --backends wgpu -V local
+
 #[cfg(all(
-    feature = "test-remote",
+    feature = "distributed",
     not(feature = "legacy-v16"),
     not(feature = "legacy-v17")
 ))]
@@ -15,7 +17,7 @@ mod remote_benchmarks {
 
     use burn::backend::remote::{self, RemoteDevice};
     use burn::{
-        backend::BackendIr,
+        backend::ir::BackendIr,
         tensor::{Distribution, Shape, Tensor, backend::Backend},
     };
     use tokio::runtime::Runtime;
@@ -43,7 +45,6 @@ mod remote_benchmarks {
         }
 
         pub fn get_device(&self) -> RemoteDevice {
-            println!("ws://localhost:{}", self.port);
             remote::RemoteDevice::new(&format!("ws://localhost:{}", self.port))
         }
     }
@@ -66,7 +67,7 @@ mod remote_benchmarks {
         }
     }
 
-    impl<'a, B: burn::backend::BackendIr> Benchmark for RemoteBenchmark<'a, B> {
+    impl<'a, B: burn::backend::ir::BackendIr> Benchmark for RemoteBenchmark<'a, B> {
         type Input = ();
         type Output = ();
 
@@ -107,7 +108,7 @@ mod remote_benchmarks {
     }
 
     #[allow(dead_code)]
-    pub fn bench<B: burn::backend::BackendIr>(_device: &B::Device) -> Vec<BenchmarkResult> {
+    pub fn bench<B: burn::backend::ir::BackendIr>(_device: &B::Device) -> Vec<BenchmarkResult> {
         let server_a = LocalServer::<B>::new(3000);
         let server_b = LocalServer::<B>::new(3001);
 
@@ -132,12 +133,9 @@ mod remote_benchmarks {
 
         let mut results = vec![];
         for bench in benches {
-            println!("doing bench {:?}", &bench.shape);
             let result = run_benchmark(bench);
             results.push(result);
         }
-
-        println!("shutting down runtimes");
 
         server_a.runtime.shutdown_background();
         server_b.runtime.shutdown_background();
@@ -147,17 +145,17 @@ mod remote_benchmarks {
 }
 
 #[cfg(all(
-    feature = "test-remote",
+    feature = "distributed",
     not(feature = "legacy-v16"),
     not(feature = "legacy-v17")
 ))]
 #[allow(dead_code)]
-fn bench<B: burn::backend::BackendIr>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench<B: burn::backend::ir::BackendIr>(device: &B::Device) -> Vec<BenchmarkResult> {
     remote_benchmarks::bench::<B>(device)
 }
 
 #[cfg(any(
-    not(feature = "test-remote"),
+    not(feature = "distributed"),
     feature = "legacy-v16",
     feature = "legacy-v17"
 ))]

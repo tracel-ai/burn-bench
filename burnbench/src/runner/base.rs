@@ -292,7 +292,7 @@ fn run_backend_comparison_benchmarks(
 }
 
 fn get_required_features(info: &CrateInfo, target_bench: &str) -> Vec<String> {
-    let cargo_file_path = info.path.join("Cargo.toml");
+    let cargo_file_path = Path::new(&info.path).join("Cargo.toml");
 
     let content = fs::read_to_string(&cargo_file_path).expect("Failed to read Cargo.toml");
     let parsed: toml::Value = content.parse().expect("Invalid TOML");
@@ -348,16 +348,16 @@ fn run_cargo(
 
     features += &format!("{name}/{backend},{name}/{dtype}");
 
-    for req_feature in get_required_features(info, bench) {
-        features += &format!(",{}", req_feature);
-    }
-
     if version.starts_with("0.16") {
         features += ",legacy-v16";
     } else if version.starts_with("0.17") {
         features += ",legacy-v17";
     }
 
+    for req_feature in get_required_features(info, bench) {
+        features += &format!(",{name}/{req_feature}");
+    }
+    
     let mut args = if bench == "all" {
         vec![
             "--benches",
