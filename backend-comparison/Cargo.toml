@@ -42,6 +42,7 @@ legacy-v17 = []
 server = ["burn/server"]
 remote = ["burn/remote"]
 test-remote = ["server", "remote"]
+collective = ["burn/collective"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
