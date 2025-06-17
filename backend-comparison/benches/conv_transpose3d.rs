@@ -2,7 +2,7 @@ use burn::tensor::{
     Distribution, Element, Shape, Tensor, backend::Backend, module::conv_transpose3d,
     ops::ConvTransposeOptions,
 };
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
 pub struct ConvTranspose3dBenchmark<B: Backend> {
     input_shape: Shape,
@@ -13,7 +13,8 @@ pub struct ConvTranspose3dBenchmark<B: Backend> {
 }
 
 impl<B: Backend> Benchmark for ConvTranspose3dBenchmark<B> {
-    type Args = (Tensor<B, 5>, Tensor<B, 5>, Tensor<B, 1>);
+    type Input = (Tensor<B, 5>, Tensor<B, 5>, Tensor<B, 1>);
+    type Output = Tensor<B, 5>;
 
     fn name(&self) -> String {
         format!("conv_transpose3d-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -27,11 +28,11 @@ impl<B: Backend> Benchmark for ConvTranspose3dBenchmark<B> {
         ]
     }
 
-    fn execute(&self, (x, w, b): Self::Args) {
-        conv_transpose3d(x, w, Some(b), self.options.clone());
+    fn execute(&self, (x, w, b): Self::Input) -> Self::Output {
+        conv_transpose3d(x, w, Some(b), self.options.clone())
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         (
             Tensor::random(
                 self.input_shape.clone(),

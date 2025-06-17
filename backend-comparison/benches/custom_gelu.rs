@@ -3,7 +3,7 @@ use burn::backend::autodiff::checkpoint::strategy::{
     BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
 };
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use core::f64::consts::SQRT_2;
 
 #[derive(Debug)]
@@ -46,7 +46,7 @@ impl core::fmt::Debug for Mode {
 }
 
 impl<B: Backend, const D: usize> CustomGeluBenchmark<B, D> {
-    fn execute_autodiff<C: CheckpointStrategy>(&self, tensor: Tensor<B, D>) {
+    fn execute_autodiff<C: CheckpointStrategy>(&self, tensor: Tensor<B, D>) -> Tensor<B, D> {
         let tensor: Tensor<Autodiff<B, C>, D> = Tensor::from_inner(tensor).require_grad();
         let output = match self.kind {
             GeluKind::Reference => burn::tensor::activation::gelu(tensor.clone()),
@@ -54,12 +54,13 @@ impl<B: Backend, const D: usize> CustomGeluBenchmark<B, D> {
             GeluKind::WithCustomErf => gelu_custom(tensor.clone(), erf_custom),
         };
         let mut gradients = output.sum().backward();
-        let _tmp = tensor.grad_remove(&mut gradients).unwrap();
+        tensor.grad_remove(&mut gradients).unwrap()
     }
 }
 
 impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
-    type Args = Tensor<B, D>;
+    type Input = Tensor<B, D>;
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!(
@@ -79,7 +80,7 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, tensor: Self::Args) {
+    fn execute(&self, tensor: Self::Input) -> Self::Output {
         match self.mode {
             Mode::Autodiff {
                 gradient_checkpointing,
@@ -90,17 +91,15 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
                     self.execute_autodiff::<NoCheckpointing>(tensor)
                 }
             }
-            Mode::Inference => {
-                match self.kind {
-                    GeluKind::Reference => burn::tensor::activation::gelu(tensor),
-                    GeluKind::WithReferenceErf => gelu_custom(tensor, Tensor::erf),
-                    GeluKind::WithCustomErf => gelu_custom(tensor, erf_custom),
-                };
-            }
+            Mode::Inference => match self.kind {
+                GeluKind::Reference => burn::tensor::activation::gelu(tensor),
+                GeluKind::WithReferenceErf => gelu_custom(tensor, Tensor::erf),
+                GeluKind::WithCustomErf => gelu_custom(tensor, erf_custom),
+            },
         }
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         Tensor::random(self.shape.clone(), Distribution::Default, &self.device)
     }
 

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use sysinfo;
 use wgpu::{self, Backends};
 
 #[derive(Default, Clone, Serialize, Deserialize)]

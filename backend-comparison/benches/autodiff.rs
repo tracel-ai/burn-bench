@@ -6,7 +6,7 @@ use burn::{
         backend::{AutodiffBackend, Backend},
     },
 };
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
 pub struct AutodiffOverheadBenchmark<B: AutodiffBackend> {
     config: nn::LstmConfig,
@@ -15,7 +15,8 @@ pub struct AutodiffOverheadBenchmark<B: AutodiffBackend> {
 }
 
 impl<B: AutodiffBackend> Benchmark for AutodiffOverheadBenchmark<B> {
-    type Args = Tensor<B, 3>;
+    type Input = Tensor<B, 3>;
+    type Output = ();
 
     fn name(&self) -> String {
         format!("autodiff_overhead-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -25,7 +26,7 @@ impl<B: AutodiffBackend> Benchmark for AutodiffOverheadBenchmark<B> {
         vec![]
     }
 
-    fn execute(&self, input: Self::Args) {
+    fn execute(&self, input: Self::Input) -> Self::Output {
         for _ in 0..20 {
             let input = input.clone().detach();
             let mut cell = input.clone();
@@ -36,11 +37,11 @@ impl<B: AutodiffBackend> Benchmark for AutodiffOverheadBenchmark<B> {
                 cell = cell + cells;
             }
 
-            cell.backward();
+            let _grads = cell.backward();
         }
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         let shape = [1, 3, self.config.d_hidden];
         Tensor::random(shape, Distribution::Default, &self.device)
     }

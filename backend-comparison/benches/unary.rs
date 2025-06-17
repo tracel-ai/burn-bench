@@ -1,5 +1,5 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burn_common::benchmark::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
@@ -9,7 +9,8 @@ struct UnaryBenchmark<B: Backend, const D: usize> {
 }
 
 impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
-    type Args = Tensor<B, D>;
+    type Input = Tensor<B, D>;
+    type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
         format!("unary-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -19,12 +20,12 @@ impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
         vec![self.shape.dims.clone()]
     }
 
-    fn execute(&self, args: Self::Args) {
+    fn execute(&self, args: Self::Input) -> Self::Output {
         // Choice of tanh is arbitrary
-        B::float_tanh(args.clone().into_primitive().tensor());
+        args.tanh()
     }
 
-    fn prepare(&self) -> Self::Args {
+    fn prepare(&self) -> Self::Input {
         Tensor::random(self.shape.clone(), Distribution::Default, &self.device)
     }
 

@@ -1,6 +1,6 @@
 use burn::tensor::backend::Backend;
-use burn_common::benchmark::BenchmarkResult;
 use burnbench;
+use burnbench::BenchmarkResult;
 
 // cargo bb run -b remote --backends wgpu -V local
 
@@ -12,7 +12,7 @@ use burnbench;
 mod remote_benchmarks {
     use super::*;
 
-    use burn_common::benchmark::{Benchmark, run_benchmark};
+    use burnbench::{Benchmark, run_benchmark};
     use std::marker::PhantomData;
 
     use burn::backend::remote::{self, RemoteDevice};
@@ -68,11 +68,12 @@ mod remote_benchmarks {
     }
 
     impl<'a, B: burn::backend::ir::BackendIr> Benchmark for RemoteBenchmark<'a, B> {
-        type Args = ();
+        type Input = ();
+        type Output = ();
 
-        fn prepare(&self) -> Self::Args {}
+        fn prepare(&self) -> Self::Input {}
 
-        fn execute(&self, _: Self::Args) {
+        fn execute(&self, _: Self::Input) -> Self::Output {
             // Some random input
             let input = Tensor::<remote::RemoteBackend, 3>::random(
                 self.shape.clone(),
