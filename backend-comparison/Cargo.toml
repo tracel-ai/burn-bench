@@ -1,3 +1,4 @@
+
 [package]
 authors = ["Tracel Technologies Inc."]
 categories = ["science"]
@@ -41,7 +42,7 @@ legacy-v16 = []
 legacy-v17 = []
 server = ["burn/server"]
 remote = ["burn/remote"]
-test-remote = ["server", "remote"]
+distributed = ["server", "remote"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
@@ -163,7 +164,7 @@ name = "random"
 [[bench]]
 harness = false
 name = "remote"
-required-features = ["test-remote"]
+required-features = ["distributed"]
 
 [[bench]]
 harness = false
