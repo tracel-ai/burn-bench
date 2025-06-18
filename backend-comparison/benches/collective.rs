@@ -4,25 +4,29 @@ use burnbench::BenchmarkResult;
 
 use std::{sync::mpsc::SyncSender, vec};
 
-use burn::tensor::{Element, Tensor};
+use burn::tensor::{Tensor};
 use burnbench::Benchmark;
 use burnbench::run_benchmark;
 
 #[cfg(all(feature = "collective", feature = "distributed"))]
-mod collective_benchmarks {
-    use super::*;
+mod collective_remote_benchmarks {
 
+    use super::*;
     use burn::{
         backend::{
+            RemoteBackend,
             collective::{
-                all_reduce, register, reset_collective, AggregateKind, AggregateParams, AggregateStrategy
+                AggregateKind, AggregateParams, AggregateStrategy, all_reduce, register,
+                reset_collective,
             },
-            ir::BackendIr, RemoteBackend,
+            ir::BackendIr,
+            remote::RemoteDevice,
         },
         tensor::Shape,
     };
+    use std::marker::PhantomData;
+    use tokio::runtime::Runtime;
 
-    use chrono::Local;
     use derive_new::new;
 
     #[derive(Debug, Clone)]
@@ -31,15 +35,15 @@ mod collective_benchmarks {
     }
 
     #[derive(new)]
-    struct CollectiveBenchmark<B: Backend, const D: usize> {
+    struct CollectiveBenchmark<const D: usize> {
         shape: Shape,
         params: AggregateParams,
-        devices: Vec<B::Device>,
+        devices: Vec<RemoteDevice>,
     }
 
     struct LocalServer<B: BackendIr> {
         port: u16,
-        runtime: Runtime,
+        _runtime: Runtime,
         _phantom_data: PhantomData<B>,
     }
 
@@ -47,6 +51,7 @@ mod collective_benchmarks {
         pub fn new(port: u16) -> Self {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_io()
+                .enable_time()
                 .build()
                 .unwrap();
 
@@ -54,41 +59,40 @@ mod collective_benchmarks {
 
             Self {
                 port,
-                runtime,
+                _runtime: runtime,
                 _phantom_data: Default::default(),
             }
         }
 
         pub fn get_device(&self) -> RemoteDevice {
-            remote::RemoteDevice::new(&format!("ws://localhost:{}", self.port))
+            RemoteDevice::new(&format!("ws://localhost:{}", self.port))
         }
     }
 
-    pub fn run_peer<B: Backend, const D: usize>(
+    pub fn run_peer<const D: usize>(
         id: u32,
         peer_count: u32,
         params: AggregateParams,
-        input: Tensor<B, D>,
-        output: SyncSender<Tensor<B, D>>,
+        input: Tensor<RemoteBackend, D>,
+        output: SyncSender<Tensor<RemoteBackend, D>>,
     ) {
-        register::<B>(id, peer_count);
+        register::<RemoteBackend>(id, peer_count);
 
         let tensor = all_reduce(input, params);
 
         output.send(tensor).unwrap();
     }
 
-    impl<B: BackendIr, const D: usize> Benchmark for CollectiveBenchmark<B, D> {
-        type Input = CollectiveBenchmarkInput<B, D>;
+    impl<const D: usize> Benchmark for CollectiveBenchmark<D> {
+        type Input = CollectiveBenchmarkInput<D>;
         type Output = Result<(), ()>;
 
         fn name(&self) -> String {
             format!(
-                "collective-{:?}-{:?}-{:?}-x{:?}",
+                "collective-{:?}-{:?}-{:?}",
                 self.devices.len(),
                 self.params.kind,
-                self.params.strategy,
-                B::FloatElem::dtype()
+                self.params.strategy
             )
             .to_lowercase()
         }
@@ -98,7 +102,7 @@ mod collective_benchmarks {
         }
 
         fn execute(&self, mut input: Self::Input) -> Self::Output {
-            reset_collective::<B>();
+            reset_collective::<RemoteBackend>();
 
             let (send, recv) = std::sync::mpsc::sync_channel(1);
 
@@ -108,7 +112,7 @@ mod collective_benchmarks {
                 let params = self.params.clone();
                 let input = tensor;
                 std::thread::spawn(move || {
-                    run_peer::<B, D>(id as u32, peer_count as u32, params, input, send)
+                    run_peer::<D>(id as u32, peer_count as u32, params, input, send)
                 });
             }
 
@@ -120,7 +124,7 @@ mod collective_benchmarks {
         }
 
         fn prepare(&self) -> Self::Input {
-            let input_data: Vec<Tensor<B, D>> = self
+            let input_data: Vec<Tensor<RemoteBackend, D>> = self
                 .devices
                 .iter()
                 .map(|dev| {
@@ -132,43 +136,45 @@ mod collective_benchmarks {
         }
 
         fn sync(&self) {
-            self.devices.iter().for_each(|dev| B::sync(dev));
+            self.devices.iter().for_each(|dev| RemoteBackend::sync(dev));
         }
     }
 
-    pub fn bench<B: BackendIr>(device: &B::Device) -> Vec<BenchmarkResult> {
+    pub fn bench<B: BackendIr>(_device: &B::Device) -> Vec<BenchmarkResult> {
+
+        let peer_count = 2;
+
         let mut servers = vec![];
         let mut devices = vec![];
-        for port in 3000..3009 {
+        for i in 0..peer_count {
+            let port = 3000 + i;
             let server = LocalServer::<B>::new(port);
-            servers.push(server);
             devices.push(server.get_device());
+            servers.push(server);
         }
 
         let shapes = vec![
-            vec![8, 8, 8],
-            vec![16, 16, 16],
-            vec![32, 64, 128],
-            vec![64, 128, 256],
+            vec![1, 1, 8],
+            // vec![16, 16, 16],
+            // vec![32, 64, 128],
+            // vec![64, 128, 256],
         ];
 
         let kinds = vec![AggregateKind::Sum, AggregateKind::Mean];
 
         let strategies = vec![
-            AggregateStrategy::Ring,
-            AggregateStrategy::Tree(2),
-            AggregateStrategy::Tree(5),
             AggregateStrategy::Centralized,
+            // AggregateStrategy::Tree(2),
+            // AggregateStrategy::Tree(5),
+            // AggregateStrategy::Ring,
         ];
-
-        let peer_count = 4;
 
         let mut results = Vec::new();
 
         for shape_dims in shapes {
             for kind in &kinds {
                 for strategy in &strategies {
-                    let benchmark: CollectiveBenchmark<B, 3> = CollectiveBenchmark {
+                    let benchmark: CollectiveBenchmark<3> = CollectiveBenchmark {
                         shape: Shape {
                             dims: shape_dims.clone(),
                         },
@@ -191,7 +197,7 @@ mod collective_benchmarks {
 #[cfg(feature = "collective")]
 #[allow(dead_code)]
 fn bench<B: burn::backend::ir::BackendIr>(device: &B::Device) -> Vec<BenchmarkResult> {
-    collective_benchmarks::bench::<B>(device)
+    collective_remote_benchmarks::bench::<B>(device)
 }
 
 #[cfg(not(feature = "collective"))]
