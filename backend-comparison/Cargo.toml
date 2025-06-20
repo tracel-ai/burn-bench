@@ -43,10 +43,12 @@ legacy-v17 = []
 server = ["burn/server"]
 remote = ["burn/remote"]
 distributed = ["server", "remote"]
+collective = ["burn/collective"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
-burn = { version = "0.17", default-features = false }
+#burn = { version = "0.17", default-features = false }
+burn = { path = "../../burn/crates/burn", default-features = false }
 
 burnbench = { path = "../burnbench" }
 
@@ -169,3 +171,8 @@ required-features = ["distributed"]
 [[bench]]
 harness = false
 name = "softmax"
+
+[[bench]]
+harness = false
+name = "collective"
+required-features = ["collective", "distributed"]
