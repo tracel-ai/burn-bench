@@ -78,30 +78,30 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     [
         // General benches
-        // (
-        //     1,
-        //     Problem::General {
-        //         m: 6144,
-        //         n: 6144,
-        //         k: 6144,
-        //     },
-        // ),
-        // (
-        //     2,
-        //     Problem::General {
-        //         m: 5000,
-        //         n: 5000,
-        //         k: 5000,
-        //     },
-        // ),
-        // (
-        //     4,
-        //     Problem::General {
-        //         m: 4096,
-        //         n: 4096,
-        //         k: 4096,
-        //     },
-        // ),
+        (
+            1,
+            Problem::General {
+                m: 6144,
+                n: 6144,
+                k: 6144,
+            },
+        ),
+        (
+            2,
+            Problem::General {
+                m: 5000,
+                n: 5000,
+                k: 5000,
+            },
+        ),
+        (
+            4,
+            Problem::General {
+                m: 4096,
+                n: 4096,
+                k: 4096,
+            },
+        ),
         (
             4,
             Problem::General {
