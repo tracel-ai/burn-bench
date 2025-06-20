@@ -360,7 +360,7 @@ fn run_cargo(
     for req_feature in get_required_features(info, bench) {
         features += &format!(",{name}/{req_feature}");
     }
-    
+
     let mut args = if bench == "all" {
         vec![
             "--benches",
