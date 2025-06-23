@@ -49,7 +49,8 @@ struct DependencyContent {
 }
 
 static BURN_BASE: [&str; 3] = ["burn", "burn-common", "burn-import"];
-static REGEX_BASE: &str = r"\{(.|\n)*\}";
+// Match any char except \} including new lines.
+static REGEX_BASE: &str = r" = \{([^\}]|\n)*\}";
 
 impl DependencyContent {
     fn update<F: FnOnce(&str) -> String>(&self, update: F) -> DependencyContentUpdate {
