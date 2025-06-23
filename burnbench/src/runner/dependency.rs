@@ -49,6 +49,7 @@ struct DependencyContent {
 }
 
 static BURN_BASE: [&str; 3] = ["burn", "burn-common", "burn-import"];
+static REGEX_BASE: &str = r"\{(.|\n)*\}";
 
 impl DependencyContent {
     fn update<F: FnOnce(&str) -> String>(&self, update: F) -> DependencyContentUpdate {
@@ -223,7 +224,7 @@ impl Dependency {
         let update_version = |content: &str| {
             let mut content = content.to_string();
             for base in BURN_BASE {
-                let regex = base.to_string() + r" = \{ [\s\S]+ \}";
+                let regex = base.to_string() + REGEX_BASE;
                 let burn_re = Regex::new(&regex).unwrap();
                 content = burn_re
                     .replace_all(
@@ -275,7 +276,7 @@ impl Dependency {
         let update = |content: &str| {
             let mut content = content.to_string();
             for base in BURN_BASE {
-                let regex = base.to_string() + r" = \{ [\s\S]+ \}";
+                let regex = base.to_string() + REGEX_BASE;
                 let burn_re = Regex::new(&regex).unwrap();
                 content = burn_re.replace_all(
                     content.as_str(),
@@ -306,7 +307,7 @@ impl Dependency {
             let repo_path = repo_path.as_path();
 
             for base in BURN_BASE {
-                let regex = base.to_string() + r" = \{ [\s\S]+ \}";
+                let regex = base.to_string() + REGEX_BASE;
                 let burn_re = Regex::new(&regex).unwrap();
                 content = burn_re
                     .replace_all(
