@@ -16,7 +16,7 @@ const USER_BENCHMARK_SERVER_URL: &str = if cfg!(debug_assertions) {
     "http://localhost:8000/"
 } else {
     // production
-    "https://user-benchmark-server-gvtbw64teq-nn.a.run.app/"
+    "https://user-benchmark-server-812794505978.northamerica-northeast1.run.app/v1/"
 };
 
 #[cfg(test)]
