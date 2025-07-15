@@ -94,7 +94,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            1,
+            2,
             Problem::General {
                 m: 4096,
                 n: 4096,
@@ -102,7 +102,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            1,
+            16,
             Problem::General {
                 m: 2048,
                 n: 2048,
@@ -110,7 +110,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            1,
+            128,
             Problem::General {
                 m: 1024,
                 n: 1024,
@@ -118,7 +118,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            1,
+            1024,
             Problem::General {
                 m: 512,
                 n: 512,
