@@ -77,7 +77,14 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
 #[allow(dead_code)]
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     [
-        // General benches
+        (
+            1,
+            Problem::General {
+                m: 8192,
+                n: 8192,
+                k: 8192,
+            },
+        ),
         (
             1,
             Problem::General {
@@ -87,15 +94,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            2,
-            Problem::General {
-                m: 5000,
-                n: 5000,
-                k: 5000,
-            },
-        ),
-        (
-            4,
+            1,
             Problem::General {
                 m: 4096,
                 n: 4096,
@@ -103,7 +102,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            4,
+            1,
             Problem::General {
                 m: 2048,
                 n: 2048,
@@ -111,7 +110,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            8,
+            1,
             Problem::General {
                 m: 1024,
                 n: 1024,
@@ -119,38 +118,87 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             },
         ),
         (
-            16,
+            1,
             Problem::General {
                 m: 512,
                 n: 512,
                 k: 512,
             },
         ),
-        (
-            32,
-            Problem::General {
-                m: 256,
-                n: 256,
-                k: 256,
-            },
-        ),
-        // Mat@Vec benches
-        (1, Problem::MatVec { m: 8192, k: 8192 }),
-        (2, Problem::MatVec { m: 8192, k: 8192 }),
-        // Vec@Mat benches
-        (1, Problem::VecMat { n: 8192, k: 8192 }),
-        (2, Problem::VecMat { n: 8192, k: 8192 }),
-        // Inner benches
-        (1, Problem::Inner { k: 8192 }),
-        // Outer benches
-        (
-            1,
-            Problem::Outer {
-                m: 8192 * 2,
-                n: 8192 * 2,
-            },
-        ),
-        (4, Problem::Outer { m: 8192, n: 8192 }),
+        // General benches
+        // (
+        //     1,
+        //     Problem::General {
+        //         m: 6144,
+        //         n: 6144,
+        //         k: 6144,
+        //     },
+        // ),
+        // (
+        //     2,
+        //     Problem::General {
+        //         m: 5000,
+        //         n: 5000,
+        //         k: 5000,
+        //     },
+        // ),
+        // (
+        //     4,
+        //     Problem::General {
+        //         m: 4096,
+        //         n: 4096,
+        //         k: 4096,
+        //     },
+        // ),
+        // (
+        //     4,
+        //     Problem::General {
+        //         m: 2048,
+        //         n: 2048,
+        //         k: 2048,
+        //     },
+        // ),
+        // (
+        //     8,
+        //     Problem::General {
+        //         m: 1024,
+        //         n: 1024,
+        //         k: 1024,
+        //     },
+        // ),
+        // (
+        //     16,
+        //     Problem::General {
+        //         m: 512,
+        //         n: 512,
+        //         k: 512,
+        //     },
+        // ),
+        // (
+        //     32,
+        //     Problem::General {
+        //         m: 256,
+        //         n: 256,
+        //         k: 256,
+        //     },
+        // ),
+        // // Mat@Vec benches
+        // (1, Problem::MatVec { m: 8192, k: 8192 }),
+        // (2, Problem::MatVec { m: 8192, k: 8192 }),
+        // // Vec@Mat benches
+        // (1, Problem::VecMat { n: 8192, k: 8192 }),
+        // (2, Problem::VecMat { n: 8192, k: 8192 }),
+        // // Inner benches
+        // (1, Problem::Inner { k: 8192 }),
+        // // Outer benches
+        // (
+        //     1,
+        //     Problem::Outer {
+        //         m: 8192 * 2,
+        //         n: 8192 * 2,
+        //     },
+        // ),
+        // (4, Problem::Outer { m: 8192, n: 8192 }),
     ]
     .into_iter()
     .map(|(b, problem)| MatmulBenchmark::<B, 3>::new(b, problem, device.clone()))
