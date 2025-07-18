@@ -1,0 +1,77 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+    # note: by design GitHub workflow dispatch events are limited to 10 inputs
+    inputs:
+      bench_config:
+        description: "JSON config with backends, benches, dtypes, and versions"
+        required: false
+        default: '{"backends":["wgpu-fusion"],"benches":["matmul"],"dtypes":["f16"],"versions":["main"]}'
+      gcp-gpu-attached:
+        description: "Must be true if the machine type has a GPU attached"
+        type: boolean
+        required: false
+        default: true
+      gcp-image-family:
+        description: "GCP image family to use"
+        required: false
+        default: "tracel-ci-ubuntu-2404-amd64-nvidia"
+      gcp-machine-type:
+        description: "GCP machine type to use"
+        required: false
+        default: "g2-standard-4"
+      gcp-zone:
+        description: "GCP zone to use"
+        required: false
+        default: "us-east1-c"
+      repo_full:
+        description: "Full repository name, e.g. tracel-ai/burn"
+        required: false
+        default: "tracel-ai/burn"
+      rust-toolchain:
+        description: "The Rust toolchain"
+        required: false
+        default: "stable"
+      rust-version:
+        description: "The Rust version"
+        required: false
+        default: "stable"
+
+jobs:
+  burn-bench:
+    runs-on: [
+      '@id:benchmarks-job-${{ github.run_id }}-${{ github.run_attempt }}',
+      '@image-family:${{ inputs.gcp-image-family }}',
+      '@machine-type:${{ inputs.gcp-machine-type }}',
+      '@zone:${{ inputs.gcp-zone }}',
+      '@gpu:${{ inputs.gcp-gpu-attached }}' ]
+    steps:
+      - name: Setup Rust
+        uses: tracel-ai/github-actions/setup-rust@v3
+        with:
+          rust-toolchain: ${{ inputs.rust-toolchain }}
+          cache-key: ${{ inputs.rust-version }}-benchmarks
+      - name: Install jq
+        run: sudo apt update && sudo apt install -y jq
+      - name: Parse config
+        id: bench_config
+        run: |
+          echo '${{ inputs.bench_config }}' > config.json
+          echo "BACKENDS=$(jq -r '.backends | join(",")' config.json)" >> $GITHUB_ENV
+          echo "BENCHES=$(jq -r '.benches | join(",")' config.json)" >> $GITHUB_ENV
+          echo "DTYPES=$(jq -r '.dtypes | join(",")' config.json)" >> $GITHUB_ENV
+          echo "VERSIONS=$(jq -r '.versions | join(",")' config.json)" >> $GITHUB_ENV
+      - name: Print configuration
+        run: |
+          echo "Versions: $VERSIONS"
+          echo "Backends: $BACKENDS"
+          echo "DTypes: $DTYPES"
+          echo "Benchmarks: $BENCHES"
+          echo "Repository: ${{ inputs.repo_full }}"
+          echo "GCP Image Family: ${{ inputs.gcp-image-family }}"
+          echo "GCP Machine Type: ${{ inputs.gcp-machine-type }}"
+          echo "GCP Zone: ${{ inputs.gcp-zone }}"
+      - name: Run benchmarks
+        run: |
+          cargo bb run -b "$BENCHES" -B "$BACKENDS" -V "$VERSIONS" -v -d "$DTYPES"
