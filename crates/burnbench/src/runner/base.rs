@@ -9,6 +9,7 @@ use strum::{Display, EnumIter, IntoEnumIterator};
 
 use super::auth::Tokens;
 use crate::system_info::BenchmarkSystemInfo;
+use crate::USER_BENCHMARK_SERVER_URL;
 
 use super::auth::get_tokens;
 use super::auth::get_username;
@@ -248,7 +249,7 @@ fn run_backend_comparison_benchmarks(
                 for dtype in dtypes.iter() {
                     let bench_str = bench.to_string();
                     let backend_str = backend.to_string();
-                    let url = format!("{}benchmarks", crate::USER_BENCHMARK_SERVER_URL);
+                    let url = format!("{USER_BENCHMARK_SERVER_URL}benchmarks");
 
                     let status = run_cargo(
                         info,

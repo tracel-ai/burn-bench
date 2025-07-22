@@ -24,7 +24,8 @@ pub(crate) struct Tokens {
     /// This token can be presented to the Burn benchmark server in order to re-issue
     /// a new access token for the user.
     /// This token is longer lived (around 6 months).
-    pub refresh_token: String,
+    /// If None then this type of access_token cannot be refreshed.
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,16 +63,26 @@ pub(crate) fn get_tokens() -> Option<Tokens> {
 pub(crate) fn get_username(access_token: &str) -> Option<UserInfo> {
     let client = reqwest::blocking::Client::new();
     let response = client
-        .get(format!("{}users/me", USER_BENCHMARK_SERVER_URL))
+        .get(format!("{USER_BENCHMARK_SERVER_URL}users/me"))
         .header(reqwest::header::USER_AGENT, "burnbench")
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .header(
             reqwest::header::AUTHORIZATION,
-            format!("Bearer {}", access_token),
+            get_auth_header_value(access_token),
         )
         .send()
         .ok()?;
     response.json::<UserInfo>().ok()
+}
+
+fn get_auth_header_value(access_token: &str) -> String {
+    if access_token.starts_with("ghu_") {
+        format!("Bearer {}", access_token)
+    } else if access_token.starts_with("github_pat_") {
+        format!("token {}", access_token)
+    } else {
+        panic!("Unsupported token format. Only 'ghu_' and 'github_pat' format are supported.");
+    }
 }
 
 fn auth() -> Option<Tokens> {
@@ -100,7 +111,7 @@ fn auth() -> Option<Tokens> {
         Ok(creds) => {
             let tokens = Tokens {
                 access_token: creds.token.clone(),
-                refresh_token: creds.refresh_token.clone(),
+                refresh_token: Some(creds.refresh_token.clone()),
             };
             save_tokens(&tokens);
             Some(tokens)
@@ -138,24 +149,29 @@ fn verify_tokens(tokens: &Tokens) -> bool {
 }
 
 fn refresh_tokens(tokens: &Tokens) -> Option<Tokens> {
-    println!("Access token must be refreshed.");
-    println!("Refreshing token...");
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .post(format!("{}auth/refresh-token", USER_BENCHMARK_SERVER_URL))
-        .header(reqwest::header::USER_AGENT, "burnbench")
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .header(
-            reqwest::header::AUTHORIZATION,
-            format!("Bearer-Refresh {}", tokens.refresh_token),
-        )
+    if let Some(ref refresh_token) = tokens.refresh_token {
+        println!("Access token must be refreshed.");
+        println!("Refreshing token...");
+        let client = reqwest::blocking::Client::new();
+        let response = client
+            .post(format!("{USER_BENCHMARK_SERVER_URL}auth/refresh-token"))
+            .header(reqwest::header::USER_AGENT, "burnbench")
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer-Refresh {}", refresh_token),
+            )
         // it is important to explicitly add an empty body otherwise
         // reqwest won't send the request in release build
-        .body(reqwest::blocking::Body::from(""))
-        .send();
-    response.ok()?.json::<Tokens>().ok().inspect(|_new_tokens| {
-        println!("✅ Token refreshed!");
-    })
+            .body(reqwest::blocking::Body::from(""))
+            .send();
+        response.ok()?.json::<Tokens>().ok().inspect(|_new_tokens| {
+            println!("✅ Token refreshed!");
+        })
+    } else {
+        println!("❌ This kind of token cannot be refresh!");
+        None
+    }
 }
 
 /// Return the file path for the auth cache on disk
@@ -191,14 +207,12 @@ use crate::{USER_BENCHMARK_SERVER_URL, runner::auth::github_device_flow::DeviceF
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rstest::*;
     use std::fs;
 
-    #[fixture]
-    fn tokens() -> Tokens {
+    fn make_tokens(access: &str, refresh: &str) -> Tokens {
         Tokens {
-            access_token: "unique_test_token".to_string(),
-            refresh_token: "unique_refresh_token".to_string(),
+            access_token: access.to_string(),
+            refresh_token: Some(refresh.to_string()),
         }
     }
 
@@ -215,15 +229,16 @@ mod tests {
         }
     }
 
-    #[rstest]
+    #[test]
     #[serial]
-    fn test_save_token_when_file_does_not_exist(tokens: Tokens) {
+    fn test_save_token_when_file_does_not_exist() {
         cleanup_test_environment();
         // Ensure the file does not exist
         let path = get_auth_cache_file_path();
         if path.exists() {
             fs::remove_file(&path).unwrap();
         }
+        let tokens = make_tokens("unique_test_token", "unique_refresh_token");
         save_tokens(&tokens);
         let retrieved_tokens = get_tokens_from_cache().unwrap();
         assert_eq!(retrieved_tokens.access_token, tokens.access_token);
@@ -231,15 +246,13 @@ mod tests {
         cleanup_test_environment();
     }
 
-    #[rstest]
+    #[test]
     #[serial]
-    fn test_overwrite_saved_token_when_file_already_exists(tokens: Tokens) {
+    fn test_overwrite_saved_token_when_file_already_exists() {
         cleanup_test_environment();
-        save_tokens(&tokens);
-        let new_tokens = Tokens {
-            access_token: "new_test_token".to_string(),
-            refresh_token: "new_refresh_token".to_string(),
-        };
+        let old_tokens = make_tokens("old_token", "old_refresh");
+        save_tokens(&old_tokens);
+        let new_tokens = make_tokens("new_test_token", "new_refresh_token");
         save_tokens(&new_tokens);
         let retrieved_tokens = get_tokens_from_cache().unwrap();
         assert_eq!(retrieved_tokens.access_token, new_tokens.access_token);
