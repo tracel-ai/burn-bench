@@ -27,8 +27,8 @@ on:
         default: "us-east1-c"
       pr_number:
         description: "Number of the pull request that triggers this run if any"
+        type: number
         required: false
-        default: null
       repo_full:
         description: "Full repository name, e.g. tracel-ai/burn"
         required: false
