@@ -3,13 +3,17 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::{
-    error::Error, fs::{self, File}, path::{Path, PathBuf}, thread, time
+    error::Error,
+    fs::{self, File},
+    path::{Path, PathBuf},
+    thread, time,
 };
 
-pub(crate) static CLIENT_ID: &str = "Iv1.692f6a61b6086810";
+pub(crate) const CLIENT_ID: &'static str = "Iv1.692f6a61b6086810";
 const FIVE_SECONDS: time::Duration = time::Duration::new(5, 0);
-static GITHUB_API_VERSION_HEADER: &str = "X-GitHub-Api-Version";
-static GITHUB_API_VERSION: &str = "2022-11-28";
+const GITHUB_API_VERSION_HEADER: &'static str = "X-GitHub-Api-Version";
+const GITHUB_API_VERSION: &'static str = "2022-11-28";
+const GITHUB_BOT_TOKEN_ENV_VAR: &'static str = "GITHUB_BOT_TOKEN";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Tokens {
@@ -31,6 +35,10 @@ pub(crate) struct UserInfo {
     pub nickname: String,
 }
 
+pub(crate) fn get_bot_token() -> Option<String> {
+    std::env::var(GITHUB_BOT_TOKEN_ENV_VAR).ok()
+}
+
 /// Retrieve an access token for GitHub API access.
 ///
 /// If the `GITHUB_BOT_TOKEN` environment variable is set, it takes precedence and is
@@ -44,7 +52,7 @@ where
     F: Fn(&Tokens) -> bool,
 {
     // return the bot token if defined
-    if let Ok(bot_token) = std::env::var("GITHUB_BOT_TOKEN") {
+    if let Some(bot_token) = get_bot_token() {
         return Some(Tokens {
             access_token: bot_token,
             refresh_token: None,
@@ -73,7 +81,7 @@ where
 }
 
 pub(crate) fn get_tokens() -> Option<Tokens> {
-    get_tokens_with_verifier(verify_tokens)
+    get_tokens_with_verifier(verify_user_tokens)
 }
 
 /// Returns the authenticated user name from access token
@@ -96,7 +104,7 @@ pub(crate) fn get_username(access_token: &str) -> Result<UserInfo, Box<dyn Error
     Ok(user_info)
 }
 
-fn get_auth_header_value(access_token: &str) -> String {
+pub(crate) fn get_auth_header_value(access_token: &str) -> String {
     if access_token.starts_with("ghu_") {
         format!("Bearer {}", access_token)
     } else if access_token.starts_with("github_pat_") {
@@ -154,7 +162,7 @@ fn get_tokens_from_cache() -> Option<Tokens> {
 }
 
 /// Returns true if the token is still valid
-fn verify_tokens(tokens: &Tokens) -> bool {
+fn verify_user_tokens(tokens: &Tokens) -> bool {
     let client = reqwest::blocking::Client::new();
     let response = client
         .get("https://api.github.com/user")
@@ -313,14 +321,14 @@ mod tests {
         cleanup_test_environment();
         let bot_token = "github_pat_example_token_123";
         unsafe {
-            std::env::set_var("GITHUB_BOT_TOKEN", bot_token);
+            std::env::set_var(GITHUB_BOT_TOKEN_ENV_VAR, bot_token);
         }
         let tokens = get_tokens().expect("Expected token from environment");
         assert_eq!(tokens.access_token, bot_token);
         assert_eq!(tokens.refresh_token, None);
         cleanup_test_environment();
         unsafe {
-            std::env::remove_var("GITHUB_BOT_TOKEN");
+            std::env::remove_var(GITHUB_BOT_TOKEN_ENV_VAR);
         }
     }
 
@@ -329,7 +337,7 @@ mod tests {
     fn test_return_user_tokens_when_environment_variable_is_not_defined() {
         cleanup_test_environment();
         unsafe {
-            std::env::remove_var("GITHUB_BOT_TOKEN");
+            std::env::remove_var(GITHUB_BOT_TOKEN_ENV_VAR);
         }
         let cached_tokens = make_tokens("cached_access", "cached_refresh");
         save_tokens(&cached_tokens);
@@ -338,7 +346,7 @@ mod tests {
         assert_eq!(tokens.refresh_token, cached_tokens.refresh_token);
         cleanup_test_environment();
         unsafe {
-            std::env::remove_var("GITHUB_BOT_TOKEN");
+            std::env::remove_var(GITHUB_BOT_TOKEN_ENV_VAR);
         }
     }
 
