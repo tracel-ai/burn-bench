@@ -37,6 +37,7 @@ enum Commands {
 }
 
 /// Information about the crate to benchmark.
+#[derive(Debug)]
 struct CrateInfo {
     /// The name of the crate that contains the benchmarks.
     name: String,
@@ -147,7 +148,7 @@ pub fn execute<P: AsRef<Path>>(name: &str, path: P) {
     let path: &Path = path.as_ref();
     let info = CrateInfo {
         name: name.to_string(),
-        path: path.join(name),
+        path: path.join("crates").join(name),
     };
     let args = Args::parse();
     match args.command {
