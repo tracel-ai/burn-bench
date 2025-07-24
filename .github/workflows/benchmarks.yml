@@ -43,7 +43,7 @@ on:
         default: "stable"
 
 env:
-  INPUT_FILE: inputs.json
+  INPUTS_FILE: inputs.json
 
 jobs:
   burn-bench:
@@ -82,7 +82,7 @@ jobs:
           echo "GCP Machine Type: ${{ inputs.gcp_machine_type }}"
           echo "GCP Zone: ${{ inputs.gcp_zone }}"
       # ----------------------------------------------------------------------
-      - name: Write inputs to ${{ env.INPUT_FILE }}
+      - name: Write inputs to ${{ env.INPUTS_FILE }}
         run: |
           jq -n \
             --arg bench_config_json '${{ inputs.bench_config_json }}' \
@@ -104,11 +104,11 @@ jobs:
               repo_full: $repo_full,
               rust_toolchain: $rust_toolchain,
               rust_version: $rust_version
-            }' > "$INPUT_FILE"
+            }' > "$INPUTS_FILE"
       # ----------------------------------------------------------------------
       - name: Run benchmarks
         env:
           GITHUB_BOT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INPUT_FILE: ${{ env.INPUT_FILE }}
+          INPUTS_FILE: ${{ env.INPUTS_FILE }}
         run: |
           cargo bb run -b "$BENCHES" -B "$BACKENDS" -V "$VERSIONS" -v -d "$DTYPES" --share
