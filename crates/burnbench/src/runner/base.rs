@@ -2,10 +2,14 @@ use clap::{Parser, Subcommand, ValueEnum};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use std::fs;
 use std::io;
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
+
+use hmac_sha256::HMAC;
+use uuid::Uuid;
 
 use super::auth::Tokens;
 use crate::USER_BENCHMARK_SERVER_URL;
@@ -18,6 +22,7 @@ use super::processor::{CargoRunner, NiceProcessor, OutputProcessor, Profiling, V
 use super::progressbar::RunnerProgressBar;
 use super::reports::{BenchmarkCollection, FailedBenchmark};
 use crate::USER_BENCHMARK_WEBSITE_URL;
+
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -290,9 +295,86 @@ fn run_backend_comparison_benchmarks(
         pb.lock().unwrap().finish();
     }
 
-    println!("{}", report_collection.load_records());
+    let collection = report_collection.load_records();
+    let mut output_results = collection.get_ascii_table();
+    // Share link
     if let Some(url) = web_results_url(token) {
-        println!("📊 Browse results at {}", url);
+        output_results.push_str(&format!("\n📊 Browse results at {}", url));
+    }
+    println!("{output_results}");
+    // 'complete' webhook
+    if let Ok(inputs_file) = std::env::var("WEBHOOK_INPUTS_FILE") {
+        send_output_results(&inputs_file, &output_results);
+    }
+}
+
+fn send_output_results(inputs_file: &str, output_results: &str) {
+    let mut json: serde_json::Value = match std::fs::File::open(inputs_file) {
+        Ok(file) => {
+            let reader = std::io::BufReader::new(file);
+            match serde_json::from_reader(reader) {
+                Ok(value) => value,
+                Err(e) => {
+                    eprintln!("❌ Error while reading the inputs file: {e}");
+                    return;
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Cannot open inputs file: {e}");
+            return;
+        }
+    };
+
+    // verify that pr_number exists in the inputs and that it's a valid number
+    if let Some(pr_number) = json["pr_number"].as_str() && pr_number.parse::<i64>().is_ok() {
+        json["output_results"] = serde_json::Value::String(output_results.to_string());
+        json["action"] = serde_json::Value::String("complete".to_string());
+
+        // Get the secret used to encode the signature
+        let secret = match env::var("WEBHOOK_PAYLOAD_SECRET") {
+            Ok(s) => s,
+            Err(_) => {
+                eprintln!("❌ WEBHOOK_PAYLOAD_SECRET is not set");
+                return;
+            }
+        };
+        // Serialize the final payload
+        let payload = match serde_json::to_vec(&json) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("❌ Failed to serialize JSON: {e}");
+                return;
+            }
+        };
+        // Compute headers HMAC-SHA256 and uuid
+        let mac = HMAC::mac(&payload, secret.as_bytes());
+        let signature = format!("sha256={}", hex::encode(mac));
+        let delivery_id = Uuid::new_v4().to_string();
+        // send webhook
+        let client = reqwest::blocking::Client::new();
+        let post_url = format!("{USER_BENCHMARK_SERVER_URL}burn_bench/webhook/benchmark");
+        match client
+            .post(&post_url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header("X-GitHub-Delivery", &delivery_id)
+            .header("X-Hub-Signature-256", &signature)
+            .body(payload)
+            .send()
+        {
+            Ok(response) => {
+                if response.status().is_success() {
+                    println!("✅ Sent 'complete' webhook to server at '{post_url}'.");
+                } else {
+                    eprintln!("❌ Failed to send 'complete' webhook. Status: {}", response.status());
+                }
+            }
+            Err(e) => {
+                eprintln!("❌ Error while sending 'complete' webhook: {e}");
+            }
+        }
+    } else {
+        eprintln!("ℹ️ No 'pr_number' found in inputs. Skipping sending 'complete' webhook.");
     }
 }
 

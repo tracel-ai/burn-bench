@@ -16,3 +16,6 @@ Cargo.toml.bak
 .vscode
 .vs
 .fleet
+
+# used by bebhook for benchmark results
+inputs.json

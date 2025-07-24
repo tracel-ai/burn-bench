@@ -20,6 +20,8 @@ comfy-table = "7.1.4"
 derive-new = { version = "0.7.0", default-features = false }
 dirs = "5.0.1"
 futures-lite = { version = "2.3.0", default-features = false }
+hex = "0.4.3"
+hmac-sha256 = "1.1.12"
 indicatif = "0.17.11"
 log = { version = "0.4.25", default-features = false }
 os_info = "3.10.0"
@@ -38,6 +40,7 @@ serde_json = { version = "1.0.140", default-features = false }
 strum = "0.27.1"
 sysinfo = { version = "0.33.1", features = ["serde"] }
 tracing-subscriber = "0.3.19"
+uuid = { version = "1.17.0", features = ["v4"] }
 wgpu = "24.0.1"
 wsl = "0.1.0"
 
