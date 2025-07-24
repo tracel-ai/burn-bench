@@ -67,7 +67,7 @@ where
             } else {
                 refresh_tokens(&tokens).map_or_else(
                     || {
-                        println!("⚠ Cannot refresh the access token. You need to reauthorize the Burnbench application.");
+                        println!("⚠️ Cannot refresh no the access token. You need to reauthorize the Burnbench application.");
                         auth()
                     },
                     |new_tokens| {
@@ -199,7 +199,7 @@ fn refresh_tokens(tokens: &Tokens) -> Option<Tokens> {
         })
     } else {
         // PAT tokens does not need to be refreshed, we just return back the initial tokens
-        println!("⚠️ PAT tokens don't not need to be refreshed.");
+        println!("✅️ PAT tokens don't need to be refreshed. Nothing done.");
         Some(tokens.clone())
     }
 }
