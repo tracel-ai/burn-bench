@@ -3,8 +3,8 @@
 # require version 2 to avoid "feature" additiveness for dev-dependencies
 # https://doc.rust-lang.org/cargo/reference/resolver.html#feature-resolver-version-2
 resolver = "2"
-
-members = ["backend-comparison", "burnbench"]
+members = ["crates/*"]
+exclude = ["xtask"]
 
 [workspace.package]
 edition = "2024"

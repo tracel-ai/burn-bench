@@ -153,7 +153,7 @@ impl Drop for TomlDependencyGuard {
 
 impl Dependency {
     pub fn patch(&self, base_path: &Path) -> std::io::Result<CargoDependencyGuard> {
-        let burn_dir = std::env::var("BURN_BENCH_BURN_DIR").unwrap_or("../burn/".into());
+        let burn_dir = std::env::var("BURN_BENCH_BURN_DIR").unwrap_or("../../burn/".into());
         let content_original = DependencyContent::from_path(base_path)?;
 
         let content = match self {

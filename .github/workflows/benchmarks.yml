@@ -25,6 +25,10 @@ on:
         description: "GCP zone to use"
         required: false
         default: "us-east1-c"
+      pr_number:
+        description: "Number of the pull request that triggers this run if any"
+        type: number
+        required: false
       repo_full:
         description: "Full repository name, e.g. tracel-ai/burn"
         required: false
@@ -38,6 +42,9 @@ on:
         required: false
         default: "stable"
 
+env:
+  INPUT_FILE: inputs.json
+
 jobs:
   burn-bench:
     runs-on: [
@@ -47,6 +54,7 @@ jobs:
       '@zone:${{ inputs.gcp_zone }}',
       '@gpu:${{ inputs.gcp_gpu_attached }}' ]
     steps:
+      # ----------------------------------------------------------------------
       - name: Setup Rust
         uses: tracel-ai/github-actions/setup-rust@v3
         with:
@@ -62,6 +70,7 @@ jobs:
           echo "BENCHES=$(jq -r '.benches | join(",")' config.json)" >> $GITHUB_ENV
           echo "DTYPES=$(jq -r '.dtypes | join(",")' config.json)" >> $GITHUB_ENV
           echo "VERSIONS=$(jq -r '.versions | join(",")' config.json)" >> $GITHUB_ENV
+      # ----------------------------------------------------------------------
       - name: Print configuration
         run: |
           echo "Versions: $VERSIONS"
@@ -72,6 +81,34 @@ jobs:
           echo "GCP Image Family: ${{ inputs.gcp_image_family }}"
           echo "GCP Machine Type: ${{ inputs.gcp_machine_type }}"
           echo "GCP Zone: ${{ inputs.gcp_zone }}"
-      - name: Run benchmarks
+      # ----------------------------------------------------------------------
+      - name: Write inputs to ${{ env.INPUT_FILE }}
         run: |
-          cargo bb run -b "$BENCHES" -B "$BACKENDS" -V "$VERSIONS" -v -d "$DTYPES"
+          jq -n \
+            --arg bench_config_json '${{ inputs.bench_config_json }}' \
+            --argjson gcp_gpu_attached '${{ inputs.gcp_gpu_attached }}' \
+            --arg gcp_image_family '${{ inputs.gcp_image_family }}' \
+            --arg gcp_machine_type '${{ inputs.gcp_machine_type }}' \
+            --arg gcp_zone '${{ inputs.gcp_zone }}' \
+            --argjson pr_number '${{ inputs.pr_number }}' \
+            --arg repo_full '${{ inputs.repo_full }}' \
+            --arg rust_toolchain '${{ inputs.rust_toolchain }}' \
+            --arg rust_version '${{ inputs.rust_version }}' \
+            '{
+              bench_config_json: $bench_config_json,
+              gcp_gpu_attached: $gcp_gpu_attached,
+              gcp_image_family: $gcp_image_family,
+              gcp_machine_type: $gcp_machine_type,
+              gcp_zone: $gcp_zone,
+              pr_number: $pr_number,
+              repo_full: $repo_full,
+              rust_toolchain: $rust_toolchain,
+              rust_version: $rust_version
+            }' > "$INPUT_FILE"
+      # ----------------------------------------------------------------------
+      - name: Run benchmarks
+        env:
+          GITHUB_BOT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_FILE: ${{ env.INPUT_FILE }}
+        run: |
+          cargo bb run -b "$BENCHES" -B "$BACKENDS" -V "$VERSIONS" -v -d "$DTYPES" --share

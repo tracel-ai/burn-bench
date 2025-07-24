@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use super::auth::Tokens;
+use crate::USER_BENCHMARK_SERVER_URL;
 use crate::system_info::BenchmarkSystemInfo;
 
 use super::auth::get_tokens;
@@ -36,6 +37,7 @@ enum Commands {
 }
 
 /// Information about the crate to benchmark.
+#[derive(Debug)]
 struct CrateInfo {
     /// The name of the crate that contains the benchmarks.
     name: String,
@@ -141,12 +143,12 @@ enum BackendValues {
     MetalFusion,
 }
 
-/// Execute burnbench on the provided crate localted at the provided path.
+/// Execute burnbench on the provided crate located at the provided path.
 pub fn execute<P: AsRef<Path>>(name: &str, path: P) {
     let path: &Path = path.as_ref();
     let info = CrateInfo {
         name: name.to_string(),
-        path: path.join(name),
+        path: path.join("crates").join(name),
     };
     let args = Args::parse();
     match args.command {
@@ -159,14 +161,17 @@ pub fn execute<P: AsRef<Path>>(name: &str, path: P) {
 /// Create an access token from GitHub Burnbench application, store it,
 /// and display the name of the authenticated user.
 fn command_auth() {
-    get_tokens()
+    match get_tokens()
+        .ok_or_else(|| "missing access token".into())
         .and_then(|t| get_username(&t.access_token))
-        .map(|user_info| {
+    {
+        Ok(user_info) => {
             println!("🔑 Your username is: {}", user_info.nickname);
-        })
-        .unwrap_or_else(|| {
-            println!("Failed to display your username.");
-        });
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to authenticate ({e})");
+        }
+    }
 }
 
 fn command_list() {
@@ -248,7 +253,7 @@ fn run_backend_comparison_benchmarks(
                 for dtype in dtypes.iter() {
                     let bench_str = bench.to_string();
                     let backend_str = backend.to_string();
-                    let url = format!("{}benchmarks", crate::USER_BENCHMARK_SERVER_URL);
+                    let url = format!("{USER_BENCHMARK_SERVER_URL}benchmarks");
 
                     let status = run_cargo(
                         info,
@@ -402,7 +407,7 @@ fn run_cargo(
 
 fn web_results_url(token: Option<&str>) -> Option<String> {
     if let Some(t) = token {
-        if let Some(user) = get_username(t) {
+        if let Ok(user) = get_username(t) {
             let sysinfo = BenchmarkSystemInfo::new();
             let encoded_os = utf8_percent_encode(&sysinfo.os.name, NON_ALPHANUMERIC).to_string();
             let output = std::process::Command::new("git")

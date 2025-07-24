@@ -3,17 +3,19 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::{
+    error::Error,
     fs::{self, File},
     path::{Path, PathBuf},
     thread, time,
 };
 
-pub(crate) static CLIENT_ID: &str = "Iv1.692f6a61b6086810";
+pub(crate) const CLIENT_ID: &'static str = "Iv1.692f6a61b6086810";
 const FIVE_SECONDS: time::Duration = time::Duration::new(5, 0);
-static GITHUB_API_VERSION_HEADER: &str = "X-GitHub-Api-Version";
-static GITHUB_API_VERSION: &str = "2022-11-28";
+const GITHUB_API_VERSION_HEADER: &'static str = "X-GitHub-Api-Version";
+const GITHUB_API_VERSION: &'static str = "2022-11-28";
+const GITHUB_BOT_TOKEN_ENV_VAR: &'static str = "GITHUB_BOT_TOKEN";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Tokens {
     /// Token returned once the Burnbench Github app has been authorized by the user.
     /// This token is used to authenticate the user to the Burn benchmark server.
@@ -24,7 +26,8 @@ pub(crate) struct Tokens {
     /// This token can be presented to the Burn benchmark server in order to re-issue
     /// a new access token for the user.
     /// This token is longer lived (around 6 months).
-    pub refresh_token: String,
+    /// If None then this type of access_token cannot be refreshed.
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,46 +35,83 @@ pub(crate) struct UserInfo {
     pub nickname: String,
 }
 
-/// Retrieve cached tokens and refresh them if necessary then save the new tokens.
-/// If there is no cached token or if the access token cannot be resfresh then
-/// ask for the user to reauthorize the Burnbench github application.
-pub(crate) fn get_tokens() -> Option<Tokens> {
+pub(crate) fn get_bot_token() -> Option<String> {
+    std::env::var(GITHUB_BOT_TOKEN_ENV_VAR).ok()
+}
+
+/// Retrieve an access token for GitHub API access.
+///
+/// If the `GITHUB_BOT_TOKEN` environment variable is set, it takes precedence and is
+/// returned as the access token with no refresh token.
+///
+/// Otherwise, attempt to load cached tokens and refresh them if necessary. If no
+/// cached token is found or the refresh fails, prompt the user to reauthorize
+/// the Burnbench GitHub application.
+pub(crate) fn get_tokens_with_verifier<F>(verifier: F) -> Option<Tokens>
+where
+    F: Fn(&Tokens) -> bool,
+{
+    // return the bot token if defined
+    if let Some(bot_token) = get_bot_token() {
+        return Some(Tokens {
+            access_token: bot_token,
+            refresh_token: None,
+        });
+    }
+    // otherwise return the user tokens from the cache
     get_tokens_from_cache().map_or_else(
-        // no token saved yet
         auth,
-        // cached tokens found
         |tokens| {
-            if verify_tokens(&tokens) {
+            if verifier(&tokens) {
                 Some(tokens)
             } else {
                 refresh_tokens(&tokens).map_or_else(
                     || {
-                        println!("⚠ Cannot refresh the access token. You need to reauthorize the Burnbench application.");
+                        println!("⚠️ Cannot refresh no the access token. You need to reauthorize the Burnbench application.");
                         auth()
                     },
                     |new_tokens| {
                         save_tokens(&new_tokens);
                         Some(new_tokens)
-                    })
+                    },
+                )
             }
         },
     )
 }
 
+pub(crate) fn get_tokens() -> Option<Tokens> {
+    get_tokens_with_verifier(verify_user_tokens)
+}
+
 /// Returns the authenticated user name from access token
-pub(crate) fn get_username(access_token: &str) -> Option<UserInfo> {
+pub(crate) fn get_username(access_token: &str) -> Result<UserInfo, Box<dyn Error>> {
     let client = reqwest::blocking::Client::new();
     let response = client
-        .get(format!("{}users/me", USER_BENCHMARK_SERVER_URL))
+        .get(format!("{USER_BENCHMARK_SERVER_URL}users/me"))
         .header(reqwest::header::USER_AGENT, "burnbench")
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .header(
             reqwest::header::AUTHORIZATION,
-            format!("Bearer {}", access_token),
+            get_auth_header_value(access_token),
         )
-        .send()
-        .ok()?;
-    response.json::<UserInfo>().ok()
+        .send()?;
+    let status = response.status();
+    if status != reqwest::StatusCode::OK {
+        return Err(format!("error {status}").into());
+    }
+    let user_info = response.json::<UserInfo>()?;
+    Ok(user_info)
+}
+
+pub(crate) fn get_auth_header_value(access_token: &str) -> String {
+    if access_token.starts_with("ghu_") {
+        format!("Bearer {}", access_token)
+    } else if access_token.starts_with("github_pat_") {
+        format!("token {}", access_token)
+    } else {
+        panic!("Unsupported token format. Only 'ghu_' and 'github_pat' format are supported.");
+    }
 }
 
 fn auth() -> Option<Tokens> {
@@ -100,7 +140,7 @@ fn auth() -> Option<Tokens> {
         Ok(creds) => {
             let tokens = Tokens {
                 access_token: creds.token.clone(),
-                refresh_token: creds.refresh_token.clone(),
+                refresh_token: Some(creds.refresh_token.clone()),
             };
             save_tokens(&tokens);
             Some(tokens)
@@ -122,7 +162,7 @@ fn get_tokens_from_cache() -> Option<Tokens> {
 }
 
 /// Returns true if the token is still valid
-fn verify_tokens(tokens: &Tokens) -> bool {
+fn verify_user_tokens(tokens: &Tokens) -> bool {
     let client = reqwest::blocking::Client::new();
     let response = client
         .get("https://api.github.com/user")
@@ -138,24 +178,30 @@ fn verify_tokens(tokens: &Tokens) -> bool {
 }
 
 fn refresh_tokens(tokens: &Tokens) -> Option<Tokens> {
-    println!("Access token must be refreshed.");
-    println!("Refreshing token...");
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .post(format!("{}auth/refresh-token", USER_BENCHMARK_SERVER_URL))
-        .header(reqwest::header::USER_AGENT, "burnbench")
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .header(
-            reqwest::header::AUTHORIZATION,
-            format!("Bearer-Refresh {}", tokens.refresh_token),
-        )
-        // it is important to explicitly add an empty body otherwise
-        // reqwest won't send the request in release build
-        .body(reqwest::blocking::Body::from(""))
-        .send();
-    response.ok()?.json::<Tokens>().ok().inspect(|_new_tokens| {
-        println!("✅ Token refreshed!");
-    })
+    if let Some(ref refresh_token) = tokens.refresh_token {
+        println!("Access token must be refreshed.");
+        println!("Refreshing token...");
+        let client = reqwest::blocking::Client::new();
+        let response = client
+            .post(format!("{USER_BENCHMARK_SERVER_URL}auth/refresh-token"))
+            .header(reqwest::header::USER_AGENT, "burnbench")
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer-Refresh {}", refresh_token),
+            )
+            // it is important to explicitly add an empty body otherwise
+            // reqwest won't send the request in release build
+            .body(reqwest::blocking::Body::from(""))
+            .send();
+        response.ok()?.json::<Tokens>().ok().inspect(|_new_tokens| {
+            println!("✅ Token refreshed!");
+        })
+    } else {
+        // PAT tokens does not need to be refreshed, we just return back the initial tokens
+        println!("✅️ PAT tokens don't need to be refreshed. Nothing done.");
+        Some(tokens.clone())
+    }
 }
 
 /// Return the file path for the auth cache on disk
@@ -191,14 +237,12 @@ use crate::{USER_BENCHMARK_SERVER_URL, runner::auth::github_device_flow::DeviceF
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rstest::*;
     use std::fs;
 
-    #[fixture]
-    fn tokens() -> Tokens {
+    fn make_tokens(access: &str, refresh: &str) -> Tokens {
         Tokens {
-            access_token: "unique_test_token".to_string(),
-            refresh_token: "unique_refresh_token".to_string(),
+            access_token: access.to_string(),
+            refresh_token: Some(refresh.to_string()),
         }
     }
 
@@ -215,15 +259,11 @@ mod tests {
         }
     }
 
-    #[rstest]
+    #[test]
     #[serial]
-    fn test_save_token_when_file_does_not_exist(tokens: Tokens) {
+    fn test_save_token_when_file_does_not_exist() {
         cleanup_test_environment();
-        // Ensure the file does not exist
-        let path = get_auth_cache_file_path();
-        if path.exists() {
-            fs::remove_file(&path).unwrap();
-        }
+        let tokens = make_tokens("unique_test_token", "unique_refresh_token");
         save_tokens(&tokens);
         let retrieved_tokens = get_tokens_from_cache().unwrap();
         assert_eq!(retrieved_tokens.access_token, tokens.access_token);
@@ -231,15 +271,13 @@ mod tests {
         cleanup_test_environment();
     }
 
-    #[rstest]
+    #[test]
     #[serial]
-    fn test_overwrite_saved_token_when_file_already_exists(tokens: Tokens) {
+    fn test_overwrite_saved_token_when_file_already_exists() {
         cleanup_test_environment();
-        save_tokens(&tokens);
-        let new_tokens = Tokens {
-            access_token: "new_test_token".to_string(),
-            refresh_token: "new_refresh_token".to_string(),
-        };
+        let old_tokens = make_tokens("old_token", "old_refresh");
+        save_tokens(&old_tokens);
+        let new_tokens = make_tokens("new_test_token", "new_refresh_token");
         save_tokens(&new_tokens);
         let retrieved_tokens = get_tokens_from_cache().unwrap();
         assert_eq!(retrieved_tokens.access_token, new_tokens.access_token);
@@ -275,5 +313,61 @@ mod tests {
             "Expected None for empty cache file, got Some"
         );
         cleanup_test_environment();
+    }
+
+    #[test]
+    #[serial]
+    fn test_return_pat_when_environment_variable_is_defined() {
+        cleanup_test_environment();
+        let bot_token = "github_pat_example_token_123";
+        unsafe {
+            std::env::set_var(GITHUB_BOT_TOKEN_ENV_VAR, bot_token);
+        }
+        let tokens = get_tokens().expect("Expected token from environment");
+        assert_eq!(tokens.access_token, bot_token);
+        assert_eq!(tokens.refresh_token, None);
+        cleanup_test_environment();
+        unsafe {
+            std::env::remove_var(GITHUB_BOT_TOKEN_ENV_VAR);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_return_user_tokens_when_environment_variable_is_not_defined() {
+        cleanup_test_environment();
+        unsafe {
+            std::env::remove_var(GITHUB_BOT_TOKEN_ENV_VAR);
+        }
+        let cached_tokens = make_tokens("cached_access", "cached_refresh");
+        save_tokens(&cached_tokens);
+        let tokens = get_tokens_with_verifier(|_| true).expect("Expected tokens from cache");
+        assert_eq!(tokens.access_token, cached_tokens.access_token);
+        assert_eq!(tokens.refresh_token, cached_tokens.refresh_token);
+        cleanup_test_environment();
+        unsafe {
+            std::env::remove_var(GITHUB_BOT_TOKEN_ENV_VAR);
+        }
+    }
+
+    #[test]
+    fn test_get_auth_header_value_with_ghu_token() {
+        let token = "ghu_abc123";
+        let header = get_auth_header_value(token);
+        assert_eq!(header, "Bearer ghu_abc123");
+    }
+
+    #[test]
+    fn test_get_auth_header_value_with_github_pat_token() {
+        let token = "github_pat_abc123";
+        let header = get_auth_header_value(token);
+        assert_eq!(header, "token github_pat_abc123");
+    }
+
+    #[test]
+    #[should_panic(expected = "Unsupported token format")]
+    fn test_get_auth_header_value_with_unsupported_token() {
+        let token = "invalid_token_format";
+        let _ = get_auth_header_value(token);
     }
 }

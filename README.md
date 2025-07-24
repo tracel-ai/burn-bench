@@ -6,11 +6,11 @@ identify regressions, improvements, and the best backend for a given workload.
 
 ## Structure
 
-- **`backend-comparison/`**: Benchmarks for backend performance, ranging from individual tensor
+- **`crates/backend-comparison/`**: Benchmarks for backend performance, ranging from individual tensor
   operations to full forward and backward passes for a given model.
-- **`burnbench/`**: The core benchmarking crate and CLI. Can be used as a standalone tool or
+- **`crates/burnbench/`**: The core benchmarking crate and CLI. Can be used as a standalone tool or
   integrated as a library to define and run custom benchmark suites.
-- **(Future)** **`integration-tests/`**: TBD. We'd like to add more tests to capture more complex
+- **(Future)** **`crates/integration-tests/`**: TBD. We'd like to add more tests to capture more complex
   workloads, including evaluation of model convergence, metrics, and overall training performance.
 
 ## Getting Started
@@ -48,8 +48,8 @@ By default, the `local` version points to a relative path for the Burn repo dire
 relative to `backend-comparison/`). This can be modified via the `BURN_BENCH_BURN_DIR` environment
 variable.
 
-For detailed instructions, see [`burnbench/README.md`](./burnbench/README.md) and
-[`backend-comparison/README.md`](./backend-comparison/README.md).
+For detailed instructions, see [`crates/burnbench/README.md`](./crates/burnbench/README.md) and
+[`crates/backend-comparison/README.md`](./crates/backend-comparison/README.md).
 
 ## Community Benchmarks
 

@@ -1,3 +1,4 @@
+use crate::auth::get_auth_header_value;
 use crate::system_info::BenchmarkSystemInfo;
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, USER_AGENT};
@@ -195,7 +196,7 @@ fn upload_record(record: &BenchmarkRecord, token: &str, url: &str) {
     let mut headers = HeaderMap::new();
     headers.insert(USER_AGENT, "burnbench".parse().unwrap());
     headers.insert(ACCEPT, "application/json".parse().unwrap());
-    headers.insert(AUTHORIZATION, format!("Bearer {}", token).parse().unwrap());
+    headers.insert(AUTHORIZATION, get_auth_header_value(token).parse().unwrap());
     // post the benchmark record
     let response = client
         .post(url)
