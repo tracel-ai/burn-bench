@@ -69,50 +69,8 @@ impl BenchmarkCollection {
 
         self
     }
-}
 
-pub struct ShapeFmt<'a> {
-    shapes: &'a Vec<Vec<usize>>,
-}
-
-impl<'a> ShapeFmt<'a> {
-    pub fn new(shapes: &'a Vec<Vec<usize>>) -> Self {
-        Self { shapes }
-    }
-}
-
-impl Display for ShapeFmt<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.shapes.is_empty() {
-            return f.write_str("()");
-        }
-
-        if self.shapes.len() > 1 {
-            f.write_str("[")?;
-        }
-
-        for shape in self.shapes {
-            f.write_str("(")?;
-            for (i, val) in shape.iter().enumerate() {
-                if i == shape.len() - 1 {
-                    f.write_fmt(format_args!("{val}"))?;
-                } else {
-                    f.write_fmt(format_args!("{val}, "))?;
-                }
-            }
-            f.write_str(")")?;
-        }
-
-        if self.shapes.len() > 1 {
-            f.write_str("]")?;
-        }
-
-        Ok(())
-    }
-}
-
-impl Display for BenchmarkCollection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub(crate) fn get_ascii_table(&self) -> String {
         let mut records = self.successful_records.clone();
 
         // Sort by benchmark name, then shapes, then median
@@ -188,6 +146,46 @@ impl Display for BenchmarkCollection {
             ]);
         }
 
-        write!(f, "{}", table)
+        table.to_string()
+    }
+}
+
+pub struct ShapeFmt<'a> {
+    shapes: &'a Vec<Vec<usize>>,
+}
+
+impl<'a> ShapeFmt<'a> {
+    pub fn new(shapes: &'a Vec<Vec<usize>>) -> Self {
+        Self { shapes }
+    }
+}
+
+impl Display for ShapeFmt<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.shapes.is_empty() {
+            return f.write_str("()");
+        }
+
+        if self.shapes.len() > 1 {
+            f.write_str("[")?;
+        }
+
+        for shape in self.shapes {
+            f.write_str("(")?;
+            for (i, val) in shape.iter().enumerate() {
+                if i == shape.len() - 1 {
+                    f.write_fmt(format_args!("{val}"))?;
+                } else {
+                    f.write_fmt(format_args!("{val}, "))?;
+                }
+            }
+            f.write_str(")")?;
+        }
+
+        if self.shapes.len() > 1 {
+            f.write_str("]")?;
+        }
+
+        Ok(())
     }
 }

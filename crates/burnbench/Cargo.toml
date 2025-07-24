@@ -24,6 +24,8 @@ comfy-table = { workspace = true }
 derive-new = { workspace = true }
 dirs = { workspace = true }
 futures-lite = { workspace = true, features = ["std"] }
+hex = { workspace = true }
+hmac-sha256 = { workspace = true }
 indicatif = { workspace = true }
 log = { workspace = true }
 os_info = { workspace = true }
@@ -37,6 +39,7 @@ strum = { workspace = true, features = ["derive"] }
 sysinfo = { workspace = true }
 tracing-subscriber = { workspace = true }
 regex = { workspace = true }
+uuid = { workspace = true }
 wgpu = { workspace = true }
 wsl = { workspace = true }
 tempfile = { workspace = true }

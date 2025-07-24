@@ -16,3 +16,6 @@ Cargo.toml.bak
 .vscode
 .vs
 .fleet
+
+# used by webhook for benchmark results
+inputs.json
