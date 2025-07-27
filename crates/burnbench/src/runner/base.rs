@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+use regex::Regex;
+use std::env;
 use std::fs;
 use std::io;
-use std::env;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::{Arc, Mutex};
@@ -22,7 +23,6 @@ use super::processor::{CargoRunner, NiceProcessor, OutputProcessor, Profiling, V
 use super::progressbar::RunnerProgressBar;
 use super::reports::{BenchmarkCollection, FailedBenchmark};
 use crate::USER_BENCHMARK_WEBSITE_URL;
-
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -296,19 +296,20 @@ fn run_backend_comparison_benchmarks(
     }
 
     let collection = report_collection.load_records();
-    let mut output_results = collection.get_ascii_table();
-    // Share link
-    if let Some(url) = web_results_url(token) {
-        output_results.push_str(&format!("\n📊 Browse results at {}", url));
+    let table = collection.get_ascii_table();
+    let mut output_results = table.clone();
+    let share_link = web_results_url(token);
+    if let Some(ref url) = share_link {
+        output_results.push_str(&format!("\n\n📊 Browse results at {}", url));
     }
     println!("{output_results}");
     // 'complete' webhook
     if let Ok(inputs_file) = std::env::var("WEBHOOK_INPUTS_FILE") {
-        send_output_results(&inputs_file, &output_results);
+        send_output_results(&inputs_file, &table, share_link.as_deref());
     }
 }
 
-fn send_output_results(inputs_file: &str, output_results: &str) {
+fn send_output_results(inputs_file: &str, table: &str, share_link: Option<&str>) {
     let mut json: serde_json::Value = match std::fs::File::open(inputs_file) {
         Ok(file) => {
             let reader = std::io::BufReader::new(file);
@@ -327,9 +328,20 @@ fn send_output_results(inputs_file: &str, output_results: &str) {
     };
 
     // verify that pr_number exists in the inputs and that it's a valid number
-    if let Some(pr_number) = json["pr_number"].as_str() && pr_number.parse::<i64>().is_ok() {
-        json["output_results"] = serde_json::Value::String(output_results.to_string());
+    if let Some(pr_number) = json["pr_number"].as_str()
+        && let Ok(pr_number) = pr_number.parse::<i64>()
+    {
+        // cleanup output from any color code
+        let ansi_re = Regex::new(r"\x1b\[[0-9;]*m").expect("should compile regex for ANSI codes");
+        let cleaned_table = ansi_re.replace_all(table, "");
+        let mut results = serde_json::Map::new();
+        results.insert("table".to_owned(), serde_json::Value::String(cleaned_table.to_string()));
+        if let Some(link) = share_link {
+            results.insert("share_link".to_string(), serde_json::Value::String(link.to_string()));
+        }
+        json["results"] = serde_json::Value::Object(results);
         json["action"] = serde_json::Value::String("complete".to_string());
+        json["pr_number"] = serde_json::Value::Number(serde_json::Number::from(pr_number));
 
         // Get the secret used to encode the signature
         let secret = match env::var("WEBHOOK_PAYLOAD_SECRET") {
@@ -366,7 +378,10 @@ fn send_output_results(inputs_file: &str, output_results: &str) {
                 if response.status().is_success() {
                     println!("✅ Sent 'complete' webhook to server at '{post_url}'.");
                 } else {
-                    eprintln!("❌ Failed to send 'complete' webhook. Status: {}", response.status());
+                    eprintln!(
+                        "❌ Failed to send 'complete' webhook. Status: {}",
+                        response.status()
+                    );
                 }
             }
             Err(e) => {
