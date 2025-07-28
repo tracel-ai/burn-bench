@@ -1,7 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
-use regex::Regex;
-use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -9,11 +7,9 @@ use std::process::ExitStatus;
 use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
-use hmac_sha256::HMAC;
-use uuid::Uuid;
-
 use super::auth::Tokens;
-use crate::USER_BENCHMARK_SERVER_URL;
+use crate::{USER_BENCHMARK_SERVER_URL, USER_BENCHMARK_WEBSITE_URL};
+use crate::runner::workflow::send_output_results;
 use crate::system_info::BenchmarkSystemInfo;
 
 use super::auth::get_tokens;
@@ -22,7 +18,6 @@ use super::dependency::Dependency;
 use super::processor::{CargoRunner, NiceProcessor, OutputProcessor, Profiling, VerboseProcessor};
 use super::progressbar::RunnerProgressBar;
 use super::reports::{BenchmarkCollection, FailedBenchmark};
-use crate::USER_BENCHMARK_WEBSITE_URL;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -306,90 +301,6 @@ fn run_backend_comparison_benchmarks(
     // 'complete' webhook
     if let Ok(inputs_file) = std::env::var("WEBHOOK_INPUTS_FILE") {
         send_output_results(&inputs_file, &table, share_link.as_deref());
-    }
-}
-
-fn send_output_results(inputs_file: &str, table: &str, share_link: Option<&str>) {
-    let mut json: serde_json::Value = match std::fs::File::open(inputs_file) {
-        Ok(file) => {
-            let reader = std::io::BufReader::new(file);
-            match serde_json::from_reader(reader) {
-                Ok(value) => value,
-                Err(e) => {
-                    eprintln!("❌ Error while reading the inputs file: {e}");
-                    return;
-                }
-            }
-        }
-        Err(e) => {
-            eprintln!("❌ Cannot open inputs file: {e}");
-            return;
-        }
-    };
-
-    // verify that pr_number exists in the inputs and that it's a valid number
-    if let Some(pr_number) = json["pr_number"].as_str()
-        && let Ok(pr_number) = pr_number.parse::<i64>()
-    {
-        // cleanup output from any color code
-        let ansi_re = Regex::new(r"\x1b\[[0-9;]*m").expect("should compile regex for ANSI codes");
-        let cleaned_table = ansi_re.replace_all(table, "");
-        let mut results = serde_json::Map::new();
-        results.insert("table".to_owned(), serde_json::Value::String(cleaned_table.to_string()));
-        if let Some(link) = share_link {
-            results.insert("share_link".to_string(), serde_json::Value::String(link.to_string()));
-        }
-        json["results"] = serde_json::Value::Object(results);
-        json["action"] = serde_json::Value::String("complete".to_string());
-        json["pr_number"] = serde_json::Value::Number(serde_json::Number::from(pr_number));
-
-        // Get the secret used to encode the signature
-        let secret = match env::var("WEBHOOK_PAYLOAD_SECRET") {
-            Ok(s) => s,
-            Err(_) => {
-                eprintln!("❌ WEBHOOK_PAYLOAD_SECRET is not set");
-                return;
-            }
-        };
-        // Serialize the final payload
-        let payload = match serde_json::to_vec(&json) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("❌ Failed to serialize JSON: {e}");
-                return;
-            }
-        };
-        // Compute headers HMAC-SHA256 and uuid
-        let mac = HMAC::mac(&payload, secret.as_bytes());
-        let signature = format!("sha256={}", hex::encode(mac));
-        let delivery_id = Uuid::new_v4().to_string();
-        // send webhook
-        let client = reqwest::blocking::Client::new();
-        let post_url = format!("{USER_BENCHMARK_SERVER_URL}burn_bench/webhook/benchmark");
-        match client
-            .post(&post_url)
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .header("X-GitHub-Delivery", &delivery_id)
-            .header("X-Hub-Signature-256", &signature)
-            .body(payload)
-            .send()
-        {
-            Ok(response) => {
-                if response.status().is_success() {
-                    println!("✅ Sent 'complete' webhook to server at '{post_url}'.");
-                } else {
-                    eprintln!(
-                        "❌ Failed to send 'complete' webhook. Status: {}",
-                        response.status()
-                    );
-                }
-            }
-            Err(e) => {
-                eprintln!("❌ Error while sending 'complete' webhook: {e}");
-            }
-        }
-    } else {
-        eprintln!("ℹ️ No 'pr_number' found in inputs. Skipping sending 'complete' webhook.");
     }
 }
 
