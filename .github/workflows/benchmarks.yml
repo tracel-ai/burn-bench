@@ -45,15 +45,13 @@ on:
 env:
   INPUTS_FILE: inputs.json
 
-#      '@id:benchmarks-job-${{ github.run_id }}-${{ github.run_attempt }}',
 jobs:
   burn-bench:
     runs-on: [
-      '@id:syl20bnr',
+      '@id:benchmarks-job-${{ github.run_id }}-${{ github.run_attempt }}',
       '@image-family:${{ inputs.gcp_image_family }}',
       '@machine-type:${{ inputs.gcp_machine_type }}',
       '@zone:${{ inputs.gcp_zone }}',
-      '@keep-alive:true',
       '@gpu:${{ inputs.gcp_gpu_attached }}' ]
     steps:
       # ----------------------------------------------------------------------

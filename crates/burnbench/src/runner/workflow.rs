@@ -1,12 +1,15 @@
 use regex::Regex;
-use reqwest::{blocking::{Client, Response}, header::CONTENT_TYPE};
+use reqwest::{
+    blocking::{Client, Response},
+    header::CONTENT_TYPE,
+};
 use serde_json::{Map as JsonMap, Value};
 use std::{env, fs::File, io::BufReader};
 
 use hmac_sha256::HMAC;
 use uuid::Uuid;
 
-use crate::{ci_errorln, USER_BENCHMARK_SERVER_URL};
+use crate::{USER_BENCHMARK_SERVER_URL, ci_errorln};
 
 pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Option<&str>) {
     let file = match File::open(inputs_file) {
@@ -54,10 +57,14 @@ pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Op
     let post_url = format!("{USER_BENCHMARK_SERVER_URL}burn_bench/webhook/benchmark");
     match send_result(&post_url, payload, &signature, &delivery_id) {
         Ok(resp) => {
-            if resp.status().is_success() {
+            let status = resp.status();
+            if status.is_success() {
                 println!("✅ Sent 'complete' webhook to server at '{post_url}'.");
             } else {
-                ci_errorln!("❌ Webhook failed with status: {}", resp.status());
+                let body = resp
+                    .text()
+                    .unwrap_or_else(|_| "<could not read body>".into());
+                ci_errorln!("❌ Webhook failed with status: {status} ({body})");
             }
         }
         Err(e) => {
@@ -102,7 +109,12 @@ fn build_req_body(payload: &[u8]) -> Result<(String, String), &'static str> {
     Ok((signature, delivery_id))
 }
 
-fn send_result(url: &str, payload: Vec<u8>, signature: &str, delivery_id: &str) -> Result<Response, reqwest::Error> {
+fn send_result(
+    url: &str,
+    payload: Vec<u8>,
+    signature: &str,
+    delivery_id: &str,
+) -> Result<Response, reqwest::Error> {
     let response = Client::new()
         .post(url)
         .header(CONTENT_TYPE, "application/json")

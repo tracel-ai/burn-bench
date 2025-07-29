@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use super::auth::Tokens;
-use crate::{USER_BENCHMARK_SERVER_URL, USER_BENCHMARK_WEBSITE_URL};
 use crate::runner::workflow::send_output_results;
 use crate::system_info::BenchmarkSystemInfo;
+use crate::{USER_BENCHMARK_SERVER_URL, USER_BENCHMARK_WEBSITE_URL};
 
 use super::auth::get_tokens;
 use super::auth::get_username;
