@@ -66,10 +66,10 @@ jobs:
         id: burn_bench_config_json
         run: |
           echo '${{ inputs.burn_bench_config_json }}' > config.json
-          echo "BACKENDS=$(jq -r '.backends | join(",")' config.json)" >> $GITHUB_ENV
-          echo "BENCHES=$(jq -r '.benches | join(",")' config.json)" >> $GITHUB_ENV
-          echo "DTYPES=$(jq -r '.dtypes | join(",")' config.json)" >> $GITHUB_ENV
-          echo "VERSIONS=$(jq -r '.versions | join(",")' config.json)" >> $GITHUB_ENV
+          echo "BACKENDS=$(jq -r '.backends | join(" ")' config.json)" >> $GITHUB_ENV
+          echo "BENCHES=$(jq -r '.benches | join(" ")' config.json)" >> $GITHUB_ENV
+          echo "DTYPES=$(jq -r '.dtypes | join(" ")' config.json)" >> $GITHUB_ENV
+          echo "VERSIONS=$(jq -r '.versions | join(" ")' config.json)" >> $GITHUB_ENV
       # ----------------------------------------------------------------------
       - name: Print configuration
         run: |
@@ -122,4 +122,4 @@ jobs:
           WEBHOOK_INPUTS_FILE: ${{ env.INPUTS_FILE }}
           WEBHOOK_PAYLOAD_SECRET: ${{ secrets.WEBHOOK_PAYLOAD_SECRET }}
         run: |
-          cargo bb run -b "$BENCHES" -B "$BACKENDS" -V "$VERSIONS" -v -d "$DTYPES" --share
+          cargo bb run -b $BENCHES -B $BACKENDS -V $VERSIONS -v -d $DTYPES --share
