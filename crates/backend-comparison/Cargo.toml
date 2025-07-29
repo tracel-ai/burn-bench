@@ -73,7 +73,7 @@ regex = { workspace = true }
 wgpu = { workspace = true }
 wsl = { workspace = true }
 tempfile = { workspace = true }
-tokio = { version = "1.44", features = ["rt-multi-thread"] }
+tokio = { version = "1.47", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 rstest = { workspace = true }

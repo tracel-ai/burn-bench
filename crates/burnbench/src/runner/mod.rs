@@ -4,5 +4,6 @@ mod dependency;
 mod processor;
 mod progressbar;
 mod reports;
+mod workflow;
 
 pub use base::*;

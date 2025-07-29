@@ -8,7 +8,8 @@ use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use super::auth::Tokens;
-use crate::USER_BENCHMARK_SERVER_URL;
+use crate::{USER_BENCHMARK_SERVER_URL, USER_BENCHMARK_WEBSITE_URL};
+use crate::runner::workflow::send_output_results;
 use crate::system_info::BenchmarkSystemInfo;
 
 use super::auth::get_tokens;
@@ -17,7 +18,6 @@ use super::dependency::Dependency;
 use super::processor::{CargoRunner, NiceProcessor, OutputProcessor, Profiling, VerboseProcessor};
 use super::progressbar::RunnerProgressBar;
 use super::reports::{BenchmarkCollection, FailedBenchmark};
-use crate::USER_BENCHMARK_WEBSITE_URL;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -290,9 +290,17 @@ fn run_backend_comparison_benchmarks(
         pb.lock().unwrap().finish();
     }
 
-    println!("{}", report_collection.load_records());
-    if let Some(url) = web_results_url(token) {
-        println!("📊 Browse results at {}", url);
+    let collection = report_collection.load_records();
+    let table = collection.get_ascii_table();
+    let mut output_results = table.clone();
+    let share_link = web_results_url(token);
+    if let Some(ref url) = share_link {
+        output_results.push_str(&format!("\n\n📊 Browse results at {}", url));
+    }
+    println!("{output_results}");
+    // 'complete' webhook
+    if let Ok(inputs_file) = std::env::var("WEBHOOK_INPUTS_FILE") {
+        send_output_results(&inputs_file, &table, share_link.as_deref());
     }
 }
 
