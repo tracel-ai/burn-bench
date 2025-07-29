@@ -6,23 +6,23 @@ use std::{env, fs::File, io::BufReader};
 use hmac_sha256::HMAC;
 use uuid::Uuid;
 
-use crate::USER_BENCHMARK_SERVER_URL;
+use crate::{ci_errorln, USER_BENCHMARK_SERVER_URL};
 
 pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Option<&str>) {
     let file = match File::open(inputs_file) {
         Ok(f) => f,
-        Err(e) => return eprintln!("❌ Cannot open inputs file: {e}"),
+        Err(e) => return ci_errorln!("❌ Cannot open inputs file: {e}"),
     };
     let reader = BufReader::new(file);
     let json: Value = match serde_json::from_reader(reader) {
         Ok(j) => j,
-        Err(e) => return eprintln!("❌ Error reading JSON: {e}"),
+        Err(e) => return ci_errorln!("❌ Error reading JSON: {e}"),
     };
 
     let pr_number = match json["pr_number"].as_i64().ok_or("Missing 'pr_number'") {
         Ok(n) => n,
         Err(_) => {
-            eprintln!("ℹ️ No valid 'pr_number' found. Skipping webhook.");
+            println!("ℹ️ No valid 'pr_number' found. Skipping webhook.");
             return;
         }
     };
@@ -30,7 +30,7 @@ pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Op
     let cleaned = match clean_output(table, share_link) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("❌ Failed to clean output: {e}");
+            ci_errorln!("❌ Failed to clean output: {e}");
             return;
         }
     };
@@ -38,7 +38,7 @@ pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Op
     let payload = match serialize_result(json, pr_number, cleaned) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("❌ Failed to serialize result: {e}");
+            ci_errorln!("❌ Failed to serialize result: {e}");
             return;
         }
     };
@@ -46,7 +46,7 @@ pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Op
     let (signature, delivery_id) = match build_req_body(&payload) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("❌ Failed to build request: {e}");
+            ci_errorln!("❌ Failed to build request: {e}");
             return;
         }
     };
@@ -57,11 +57,11 @@ pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Op
             if resp.status().is_success() {
                 println!("✅ Sent 'complete' webhook to server at '{post_url}'.");
             } else {
-                eprintln!("❌ Webhook failed with status: {}", resp.status());
+                ci_errorln!("❌ Webhook failed with status: {}", resp.status());
             }
         }
         Err(e) => {
-            eprintln!("❌ Error sending webhook: {e}");
+            ci_errorln!("❌ Error sending webhook: {e}");
         }
     }
 }
