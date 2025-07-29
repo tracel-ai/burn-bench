@@ -120,5 +120,6 @@ jobs:
         env:
           GITHUB_BOT_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
           WEBHOOK_INPUTS_FILE: ${{ env.INPUTS_FILE }}
+          WEBHOOK_PAYLOAD_SECRET: ${{ secrets.WEBHOOK_PAYLOAD_SECRET }}
         run: |
           cargo bb run -b "$BENCHES" -B "$BACKENDS" -V "$VERSIONS" -v -d "$DTYPES" --share
