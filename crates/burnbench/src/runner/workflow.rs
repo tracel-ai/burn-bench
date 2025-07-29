@@ -19,7 +19,7 @@ pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Op
         Err(e) => return eprintln!("❌ Error reading JSON: {e}"),
     };
 
-    let pr_number = match parse_pr_number(&json) {
+    let pr_number = match json["pr_number"].as_i64().ok_or("Missing 'pr_number'") {
         Ok(n) => n,
         Err(_) => {
             eprintln!("ℹ️ No valid 'pr_number' found. Skipping webhook.");
@@ -64,14 +64,6 @@ pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Op
             eprintln!("❌ Error sending webhook: {e}");
         }
     }
-}
-
-fn parse_pr_number(json: &Value) -> Result<i64, &'static str> {
-    json["pr_number"]
-        .as_str()
-        .ok_or("Missing 'pr_number'")?
-        .parse::<i64>()
-        .map_err(|_| "Invalid 'pr_number'")
 }
 
 fn clean_output(
