@@ -60,8 +60,11 @@ jobs:
         with:
           rust-toolchain: ${{ inputs.rust_toolchain }}
           cache-key: ${{ inputs.rust_version }}-benchmarks
-      - uses: jenseng/get-job-uuid@v1
-        id: job-uuid
+      - name: Get Job URL
+        uses: Tiryoh/gha-jobid-action@v1
+        id: jobs
+        with:
+          job_name: ${{ github.job }}
       - name: Install jq
         run: sudo apt update && sudo apt install -y jq
       - name: Parse config
@@ -104,7 +107,7 @@ jobs:
             --arg repo_full '${{ inputs.repo_full }}' \
             --arg rust_toolchain '${{ inputs.rust_toolchain }}' \
             --arg rust_version '${{ inputs.rust_version }}' \
-            --arg workflow_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ steps.job-uuid.outputs.uuid }}:step:8:1" \
+            --arg workflow_url "${{ steps.jobs.outputs.html_url }}:step:8:1" \
             '{
               burn_bench_config_json: $burn_bench_config_json,
               gcp_gpu_attached: $gcp_gpu_attached,
