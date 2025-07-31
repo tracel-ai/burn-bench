@@ -65,8 +65,6 @@ jobs:
         id: jobs
         with:
           job_name: ${{ github.job }}
-      - name: Install jq
-        run: sudo apt update && sudo apt install -y jq
       - name: Parse config
         id: burn_bench_config_json
         run: |
