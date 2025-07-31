@@ -107,7 +107,7 @@ jobs:
             --arg repo_full '${{ inputs.repo_full }}' \
             --arg rust_toolchain '${{ inputs.rust_toolchain }}' \
             --arg rust_version '${{ inputs.rust_version }}' \
-            --arg workflow_url "${{ steps.jobs.outputs.html_url }}:step:8:1" \
+            --arg workflow_url "${{ steps.jobs.outputs.html_url }}#:step:8:1" \
             '{
               burn_bench_config_json: $burn_bench_config_json,
               gcp_gpu_attached: $gcp_gpu_attached,

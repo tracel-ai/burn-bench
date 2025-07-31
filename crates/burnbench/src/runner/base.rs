@@ -293,7 +293,7 @@ fn run_backend_comparison_benchmarks(
     let collection = report_collection.load_records();
     let table = collection.get_ascii_table();
     let mut output_results = table.clone();
-    let share_link = web_results_url(token);
+    let share_link = web_results_url(token, versions);
     if let Some(ref url) = share_link {
         output_results.push_str(&format!("\n\n📊 Browse results at {}", url));
     }
@@ -413,20 +413,16 @@ fn run_cargo(
     status
 }
 
-fn web_results_url(token: Option<&str>) -> Option<String> {
+fn web_results_url(token: Option<&str>, versions: &[String]) -> Option<String> {
     if let Some(t) = token {
         if let Ok(user) = get_username(t) {
             let sysinfo = BenchmarkSystemInfo::new();
             let encoded_os = utf8_percent_encode(&sysinfo.os.name, NON_ALPHANUMERIC).to_string();
-            let output = std::process::Command::new("git")
-                .args(["rev-parse", "HEAD"])
-                .output()
-                .unwrap();
-            let git_hash = String::from_utf8(output.stdout).unwrap().trim().to_string();
+            let versions = utf8_percent_encode(&versions.join(","), NON_ALPHANUMERIC).to_string();
 
             return Some(format!(
-                "{}benchmarks/community-benchmarks?user={}&os={}&version1={}&version2={}&search=true",
-                USER_BENCHMARK_WEBSITE_URL, user.nickname, encoded_os, git_hash, git_hash
+                "{}benchmarks/community-benchmarks?user={}&sysHardware=Any&os={}&burnVersions={}",
+                USER_BENCHMARK_WEBSITE_URL, user.nickname, encoded_os, versions
             ));
         }
     }
