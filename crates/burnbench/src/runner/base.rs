@@ -8,6 +8,8 @@ use std::sync::{Arc, Mutex};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
 use super::auth::Tokens;
+use crate::endgroup;
+use crate::group;
 use crate::runner::workflow::send_output_results;
 use crate::system_info::BenchmarkSystemInfo;
 use crate::{USER_BENCHMARK_SERVER_URL, USER_BENCHMARK_WEBSITE_URL};
@@ -256,7 +258,7 @@ fn run_backend_comparison_benchmarks(
                     let url = format!("{USER_BENCHMARK_SERVER_URL}benchmarks");
 
                     if verbose {
-                        println!("\nRunning benchmarks: {bench_str}@{backend_str}-{dtype}");
+                        group!("Running benchmarks: {bench_str}@{backend_str}-{dtype}");
                     }
                     let status = run_cargo(
                         info,
@@ -283,6 +285,9 @@ fn run_backend_comparison_benchmarks(
                             bench: bench_str.clone(),
                             backend: backend_str.clone(),
                         })
+                    }
+                    if verbose {
+                        endgroup!();
                     }
                 }
             }
