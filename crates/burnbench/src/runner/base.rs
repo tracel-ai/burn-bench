@@ -255,6 +255,9 @@ fn run_backend_comparison_benchmarks(
                     let backend_str = backend.to_string();
                     let url = format!("{USER_BENCHMARK_SERVER_URL}benchmarks");
 
+                    if verbose {
+                        println!("\nRunning benchmarks: {bench_str}@{backend_str}-{dtype}");
+                    }
                     let status = run_cargo(
                         info,
                         &bench_str,
