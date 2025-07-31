@@ -88,7 +88,7 @@ pub(crate) fn get_tokens() -> Option<Tokens> {
 pub(crate) fn get_username(access_token: &str) -> Result<UserInfo, Box<dyn Error>> {
     let client = reqwest::blocking::Client::new();
     let response = client
-        .get(format!("{USER_BENCHMARK_SERVER_URL}users/me"))
+        .get(format!("{TRACEL_CI_SERVER_BASE_URL}users/me"))
         .header(reqwest::header::USER_AGENT, "burnbench")
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .header(
@@ -183,7 +183,7 @@ fn refresh_tokens(tokens: &Tokens) -> Option<Tokens> {
         println!("Refreshing token...");
         let client = reqwest::blocking::Client::new();
         let response = client
-            .post(format!("{USER_BENCHMARK_SERVER_URL}auth/refresh-token"))
+            .post(format!("{TRACEL_CI_SERVER_BASE_URL}auth/refresh-token"))
             .header(reqwest::header::USER_AGENT, "burnbench")
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .header(
@@ -232,7 +232,7 @@ fn save_tokens(tokens: &Tokens) {
 #[cfg(test)]
 use serial_test::serial;
 
-use crate::{USER_BENCHMARK_SERVER_URL, runner::auth::github_device_flow::DeviceFlow};
+use crate::{TRACEL_CI_SERVER_BASE_URL, runner::auth::github_device_flow::DeviceFlow};
 
 #[cfg(test)]
 mod tests {

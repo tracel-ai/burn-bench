@@ -11,8 +11,9 @@ use super::auth::Tokens;
 use crate::endgroup;
 use crate::group;
 use crate::runner::workflow::send_output_results;
+use crate::runner::workflow::send_started_event;
 use crate::system_info::BenchmarkSystemInfo;
-use crate::{USER_BENCHMARK_SERVER_URL, USER_BENCHMARK_WEBSITE_URL};
+use crate::{BENCHMARK_WEBSITE_URL, TRACEL_CI_SERVER_BASE_URL};
 
 use super::auth::get_tokens;
 use super::auth::get_username;
@@ -239,6 +240,7 @@ fn run_backend_comparison_benchmarks(
     profiling: &Profiling,
 ) {
     let mut report_collection = BenchmarkCollection::default();
+    let inputs_file = std::env::var("WEBHOOK_INPUTS_FILE");
     let total_count: u64 = (backends.len() * benches.len() * versions.len() * dtypes.len())
         .try_into()
         .unwrap();
@@ -247,6 +249,10 @@ fn run_backend_comparison_benchmarks(
     } else {
         Some(Arc::new(Mutex::new(RunnerProgressBar::new(total_count))))
     };
+    // 'started' webhook
+    if inputs_file.is_ok() {
+        send_started_event(&inputs_file.clone().unwrap());
+    }
     // Iterate through every combination of benchmark and backend
     println!("\nBenchmarking Burn @ {versions:?}");
     for version in versions.iter() {
@@ -255,7 +261,7 @@ fn run_backend_comparison_benchmarks(
                 for dtype in dtypes.iter() {
                     let bench_str = bench.to_string();
                     let backend_str = backend.to_string();
-                    let url = format!("{USER_BENCHMARK_SERVER_URL}benchmarks");
+                    let url = format!("{TRACEL_CI_SERVER_BASE_URL}benchmarks");
 
                     if verbose {
                         group!("Running benchmarks: {bench_str}@{backend_str}-{dtype}");
@@ -307,8 +313,8 @@ fn run_backend_comparison_benchmarks(
     }
     println!("{output_results}");
     // 'complete' webhook
-    if let Ok(inputs_file) = std::env::var("WEBHOOK_INPUTS_FILE") {
-        send_output_results(&inputs_file, &table, share_link.as_deref());
+    if inputs_file.is_ok() {
+        send_output_results(&inputs_file.unwrap(), &table, share_link.as_deref());
     }
 }
 
@@ -430,7 +436,7 @@ fn web_results_url(token: Option<&str>, versions: &[String]) -> Option<String> {
 
             return Some(format!(
                 "{}benchmarks/community-benchmarks?user={}&sysHardware=Any&os={}&burnVersions={}",
-                USER_BENCHMARK_WEBSITE_URL, user.nickname, encoded_os, versions
+                BENCHMARK_WEBSITE_URL, user.nickname, encoded_os, versions
             ));
         }
     }
