@@ -17,12 +17,12 @@ on:
         description: "GCP image family to use"
         required: false
         default: "tracel-ci-ubuntu-2404-amd64-nvidia"
-      gcp_machine_type:
-        description: "GCP machine type to use"
+      gcp_machine_types:
+        description: "Comma-separated GCP machine types"
         required: false
         default: "g2-standard-4"
-      gcp_zone:
-        description: "GCP zone to use"
+      gcp_zones:
+        description: "Comma-separated GCP zones matching the machine types"
         required: false
         default: "us-east1-c"
       pr_number:
@@ -46,12 +46,42 @@ env:
   INPUTS_FILE: inputs.json
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          MACHINE_TYPES="${{ inputs.gcp_machine_types }}"
+          ZONES="${{ inputs.gcp_zones }}"
+
+          IFS=',' read -r -a type_arr <<< "$MACHINE_TYPES"
+          IFS=',' read -r -a zone_arr <<< "$ZONES"
+
+          if [ "${#type_arr[@]}" -ne "${#zone_arr[@]}" ]; then
+            echo "❌ machine_types and zones count mismatch!" >&2
+            exit 1
+          fi
+
+          matrix_entries="["
+          for i in "${!type_arr[@]}"; do
+            machine="${type_arr[$i]}"
+            zone="${zone_arr[$i]}"
+            matrix_entries+="{\"index\":$i,\"gcp_machine_type\":\"$machine\",\"gcp_zone\":\"$zone\"},"
+          done
+          matrix_entries="${matrix_entries%,}]"
+          echo "matrix=$matrix_entries" >> "$GITHUB_OUTPUT"
   burn-bench:
+    needs: prepare
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
     runs-on: [
-      '@id:benchmarks-job-${{ github.run_id }}-${{ github.run_attempt }}',
+      '@id:benchmarks-job-${{ github.run_id }}-${{ matrix.index }}-${{ github.run_attempt }}',
       '@image-family:${{ inputs.gcp_image_family }}',
-      '@machine-type:${{ inputs.gcp_machine_type }}',
-      '@zone:${{ inputs.gcp_zone }}',
+      '@machine-type:${{ matrix.gcp_machine_type }}',
+      '@zone:${{ matrix.gcp_zone }}',
       '@gpu:${{ inputs.gcp_gpu_attached }}' ]
     steps:
       # ----------------------------------------------------------------------
@@ -60,11 +90,6 @@ jobs:
         with:
           rust-toolchain: ${{ inputs.rust_toolchain }}
           cache-key: ${{ inputs.rust_version }}-benchmarks
-      - name: Get Job URL
-        uses: Tiryoh/gha-jobid-action@v1
-        id: jobs
-        with:
-          job_name: ${{ github.job }}
       - name: Parse config
         id: burn_bench_config_json
         run: |
@@ -83,8 +108,8 @@ jobs:
           echo "Repository: ${{ inputs.repo_full }}"
           echo "Pull Request Number: ${{ inputs.pr_number }}"
           echo "GCP Image Family: ${{ inputs.gcp_image_family }}"
-          echo "GCP Machine Type: ${{ inputs.gcp_machine_type }}"
-          echo "GCP Zone: ${{ inputs.gcp_zone }}"
+          echo "GCP Machine Type: ${{ matrix.gcp_machine_type }}"
+          echo "GCP Zone: ${{ matrix.gcp_zone }}"
       # ----------------------------------------------------------------------
       - name: Write inputs to ${{ env.INPUTS_FILE }}
         run: |
@@ -99,13 +124,13 @@ jobs:
             --arg burn_bench_config_json '${{ inputs.burn_bench_config_json }}' \
             --argjson gcp_gpu_attached '${{ inputs.gcp_gpu_attached }}' \
             --arg gcp_image_family '${{ inputs.gcp_image_family }}' \
-            --arg gcp_machine_type '${{ inputs.gcp_machine_type }}' \
-            --arg gcp_zone '${{ inputs.gcp_zone }}' \
+            --arg gcp_machine_type '${{ matrix.gcp_machine_type }}' \
+            --arg gcp_zone '${{ matrix.gcp_zone }}' \
             --argjson pr_number "$PR_NUMBER_JSON" \
             --arg repo_full '${{ inputs.repo_full }}' \
             --arg rust_toolchain '${{ inputs.rust_toolchain }}' \
             --arg rust_version '${{ inputs.rust_version }}' \
-            --arg workflow_url "${{ steps.jobs.outputs.html_url }}#:step:7:1" \
+            --arg workflow_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{
               burn_bench_config_json: $burn_bench_config_json,
               gcp_gpu_attached: $gcp_gpu_attached,
@@ -121,10 +146,14 @@ jobs:
 
             cat "$INPUTS_FILE"
       # ----------------------------------------------------------------------
-      - name: Run benchmarks
+      - name: 🧪 Run benchmarks on machine ${{ matrix.index }} (${{matrix.gcp_machine_type }})
         env:
           GITHUB_BOT_TOKEN: ${{ secrets.GH_BOT_TOKEN }}
           WEBHOOK_INPUTS_FILE: ${{ env.INPUTS_FILE }}
           WEBHOOK_PAYLOAD_SECRET: ${{ secrets.WEBHOOK_PAYLOAD_SECRET }}
         run: |
+          if [[ "${{ matrix.index }}" == "0" ]]; then
+            export BURN_BENCH_EMIT_STARTED_WEBHOOK=1
+          fi
+
           cargo bb run -b $BENCHES -B $BACKENDS -V $VERSIONS -v -d $DTYPES --share
