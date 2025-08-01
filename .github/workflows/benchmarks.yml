@@ -153,7 +153,7 @@ jobs:
           WEBHOOK_PAYLOAD_SECRET: ${{ secrets.WEBHOOK_PAYLOAD_SECRET }}
         run: |
           if [[ "${{ matrix.index }}" == "0" ]]; then
-            export BURN_BENCH_EMIT_STARTED_WEBHOOK=1
+            export BURN_BENCH_EMIT_STARTED_WEBHOOK=true
           fi
 
           cargo bb run -b $BENCHES -B $BACKENDS -V $VERSIONS -v -d $DTYPES --share
