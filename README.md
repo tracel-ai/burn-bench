@@ -114,6 +114,7 @@ sequenceDiagram
 
     Developer->>PR: Add label "ci:benchmarks"
     PR-->>CI: Webhook "labeled"
+    CI->>PR: Post "Benchmarks Status (enabled)"
     CI->>PR: Read file "benchmarks.toml"
     CI->>W: Dispatch "burn-bench" workflow
     W-->>CI: Webhook "job queued"
@@ -121,8 +122,24 @@ sequenceDiagram
     GCP->>W: Register runner
     W->>W: Write temporary inputs.json
     W->>BB: Execute with inputs.json & env
+    BB-->>CI: Webhook "started"
+    CI->>PR: Post "Benchmarks Started"
+    BB->>BB: Run benchmarks
     BB-->>CI: Webhook "completed"
-    CI->>PR: Post benchmark results
+    CI->>PR: Post "Benchmarks Completed"
+    Note right of PR: End of sequence
+    Developer->>PR: Remove label "ci:benchmarks"
+    PR-->>CI: Webhook "unlabeled"
+    CI->>PR: Post "Benchmarks Status (disabled)"
+    Note right of PR: End of sequence
+    Developer->>PR: Update code with "ci:benchmarks"
+    PR-->>CI: Webhook "synchronized"
+    CI->>PR: Start sequence at [Read file "benchmarks.toml"]...
+    Note right of PR: End of sequence
+    Developer->>PR: Open pull-request with "ci:benchmarks"
+    PR-->>CI: Webhook "opened"
+    CI->>PR: Start sequence at [Read file "benchmarks.toml"]...
+    Note right of PR: End of sequence
 ```
 
 ### Manually executing the 'benchmarks' workflow
