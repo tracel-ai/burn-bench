@@ -109,36 +109,43 @@ sequenceDiagram
     participant PR as GitHub Pull Request
     participant CI as Tracel CI Server
     participant W as burn-bench Workflow
-    participant BB as burn-bench
     participant GCP as Google Cloud Platform
+    participant BB as burn-bench Runner
+    participant ORG as GitHub Organization
 
     Developer->>PR: Add label "ci:benchmarks"
-    PR-->>CI: Webhook "labeled"
-    CI->>PR: Post "Benchmarks Status (enabled)"
+    PR-->>CI: 🪝 Webhook "labeled"
+    CI->>PR: 💬 "Benchmarks Status (enabled)" 🟢
     CI->>PR: Read file "benchmarks.toml"
+    CI->>PR: 💬 Read file error if any (end of sequence) ❌
     CI->>W: Dispatch "burn-bench" workflow
-    W-->>CI: Webhook "job queued"
-    CI->>GCP: Start GitHub runner
-    GCP->>W: Register runner
-    W->>W: Write temporary inputs.json
-    W->>BB: Execute with inputs.json & env
-    BB-->>CI: Webhook "started"
-    CI->>PR: Post "Benchmarks Started"
+    W-->>CI: 🪝 Webhook "job queued"
+    CI->>GCP: 🖥️ Provision GitHub runners
+    GCP->>BB: Spawn instances
+    BB->>ORG: Register runners
+    ORG->>W: Start workflow matrix job (one per machine type)
+    W->>W: Write temporary `inputs.json`
+    W->>BB: 🔥 Execute benches with `inputs.json`
+    BB-->>CI: 🪝 Webhook "started" (first machine only)
+    CI->>PR: 💬 "Benchmarks Started"
     BB->>BB: Run benchmarks
-    BB-->>CI: Webhook "completed"
-    CI->>PR: Post "Benchmarks Completed"
+    BB-->>CI: 🪝 Webhook "completed" (with data from `inputs.json`)
+    CI->>PR: 💬 "Benchmarks Completed" ✅
     Note right of PR: End of sequence
+
+    Developer->>PR: Update code with 🟢
+    PR-->>CI: 🪝 Webhook "synchronized"
+    CI->>PR: Restart sequence at [Read file "benchmarks.toml"]
+    Note right of PR: End of sequence
+
+    Developer->>PR: Open pull request with "ci:benchmarks"
+    PR-->>CI: 🪝 Webhook "opened"
+    CI->>PR: Start sequence at [Read file "benchmarks.toml"]
+    Note right of PR: End of sequence
+
     Developer->>PR: Remove label "ci:benchmarks"
-    PR-->>CI: Webhook "unlabeled"
-    CI->>PR: Post "Benchmarks Status (disabled)"
-    Note right of PR: End of sequence
-    Developer->>PR: Update code with "ci:benchmarks"
-    PR-->>CI: Webhook "synchronized"
-    CI->>PR: Start sequence at [Read file "benchmarks.toml"]...
-    Note right of PR: End of sequence
-    Developer->>PR: Open pull-request with "ci:benchmarks"
-    PR-->>CI: Webhook "opened"
-    CI->>PR: Start sequence at [Read file "benchmarks.toml"]...
+    PR-->>CI: 🪝 Webhook "unlabeled"
+    CI->>PR: 💬 "Benchmarks Status (disabled)" 🔴
     Note right of PR: End of sequence
 ```
 
