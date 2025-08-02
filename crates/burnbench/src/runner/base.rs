@@ -435,6 +435,7 @@ fn web_results_url(token: Option<&str>, versions: &[String]) -> Option<String> {
             let encoded_os = utf8_percent_encode(&sysinfo.os.name, NON_ALPHANUMERIC).to_string();
             let versions = utf8_percent_encode(&versions.join(","), NON_ALPHANUMERIC).to_string();
 
+            // burnVersions must be the last param of the URL because we might append versions later on
             return Some(format!(
                 "{}benchmarks/community-benchmarks?user={}&sysHardware=Any&os={}&burnVersions={}",
                 BENCHMARK_WEBSITE_URL, user.nickname, encoded_os, versions

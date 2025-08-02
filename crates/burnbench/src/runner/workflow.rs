@@ -1,3 +1,4 @@
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use regex::Regex;
 use reqwest::{
     blocking::{Client, Response},
@@ -96,7 +97,11 @@ fn clean_output(table: &str, share_link: Option<&str>) -> Option<JsonMap<String,
     let mut map = JsonMap::new();
     map.insert("table".to_owned(), Value::String(cleaned_table));
     if let Some(link) = share_link {
-        map.insert("share_link".to_owned(), Value::String(link.to_owned()));
+        map.insert(
+            // add comparison with main branch
+            utf8_percent_encode(&format!("{link},main"), NON_ALPHANUMERIC).to_string(),
+            Value::String(link.to_owned())
+        );
     }
 
     Some(map)
