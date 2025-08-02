@@ -368,7 +368,8 @@ fn run_cargo(
     } else {
         Arc::new(VerboseProcessor)
     };
-    let dependency = Dependency::new(version);
+    let dependency_version = get_version(version);
+    let dependency = Dependency::new(&dependency_version);
     let mut features = String::new();
 
     let guard = dependency.patch(info.path.as_path()).unwrap();
@@ -426,6 +427,17 @@ fn run_cargo(
     core::mem::drop(guard);
 
     status
+}
+
+/// Take cake of special version names of the form PR#number_sha1 and return sha1.
+/// Otherwise just return version untouched.
+fn get_version(version: &str) -> String {
+    if let Some(suffix) = version.strip_prefix("PR#") {
+        if let Some((_, sha)) = suffix.split_once('_') {
+            return sha.to_string();
+        }
+    }
+    version.to_string()
 }
 
 fn web_results_url(token: Option<&str>, versions: &[String]) -> Option<String> {
