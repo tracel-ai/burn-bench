@@ -96,9 +96,7 @@ fn clean_output(table: &str, share_link: Option<&str>) -> Option<JsonMap<String,
     let mut map = JsonMap::new();
     map.insert("table".to_owned(), Value::String(cleaned_table));
     if let Some(link) = share_link {
-        map.insert(
-            "share_link".to_owned(),
-            Value::String(format!("{link}%2Cmain")));
+        map.insert("share_link".to_owned(), Value::String(link.to_owned()));
     }
 
     Some(map)
