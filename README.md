@@ -133,9 +133,9 @@ sequenceDiagram
     CI->>PR: 💬 "Benchmarks Completed" ✅
     Note right of PR: End of sequence
 
-    Developer->>PR: Update code with 🟢
-    PR-->>CI: 🪝 Webhook "synchronized"
-    CI->>PR: Restart sequence at [Read file "benchmarks.toml"]
+    Developer->>PR: Remove label "ci:benchmarks"
+    PR-->>CI: 🪝 Webhook "unlabeled"
+    CI->>PR: 💬 "Benchmarks Status (disabled)" 🔴
     Note right of PR: End of sequence
 
     Developer->>PR: Open pull request with "ci:benchmarks"
@@ -143,9 +143,14 @@ sequenceDiagram
     CI->>PR: Start sequence at [Read file "benchmarks.toml"]
     Note right of PR: End of sequence
 
-    Developer->>PR: Remove label "ci:benchmarks"
-    PR-->>CI: 🪝 Webhook "unlabeled"
-    CI->>PR: 💬 "Benchmarks Status (disabled)" 🔴
+    Developer->>PR: Update code with 🟢
+    PR-->>CI: 🪝 Webhook "synchronized"
+    CI->>PR: Restart sequence at [Read file "benchmarks.toml"]
+    Note right of PR: End of sequence
+
+    Developer->>PR: Merge pull request into main with 🟢
+    PR-->>CI: 🪝 Webhook "closed"
+    CI->>PR: Start sequence at [Read file "benchmarks.toml"] without the 💬 tasks
     Note right of PR: End of sequence
 ```
 
