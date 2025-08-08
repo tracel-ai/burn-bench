@@ -169,3 +169,7 @@ required-features = ["distributed"]
 [[bench]]
 harness = false
 name = "softmax"
+
+[[bench]]
+harness = false
+name = "grid_sample"
