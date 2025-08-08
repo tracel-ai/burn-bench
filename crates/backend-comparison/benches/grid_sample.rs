@@ -45,7 +45,7 @@ impl<B: Backend> Benchmark for GridSampleBenchmark<B> {
             &self.device,
         );
         let grid = Tensor::random(
-            Shape::new([self.n_batch, self.width_out, self.height_out]),
+            Shape::new([self.n_batch, self.width_out, self.height_out, 2]),
             Distribution::Uniform(-1.0, 1.0),
             &self.device,
         );
