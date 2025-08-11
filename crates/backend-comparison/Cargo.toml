@@ -18,6 +18,8 @@ candle-cuda = ["burn/candle-cuda"]
 candle-metal = ["burn/candle", "burn/candle-metal"]
 cuda = ["burn/cuda", "burn/autotune"]
 cuda-fusion = ["cuda", "burn/fusion"]
+cpu = ["burn/cpu", "burn/autotune"]
+cpu-fusion = ["cpu", "burn/fusion"]
 rocm = ["burn/rocm", "burn/autotune"]
 rocm-fusion = ["rocm", "burn/fusion"]
 ndarray = ["burn/ndarray"]
@@ -46,7 +48,8 @@ distributed = ["server", "remote"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
-burn = { git = "https://github.com/tracel-ai/burn", default-features = false }
+# burn = { path = "../../../burn/crates/burn", default-features = false }
+burn = { path = "../../../burn/crates/burn", default-features = false }
 
 burnbench = { path = "../burnbench" }
 

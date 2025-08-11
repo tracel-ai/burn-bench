@@ -19,3 +19,7 @@ Cargo.toml.bak
 
 # used by webhook for benchmark results
 inputs.json
+
+# Nix
+.envrc
+.direnv
