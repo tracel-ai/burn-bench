@@ -159,6 +159,14 @@ macro_rules! bench_on_backend {
             $crate::bench_on_backend!($fn_name, Metal<$dtype>, device);
         }
 
+        #[cfg(feature = "cpu")]
+        {
+            use burn::backend::Cpu;
+
+            let device = Default::default();
+            $crate::bench_on_backend!($fn_name, Cpu<$dtype>, device);
+        }
+
         #[cfg(all(target_os = "macos", feature = "vulkan"))]
         {
             panic!("vulkan benchmarks are not supported on macOS, use the wgpu backend instead.");
@@ -249,6 +257,10 @@ macro_rules! bench_on_backend {
         let feature_name = "candle-accelerate";
         #[cfg(feature = "candle-cpu")]
         let feature_name = "candle-cpu";
+        #[cfg(feature = "cpu")]
+        let feature_name = "cpu";
+        #[cfg(feature = "cpu-fusion")]
+        let feature_name = "cpu-fusion";
         #[cfg(feature = "candle-cuda")]
         let feature_name = "candle-cuda";
         #[cfg(feature = "candle-metal")]
