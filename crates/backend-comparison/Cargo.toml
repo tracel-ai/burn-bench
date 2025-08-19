@@ -46,7 +46,7 @@ distributed = ["server", "remote"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
-burn = { git = "https://github.com/tracel-ai/burn", default-features = false }
+burn = { path = "../../../burn/crates/burn", default-features = false }
 
 burnbench = { path = "../burnbench" }
 
@@ -173,3 +173,7 @@ name = "softmax"
 [[bench]]
 harness = false
 name = "grid_sample"
+
+[[bench]]
+harness = false
+name = "linear"
