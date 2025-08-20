@@ -7,15 +7,39 @@ struct MatmulBenchmark<B: Backend, const D: usize> {
     b: usize,
     problem: Problem,
     device: B::Device,
+    layouts: (Layout, Layout),
 }
 
 #[derive(Clone, Copy)]
 enum Problem {
-    General { m: usize, n: usize, k: usize },
-    MatVec { m: usize, k: usize },
-    VecMat { n: usize, k: usize },
-    Inner { k: usize },
-    Outer { m: usize, n: usize },
+    General {
+        m: usize,
+        n: usize,
+        k: usize,
+        lhs: Layout,
+        rhs: Layout,
+    },
+    MatVec {
+        m: usize,
+        k: usize,
+    },
+    VecMat {
+        n: usize,
+        k: usize,
+    },
+    Inner {
+        k: usize,
+    },
+    Outer {
+        m: usize,
+        n: usize,
+    },
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Layout {
+    Row,
+    Col,
 }
 
 impl Problem {
@@ -30,7 +54,7 @@ impl Problem {
     }
     fn shapes(self, b: usize) -> (Shape, Shape) {
         match self {
-            Problem::General { m, n, k } => ([b, m, k].into(), [b, k, n].into()),
+            Problem::General { m, n, k, .. } => ([b, m, k].into(), [b, k, n].into()),
             Problem::MatVec { m, k } => ([b, m, k].into(), [b, k, 1].into()),
             Problem::VecMat { n, k } => ([b, 1, k].into(), [b, k, n].into()),
             Problem::Inner { k } => ([b, 1, k].into(), [b, k, 1].into()),
@@ -44,7 +68,13 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
-        format!("matmul-{}-{:?}", self.problem.name(), B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "matmul-{}-{:?}-{:?}",
+            self.problem.name(),
+            B::FloatElem::dtype(),
+            self.layouts
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -63,8 +93,20 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
 
     fn prepare(&self) -> Self::Input {
         let (shape_lhs, shape_rhs) = self.problem.shapes(self.b);
-        let lhs = Tensor::random(shape_lhs, Distribution::Default, &self.device);
-        let rhs = Tensor::random(shape_rhs, Distribution::Default, &self.device);
+        let lhs = match self.layouts.0 {
+            Layout::Row => Tensor::random(shape_lhs, Distribution::Default, &self.device),
+            Layout::Col => {
+                Tensor::random(transpose(shape_lhs), Distribution::Default, &self.device)
+                    .transpose()
+            }
+        };
+        let rhs = match self.layouts.1 {
+            Layout::Row => Tensor::random(shape_rhs, Distribution::Default, &self.device),
+            Layout::Col => {
+                Tensor::random(transpose(shape_rhs), Distribution::Default, &self.device)
+                    .transpose()
+            }
+        };
 
         (lhs, rhs)
     }
@@ -74,88 +116,69 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     }
 }
 
+fn transpose(shape: Shape) -> Shape {
+    let mut output = shape.clone();
+    let rank = shape.num_dims();
+    output.dims[rank - 1] = shape.dims[rank - 2];
+    output.dims[rank - 2] = shape.dims[rank - 1];
+    output
+}
+
 #[allow(dead_code)]
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
-    [
-        // General benches
-        (
-            1,
-            Problem::General {
-                m: 6144,
-                n: 6144,
-                k: 6144,
-            },
-        ),
-        (
-            2,
-            Problem::General {
-                m: 5000,
-                n: 5000,
-                k: 5000,
-            },
-        ),
-        (
-            4,
-            Problem::General {
-                m: 4096,
-                n: 4096,
-                k: 4096,
-            },
-        ),
-        (
-            4,
-            Problem::General {
-                m: 2048,
-                n: 2048,
-                k: 2048,
-            },
-        ),
-        (
-            8,
-            Problem::General {
-                m: 1024,
-                n: 1024,
-                k: 1024,
-            },
-        ),
-        (
-            16,
-            Problem::General {
-                m: 512,
-                n: 512,
-                k: 512,
-            },
-        ),
-        (
-            32,
-            Problem::General {
-                m: 256,
-                n: 256,
-                k: 256,
-            },
-        ),
-        // Mat@Vec benches
-        (1, Problem::MatVec { m: 8192, k: 8192 }),
-        (2, Problem::MatVec { m: 8192, k: 8192 }),
-        // Vec@Mat benches
-        (1, Problem::VecMat { n: 8192, k: 8192 }),
-        (2, Problem::VecMat { n: 8192, k: 8192 }),
-        // Inner benches
-        (1, Problem::Inner { k: 8192 }),
-        // Outer benches
-        (
-            1,
-            Problem::Outer {
-                m: 8192 * 2,
-                n: 8192 * 2,
-            },
-        ),
-        (4, Problem::Outer { m: 8192, n: 8192 }),
-    ]
-    .into_iter()
-    .map(|(b, problem)| MatmulBenchmark::<B, 3>::new(b, problem, device.clone()))
-    .map(run_benchmark)
-    .collect()
+    let mut results = Vec::new();
+    for lhs in [Layout::Row] {
+        for rhs in [Layout::Row, Layout::Col] {
+            for (b, problem) in [
+                // General benches
+                (
+                    16,
+                    Problem::General {
+                        m: 1,
+                        n: 6144,
+                        k: 6144,
+                        lhs,
+                        rhs,
+                    },
+                ),
+                (
+                    16,
+                    Problem::General {
+                        m: 1,
+                        n: 5000,
+                        k: 5000,
+                        lhs,
+                        rhs,
+                    },
+                ),
+                (
+                    16,
+                    Problem::General {
+                        m: 1,
+                        n: 2048,
+                        k: 8192,
+                        lhs,
+                        rhs,
+                    },
+                ),
+                (
+                    16,
+                    Problem::General {
+                        m: 1,
+                        n: 8192,
+                        k: 2048,
+                        lhs,
+                        rhs,
+                    },
+                ),
+            ] {
+                let bench = MatmulBenchmark::<B, 3>::new(b, problem, device.clone(), (lhs, rhs));
+                let result = run_benchmark(bench);
+                results.push(result);
+            }
+        }
+    }
+    results
 }
 
 fn main() {
