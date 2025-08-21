@@ -180,12 +180,12 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     };
 
     run(Mode::Inference);
-    // run(Mode::Autodiff {
-    //     gradient_checkpointing: false,
-    // });
-    // run(Mode::Autodiff {
-    //     gradient_checkpointing: true,
-    // });
+    run(Mode::Autodiff {
+        gradient_checkpointing: false,
+    });
+    run(Mode::Autodiff {
+        gradient_checkpointing: true,
+    });
 
     benches
 }
