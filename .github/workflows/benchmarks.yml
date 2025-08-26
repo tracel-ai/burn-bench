@@ -50,7 +50,21 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      repo_owner: ${{ steps.parse-repo.outputs.repo_owner }}
+      repo_name:  ${{ steps.parse-repo.outputs.repo_name }}
     steps:
+      # we cannot pass repo_full as is because it will be used to tag cloud resources
+      # cloud resources can have naming limitations like '/' being forbidden.
+      - id: parse-repo
+        run: |
+          REPO_FULL="${{ inputs.repo_full }}"
+          if [[ "$REPO_FULL" =~ ^([^/]+)/([^/]+)$ ]]; then
+            echo "repo_owner=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "repo_name=${BASH_REMATCH[2]}"  >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::inputs.repo_full must be 'owner/repo', got: '$REPO_FULL'"
+            exit 1
+          fi
       - id: set-matrix
         run: |
           MACHINE_TYPES="${{ inputs.gcp_machine_types }}"
@@ -79,6 +93,9 @@ jobs:
         include: ${{ fromJson(needs.prepare.outputs.matrix) }}
     runs-on: [
       '@id:benchmarks-job-${{ github.run_id }}-${{ matrix.index }}-${{ github.run_attempt }}',
+      '@pr_number:${{ inputs.pr_number }}',
+      '@organization:${{ needs.prepare.outputs.repo_owner }}',
+      '@repository:${{ needs.prepare.outputs.repo_name }}',
       '@image-family:${{ inputs.gcp_image_family }}',
       '@machine-type:${{ matrix.gcp_machine_type }}',
       '@zone:${{ matrix.gcp_zone }}',
