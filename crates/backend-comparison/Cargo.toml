@@ -175,3 +175,7 @@ name = "softmax"
 [[bench]]
 harness = false
 name = "grid_sample"
+
+[[bench]]
+harness = false
+name = "bool_select"
