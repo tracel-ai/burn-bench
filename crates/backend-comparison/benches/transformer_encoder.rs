@@ -23,7 +23,7 @@ pub struct InferenceBatch<B: Backend> {
     pub mask_pad: Tensor<B, 2, Bool>,
 }
 
-#[derive(Config)]
+#[derive(Config, Debug)]
 pub struct ModelConfig {
     transformer: TransformerEncoderConfig,
     n_classes: usize,

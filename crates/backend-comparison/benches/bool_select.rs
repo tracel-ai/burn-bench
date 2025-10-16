@@ -71,12 +71,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     ];
 
     for (shape, dim, indices_count) in test_configs {
-        let benchmark = BoolSelectBenchmark::<B, 3>::new(
-            shape,
-            dim,
-            indices_count,
-            device.clone()
-        );
+        let benchmark = BoolSelectBenchmark::<B, 3>::new(shape, dim, indices_count, device.clone());
         results.push(run_benchmark(benchmark));
     }
 
