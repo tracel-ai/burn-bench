@@ -149,11 +149,6 @@ path = "benches/transformer_encoder.rs"
 
 [[bench]]
 harness = false
-name = "resnet50"
-path = "benches/resnet.rs"
-
-[[bench]]
-harness = false
 name = "autodiff"
 
 [[bench]]

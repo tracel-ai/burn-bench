@@ -248,7 +248,7 @@ fn run_backend_comparison_benchmarks(
     let emit_started_webhook = std::env::var("BURN_BENCH_EMIT_STARTED_WEBHOOK")
         .ok()
         .map_or(false, |v| v == "true");
-    let total_count: u64 = (backends.len() * benches.len() * versions.len() * dtypes.len())
+    let total_count: u64 = (backends.len() * versions.len() * dtypes.len())
         .try_into()
         .unwrap();
     let runner_pb: Option<Arc<Mutex<RunnerProgressBar>>> = if verbose {
@@ -266,44 +266,42 @@ fn run_backend_comparison_benchmarks(
     println!("\nBenchmarking Burn @ {versions:?}");
     for version in versions.iter() {
         for backend in backends.iter() {
-            for bench in benches.iter() {
-                for dtype in dtypes.iter() {
-                    let bench_str = bench.to_string();
-                    let backend_str = backend.to_string();
-                    let url = format!("{TRACEL_CI_SERVER_BASE_URL}benchmarks");
+            for dtype in dtypes.iter() {
+                let bench_str = benches.join(", ");
+                let backend_str = backend.to_string();
+                let url = format!("{TRACEL_CI_SERVER_BASE_URL}benchmarks");
 
-                    if verbose {
-                        group!("Running benchmarks: {bench_str}@{backend_str}-{dtype}");
-                    }
-                    let status = run_cargo(
-                        info,
-                        &bench_str,
-                        &backend_str,
-                        dtype,
-                        &url,
-                        token,
-                        &runner_pb,
-                        version,
-                        profiling,
-                    );
-                    let success = status.unwrap().success();
+                if verbose {
+                    group!("Running benchmarks: {bench_str}@{backend_str}-{dtype}");
+                }
+                let status = run_cargo(
+                    info,
+                    benches,
+                    &backend_str,
+                    dtype,
+                    &url,
+                    token,
+                    &runner_pb,
+                    version,
+                    profiling,
+                );
+                let success = status.unwrap().success();
 
-                    if success {
-                        if let Some(ref pb) = runner_pb {
-                            pb.lock().unwrap().succeeded_inc();
-                        }
-                    } else {
-                        if let Some(ref pb) = runner_pb {
-                            pb.lock().unwrap().failed_inc();
-                        }
-                        report_collection.push_failed_benchmark(FailedBenchmark {
-                            bench: bench_str.clone(),
-                            backend: backend_str.clone(),
-                        })
+                if success {
+                    if let Some(ref pb) = runner_pb {
+                        pb.lock().unwrap().succeeded_inc();
                     }
-                    if verbose {
-                        endgroup!();
+                } else {
+                    if let Some(ref pb) = runner_pb {
+                        pb.lock().unwrap().failed_inc();
                     }
+                    report_collection.push_failed_benchmark(FailedBenchmark {
+                        bench: bench_str.clone(),
+                        backend: backend_str.clone(),
+                    })
+                }
+                if verbose {
+                    endgroup!();
                 }
             }
         }
@@ -358,7 +356,7 @@ fn get_required_features(info: &CrateInfo, target_bench: &str) -> Vec<String> {
 
 fn run_cargo(
     info: &CrateInfo,
-    bench: &str,
+    benches: &[String],
     backend: &str,
     dtype: &BenchDType,
     url: &str,
@@ -367,10 +365,12 @@ fn run_cargo(
     version: &str,
     profile: &Profiling,
 ) -> io::Result<ExitStatus> {
+    let bench_str = benches.join(", ");
     let processor: Arc<dyn OutputProcessor> = if let Some(pb) = progress_bar {
         Arc::new(NiceProcessor::new(
-            bench.to_string(),
+            bench_str,
             backend.to_string(),
+            version.to_string(),
             pb.clone(),
         ))
     } else {
@@ -384,8 +384,10 @@ fn run_cargo(
     let name = &info.name;
     features += &format!("{name}/{backend},{name}/{dtype}");
 
-    for req_feature in get_required_features(info, bench) {
-        features += &format!(",{}", req_feature);
+    for bench in benches.iter() {
+        for req_feature in get_required_features(info, bench) {
+            features += &format!(",{}", req_feature);
+        }
     }
 
     if version.starts_with("0.16") {
@@ -394,12 +396,15 @@ fn run_cargo(
         features += ",legacy-v17";
     }
 
-    for req_feature in get_required_features(info, bench) {
-        features += &format!(",{name}/{req_feature}");
+    for bench in benches.iter() {
+        for req_feature in get_required_features(info, bench) {
+            features += &format!(",{name}/{req_feature}");
+        }
     }
 
-    let mut args = if bench == "all" {
-        vec![
+    let mut args = vec![];
+    if benches[0] == "all" {
+        args = vec![
             "--benches",
             "--features",
             &features,
@@ -407,15 +412,15 @@ fn run_cargo(
             crate::BENCHMARKS_TARGET_DIR,
         ]
     } else {
-        vec![
-            "--bench",
-            bench,
-            "--features",
-            &features,
-            "--target-dir",
-            crate::BENCHMARKS_TARGET_DIR,
-        ]
-    };
+        for bench in benches.iter() {
+            args.push("--bench");
+            args.push(bench);
+        }
+        args.push("--features");
+        args.push(&features);
+        args.push("--target-dir");
+        args.push(crate::BENCHMARKS_TARGET_DIR);
+    }
 
     if let Some(t) = token {
         args.push("--");

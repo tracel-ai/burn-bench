@@ -43,6 +43,7 @@ impl OutputProcessor for SinkProcessor {
 pub struct NiceProcessor {
     bench: String,
     backend: String,
+    version: String,
     pb: Arc<Mutex<RunnerProgressBar>>,
 }
 
@@ -54,20 +55,30 @@ pub(crate) enum NiceProcessorState {
 }
 
 impl NiceProcessor {
-    pub fn new(bench: String, backend: String, pb: Arc<Mutex<RunnerProgressBar>>) -> Self {
-        Self { bench, backend, pb }
+    pub fn new(
+        bench: String,
+        backend: String,
+        version: String,
+        pb: Arc<Mutex<RunnerProgressBar>>,
+    ) -> Self {
+        Self {
+            bench,
+            backend,
+            version,
+            pb,
+        }
     }
 
     pub fn format_pb_message(&self, state: NiceProcessorState) -> String {
         match state {
             NiceProcessorState::Default | NiceProcessorState::Compiling => {
-                format!("🔨 {} ▶ {}", self.bench, self.backend)
+                format!("🔨 {} ▶ {} ▶ {}", self.version, self.backend, self.bench)
             }
             NiceProcessorState::Running => {
-                format!("🔥 {} ▶ {}", self.bench, self.backend)
+                format!("🔥 {} ▶ {} ▶ {}", self.version, self.backend, self.bench)
             }
             NiceProcessorState::Uploading => {
-                format!("💾 {} ▶ {}", self.bench, self.backend)
+                format!("💾 {} ▶ {} ▶ {}", self.version, self.backend, self.bench)
             }
         }
     }
