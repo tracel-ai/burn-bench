@@ -88,6 +88,7 @@ jobs:
           echo "matrix=$matrix_entries" >> "$GITHUB_OUTPUT"
   burn-bench:
     needs: prepare
+    timeout-minutes: 60
     strategy:
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix) }}
