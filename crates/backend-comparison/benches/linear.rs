@@ -1,6 +1,7 @@
 use burn::{
     module::Quantizer,
     prelude::*,
+    tensor::Element,
     tensor::quantization::{
         BlockSize, Calibration, QuantLevel, QuantMode, QuantParam, QuantScheme, QuantStore,
         QuantValue,
@@ -59,8 +60,8 @@ impl<B: Backend> LinearBench<B> {
         let name = match config.bias {
             true => "linear-bias",
             false => "linear",
-        }
-        .to_string();
+        };
+        let name = format!("{name}_{:?}", B::FloatElem::dtype());
         let linear = config.init(device);
 
         (linear, signal_shape, name)
@@ -102,7 +103,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 
     for (d_input, d_output) in [(4096, 4096)] {
         for bias in [true, false] {
-            for batch_sizes in [[1, 1], [32, 1]] {
+            for batch_sizes in [[1, 1], [32, 1], [1, 32]] {
                 let inference = LinearBench::<B>::inference(
                     nn::LinearConfig::new(d_input, d_output).with_bias(bias),
                     device,
@@ -110,28 +111,16 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
                 );
                 results.push(run_benchmark(inference));
 
-                for (scheme, tag) in [
-                    (
-                        QuantScheme {
-                            value: QuantValue::Q4F,
-                            param: QuantParam::F16,
-                            store: QuantStore::U32,
-                            level: QuantLevel::Block(BlockSize::new([32])),
-                            mode: QuantMode::Symmetric,
-                        },
-                        "q4b32",
-                    ),
-                    (
-                        QuantScheme {
-                            value: QuantValue::Q8F,
-                            param: QuantParam::F32,
-                            store: QuantStore::U32,
-                            level: QuantLevel::Tensor,
-                            mode: QuantMode::Symmetric,
-                        },
-                        "q8t",
-                    ),
-                ] {
+                for (scheme, tag) in [(
+                    QuantScheme {
+                        value: QuantValue::Q4F,
+                        param: QuantParam::F16,
+                        store: QuantStore::U32,
+                        level: QuantLevel::Block(BlockSize::new([32])),
+                        mode: QuantMode::Symmetric,
+                    },
+                    "q4b32",
+                )] {
                     let inference = LinearBench::<B>::q_inference(
                         nn::LinearConfig::new(d_input, d_output).with_bias(bias),
                         device,
