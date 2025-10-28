@@ -2,6 +2,9 @@ use burn::backend::Autodiff;
 use burn::backend::autodiff::checkpoint::strategy::{
     BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
 };
+use burn::tensor::quantization::{
+    BlockSize, QuantLevel, QuantMode, QuantParam, QuantScheme, QuantStore, QuantValue,
+};
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use core::f64::consts::SQRT_2;
@@ -25,7 +28,7 @@ struct CustomGeluBenchmark<B: Backend, const D: usize> {
 #[derive(Clone, Copy)]
 enum Mode {
     Autodiff { gradient_checkpointing: bool },
-    Inference,
+    Inference(Option<QuantScheme>),
 }
 
 impl core::fmt::Debug for Mode {
@@ -40,7 +43,10 @@ impl core::fmt::Debug for Mode {
                     f.write_str("autodiff")
                 }
             }
-            Mode::Inference => Ok(()),
+            Mode::Inference(scheme) => match scheme {
+                Some(_) => f.write_str("inference-q4"),
+                None => f.write_str("inference"),
+            },
         }
     }
 }
@@ -91,7 +97,7 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
                     self.execute_autodiff::<NoCheckpointing>(tensor)
                 }
             }
-            Mode::Inference => match self.kind {
+            Mode::Inference(_scheme) => match self.kind {
                 GeluKind::Reference => burn::tensor::activation::gelu(tensor),
                 GeluKind::WithReferenceErf => gelu_custom(tensor, Tensor::erf),
                 GeluKind::WithCustomErf => gelu_custom(tensor, erf_custom),
@@ -100,7 +106,15 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
     }
 
     fn prepare(&self) -> Self::Input {
-        Tensor::random(self.shape.clone(), Distribution::Default, &self.device)
+        let input = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);
+
+        match &self.mode {
+            Mode::Autodiff { .. } => input,
+            Mode::Inference(scheme) => match scheme {
+                Some(scheme) => input.quantize_dynamic(scheme),
+                None => input,
+            },
+        }
     }
 
     fn sync(&self) {
@@ -179,7 +193,14 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         benches.push(run_benchmark(custom_erf_gelu));
     };
 
-    run(Mode::Inference);
+    run(Mode::Inference(None));
+    run(Mode::Inference(Some(QuantScheme {
+        value: QuantValue::Q4F,
+        param: QuantParam::F16,
+        store: QuantStore::U32,
+        level: QuantLevel::Block(BlockSize::new([32])),
+        mode: QuantMode::Symmetric,
+    })));
     run(Mode::Autodiff {
         gradient_checkpointing: false,
     });
