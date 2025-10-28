@@ -100,9 +100,9 @@ impl<B: Backend> Benchmark for LinearBench<B> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let mut results = Vec::new();
 
-    for (d_input, d_output) in [(2048, 2048), (4096, 4096), (512, 4096)] {
+    for (d_input, d_output) in [(4096, 4096)] {
         for bias in [true, false] {
-            for batch_sizes in [[1, 1], [32, 1], [1, 512], [32, 32]] {
+            for batch_sizes in [[1, 1], [32, 1]] {
                 let inference = LinearBench::<B>::inference(
                     nn::LinearConfig::new(d_input, d_output).with_bias(bias),
                     device,
