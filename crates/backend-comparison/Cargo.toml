@@ -125,6 +125,10 @@ name = "matmul"
 
 [[bench]]
 harness = false
+name = "linear"
+
+[[bench]]
+harness = false
 name = "matmul-fused"
 path = "benches/matmul_fused.rs"
 
