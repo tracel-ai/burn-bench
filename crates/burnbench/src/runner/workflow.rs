@@ -15,15 +15,6 @@ fn get_webhook_url() -> String {
     format!("{TRACEL_CI_SERVER_BASE_URL}burn_bench/webhook/benchmark")
 }
 
-pub(crate) fn send_started_event(inputs_file: &str) {
-    if let Some((json, pr_number)) = load_inputs(inputs_file) {
-        let table = clean_output("no results", Some("no share link"));
-        if let Some(payload) = serialize_result(json, pr_number, table.unwrap(), "started") {
-            send_event("started", payload);
-        }
-    }
-}
-
 pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Option<&str>) {
     if let Some((json, pr_number)) = load_inputs(inputs_file) {
         if let Some(cleaned_table) = clean_output(table, share_link) {

@@ -11,7 +11,6 @@ use super::auth::Tokens;
 use crate::endgroup;
 use crate::group;
 use crate::runner::workflow::send_output_results;
-use crate::runner::workflow::send_started_event;
 use crate::system_info::BenchmarkSystemInfo;
 use crate::{BENCHMARK_WEBSITE_URL, TRACEL_CI_SERVER_BASE_URL};
 
@@ -245,9 +244,6 @@ fn run_backend_comparison_benchmarks(
 ) {
     let mut report_collection = BenchmarkCollection::default();
     let inputs_file = std::env::var("WEBHOOK_INPUTS_FILE");
-    let emit_started_webhook = std::env::var("BURN_BENCH_EMIT_STARTED_WEBHOOK")
-        .ok()
-        .map_or(false, |v| v == "true");
     let total_count: u64 = (backends.len() * versions.len() * dtypes.len())
         .try_into()
         .unwrap();
@@ -256,12 +252,6 @@ fn run_backend_comparison_benchmarks(
     } else {
         Some(Arc::new(Mutex::new(RunnerProgressBar::new(total_count))))
     };
-    // 'started' webhook
-    if let Ok(ref inputs) = inputs_file
-        && emit_started_webhook
-    {
-        send_started_event(&inputs);
-    }
     // Iterate through every combination of benchmark and backend
     println!("\nBenchmarking Burn @ {versions:?}");
     for version in versions.iter() {
