@@ -108,7 +108,7 @@ jobs:
     steps:
       # ----------------------------------------------------------------------
       - name: Setup Rust
-        uses: tracel-ai/github-actions/setup-rust@v3
+        uses: tracel-ai/github-actions/setup-rust@v5
         with:
           rust-toolchain: ${{ inputs.rust_toolchain }}
           cache-key: ${{ inputs.rust_version }}-benchmarks
