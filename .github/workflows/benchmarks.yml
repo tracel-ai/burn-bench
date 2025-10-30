@@ -42,6 +42,10 @@ on:
         required: false
         default: "stable"
 
+# important to set the run name to this format so that the CI server
+# can track the PR number from the workflow_run events.
+run-name: ${{ github.workflow }}:${{ inputs.repo_full }}#${{ inputs.pr_number }}
+
 env:
   INPUTS_FILE: inputs.json
 
