@@ -69,31 +69,54 @@ pub trait Benchmark {
     /// Run the benchmark a number of times.
     #[allow(unused_variables)]
     fn run(&self, timing_method: TimingMethod) -> BenchmarkDurations {
-        let execute = |args: &Self::Input| {
+        let execute = |args: Self::Input| {
             let profile = match timing_method {
-                TimingMethod::System => self.profile_full(args.clone()),
-                TimingMethod::Device => self.profile(args.clone()),
+                TimingMethod::System => self.profile_full(args),
+                TimingMethod::Device => self.profile(args),
             };
             futures_lite::future::block_on(profile.resolve())
         };
-        let args = self.prepare();
 
-        // Warmup
-        for _ in 0..3 {
-            let _duration = execute(&args);
-        }
-        std::thread::sleep(Duration::from_secs(1));
-
-        // Real execution.
         let mut durations = Vec::with_capacity(self.num_samples());
-        for _ in 0..self.num_samples() {
-            durations.push(execute(&args));
+
+        if self.prepare_cloned() {
+            let args = self.prepare();
+
+            // Warmup
+            for _ in 0..3 {
+                let _duration = execute(args.clone());
+            }
+            std::thread::sleep(Duration::from_secs(1));
+
+            // Real execution.
+            for _ in 0..self.num_samples() {
+                durations.push(execute(args.clone()));
+            }
+        } else {
+            // Warmup
+            for _ in 0..3 {
+                let _duration = execute(self.prepare());
+            }
+            std::thread::sleep(Duration::from_secs(1));
+
+            // Real execution.
+            for _ in 0..self.num_samples() {
+                durations.push(execute(self.prepare()));
+            }
         }
 
         BenchmarkDurations {
             timing_method,
             durations,
         }
+    }
+
+    /// When true, [Benchmark::prepare()] is called only once and the inputs are reused for all
+    /// execution using [Clone::clone].
+    ///
+    /// When false, [Benchmark::prepare()] is called before every execution.
+    fn prepare_cloned(&self) -> bool {
+        true
     }
 }
 

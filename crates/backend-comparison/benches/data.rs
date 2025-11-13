@@ -132,15 +132,20 @@ impl<B: Backend, const D: usize> Benchmark for FromFileBenchmark<B, D> {
 
 struct FromMemoryBenchmark<B: Backend, const D: usize> {
     data: TensorData,
+    staging: bool,
     device: B::Device,
 }
 
 impl<B: Backend, const D: usize> FromMemoryBenchmark<B, D> {
-    pub fn new(shape: Shape, device: B::Device) -> Self {
+    pub fn new(shape: Shape, device: B::Device, staging: bool) -> Self {
         let tensor = Tensor::<B, 3>::random(shape.clone(), Distribution::Default, &device);
         let data = tensor.into_data();
 
-        Self { data, device }
+        Self {
+            data,
+            device,
+            staging,
+        }
     }
 }
 
@@ -149,7 +154,13 @@ impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
     type Output = Tensor<B, D>;
 
     fn name(&self) -> String {
-        format!("load-from-memory")
+        format!(
+            "load-from-memory{}",
+            match self.staging {
+                true => "-staging",
+                false => "",
+            }
+        )
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -161,11 +172,20 @@ impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
     }
 
     fn prepare(&self) -> Self::Input {
-        self.data.clone()
+        let mut data = [self.data.clone()];
+        if self.staging {
+            B::staging(data.iter_mut(), &self.device);
+        }
+        let [data] = data;
+        data
     }
 
     fn sync(&self) {
         B::sync(&self.device)
+    }
+
+    fn prepare_cloned(&self) -> bool {
+        false
     }
 }
 
@@ -179,10 +199,14 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         shape.clone(),
         device.clone(),
     )));
-    results.push(run_benchmark(FromMemoryBenchmark::<B, D>::new(
-        shape.clone(),
-        device.clone(),
-    )));
+
+    for staging in [true, false] {
+        results.push(run_benchmark(FromMemoryBenchmark::<B, D>::new(
+            shape.clone(),
+            device.clone(),
+            staging,
+        )));
+    }
 
     for lazy in [true, false] {
         for quant in [
