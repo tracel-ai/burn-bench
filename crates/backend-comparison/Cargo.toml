@@ -48,8 +48,7 @@ distributed = ["server", "remote"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
-burn = { path = "../../../burn/crates/burn", default-features = false }
-# burn = { path = "../../../burn/crates/burn", default-features = false }
+burn = { version = "0.20.0-pre.2" }
 
 burnbench = { path = "../burnbench" }
 
