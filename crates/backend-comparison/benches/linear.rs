@@ -89,7 +89,7 @@ impl<B: Backend> Benchmark for LinearBench<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device);
+        B::sync(&self.device).unwrap();
     }
     fn shapes(&self) -> Vec<Vec<usize>> {
         let weights = self.linear.weight.shape();

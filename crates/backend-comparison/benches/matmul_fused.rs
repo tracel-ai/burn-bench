@@ -42,7 +42,7 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 }
 

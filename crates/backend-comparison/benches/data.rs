@@ -42,7 +42,7 @@ impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 }
 
@@ -126,7 +126,7 @@ impl<B: Backend, const D: usize> Benchmark for FromFileBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 }
 
@@ -181,7 +181,7 @@ impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 
     fn prepare_cloned(&self) -> bool {

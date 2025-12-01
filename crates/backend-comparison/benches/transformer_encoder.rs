@@ -167,7 +167,7 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 }
 
@@ -199,7 +199,7 @@ impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 }
 

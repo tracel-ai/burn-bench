@@ -49,7 +49,7 @@ impl<B: Backend> Benchmark for ConvTranspose3dBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 }
 
