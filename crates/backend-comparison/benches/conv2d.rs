@@ -50,7 +50,7 @@ impl<B: Backend> Benchmark for Conv2dBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 
     fn num_samples(&self) -> usize {

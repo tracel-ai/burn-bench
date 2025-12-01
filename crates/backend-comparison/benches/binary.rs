@@ -36,7 +36,7 @@ impl<B: Backend, const D: usize> Benchmark for BinaryBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device);
+        B::sync(&self.device).unwrap();
     }
 }
 
@@ -70,7 +70,7 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
     }
 
     fn sync(&self) {
-        B::sync(&self.device);
+        B::sync(&self.device).unwrap();
     }
 }
 

@@ -83,7 +83,7 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

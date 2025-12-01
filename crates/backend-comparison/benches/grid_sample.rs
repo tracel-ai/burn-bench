@@ -53,9 +53,10 @@ impl<B: Backend> Benchmark for GridSampleBenchmark<B> {
     }
 
     fn execute(&self, (tensor, grid): Self::Input) -> Self::Output {
-        tensor
-            .clone()
-            .grid_sample_2d(grid.clone(), burn::tensor::ops::InterpolateMode::Nearest)
+        tensor.clone().grid_sample_2d(
+            grid.clone(),
+            burn::tensor::ops::GridSampleOptions::new(burn::tensor::ops::InterpolateMode::Nearest),
+        )
     }
 
     fn name(&self) -> String {
@@ -72,7 +73,7 @@ impl<B: Backend> Benchmark for GridSampleBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device)
+        B::sync(&self.device).unwrap();
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
