@@ -30,6 +30,7 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
             self.stride,
             self.padding,
             self.dilation,
+            false,
         )
     }
 
@@ -48,7 +49,7 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let benchmark = MaxPool2dBenchmark::<B> {
         name: "default",
-        shape: [32, 128, 512, 512].into(),
+        shape: [2, 128, 512, 512].into(),
         kernel_size: [5, 5],
         stride: [2, 2],
         padding: [2, 2],
@@ -57,7 +58,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     };
     let benchmark2 = MaxPool2dBenchmark::<B> {
         name: "unit_stride",
-        shape: [32, 32, 512, 512].into(),
+        shape: [2, 32, 512, 512].into(),
         kernel_size: [5, 5],
         stride: [1, 1],
         padding: [2, 2],

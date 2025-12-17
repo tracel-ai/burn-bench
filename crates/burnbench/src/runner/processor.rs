@@ -31,6 +31,7 @@ impl OutputProcessor for VerboseProcessor {
 
 /// A processor that just send the output into oblivion.
 #[derive(Default)]
+#[allow(dead_code)]
 pub struct SinkProcessor;
 
 impl OutputProcessor for SinkProcessor {

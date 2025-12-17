@@ -20,7 +20,7 @@ struct ReduceBenchmark<B: Backend> {
 
 impl<B: Backend> ReduceBenchmark<B> {
     pub fn new(instruction: Instruction, device: B::Device) -> Self {
-        let shape = Shape::new([2048, 256, 64]);
+        let shape = Shape::new([32, 512, 4096]);
         let tensor = Tensor::random(shape.clone(), Distribution::Default, &device);
         Self {
             instruction,
@@ -49,10 +49,10 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
             Instruction::SumDim(axis) => ReduceOutput::Dim(self.tensor.clone().sum_dim(axis)),
             Instruction::SumDimFused(axis) => {
                 let tensor = self.tensor.clone() + 5;
-                let tensor = tensor.log();
+                let tensor = tensor.sum_dim(axis);
                 let tensor = tensor.tanh();
                 let tensor = tensor * 3;
-                ReduceOutput::Dim(tensor.sum_dim(axis))
+                ReduceOutput::Dim(tensor)
             }
             Instruction::ArgMinFused(axis) => {
                 let tensor = self.tensor.clone() + 5;
@@ -104,7 +104,6 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             Instruction::ArgMinFused(axis),
             device.clone(),
         ));
-
         benchmarks.push(ReduceBenchmark::<B>::new(
             Instruction::SumDim(axis),
             device.clone(),
