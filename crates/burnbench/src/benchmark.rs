@@ -26,7 +26,7 @@ pub trait Benchmark {
 
     /// Number of samples per run required to have a statistical significance.
     fn num_samples(&self) -> usize {
-        const DEFAULT: usize = 10;
+        const DEFAULT: usize = 15;
 
         std::env::var("BENCH_NUM_SAMPLES")
             .map(|val| str::parse::<usize>(&val).unwrap_or(DEFAULT))
@@ -83,10 +83,9 @@ pub trait Benchmark {
             let args = self.prepare();
 
             // Warmup
-            for _ in 0..3 {
+            for _ in 0..5 {
                 let _duration = execute(args.clone());
             }
-            std::thread::sleep(Duration::from_secs(1));
 
             // Real execution.
             for _ in 0..self.num_samples() {
@@ -94,10 +93,9 @@ pub trait Benchmark {
             }
         } else {
             // Warmup
-            for _ in 0..3 {
+            for _ in 0..5 {
                 let _duration = execute(self.prepare());
             }
-            std::thread::sleep(Duration::from_secs(1));
 
             // Real execution.
             for _ in 0..self.num_samples() {
