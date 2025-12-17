@@ -48,7 +48,7 @@ distributed = ["server", "remote"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
-burn = { path = "../../../burn/crates/burn", default-features = false }
+burn = { git = "https://github.com/tracel-ai/burn", rev="3d1b605431d1ddbb077ee8341969a1d48240edcb" }
 
 burnbench = { path = "../burnbench" }
 
