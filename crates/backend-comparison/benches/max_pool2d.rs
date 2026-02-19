@@ -20,7 +20,7 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, x: Self::Input) -> Self::Output {

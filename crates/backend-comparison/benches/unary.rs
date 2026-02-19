@@ -17,7 +17,7 @@ impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, args: Self::Input) -> Self::Output {

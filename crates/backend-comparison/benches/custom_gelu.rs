@@ -83,7 +83,7 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, tensor: Self::Input) -> Self::Output {
@@ -197,7 +197,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     run(Mode::Inference(Some(QuantScheme {
         value: QuantValue::Q4F,
         param: QuantParam::F16,
-        store: QuantStore::U32,
+        store: QuantStore::PackedU32(0),
         level: QuantLevel::Block(BlockSize::new([32])),
         mode: QuantMode::Symmetric,
     })));

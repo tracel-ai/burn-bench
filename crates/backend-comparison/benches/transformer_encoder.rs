@@ -146,7 +146,7 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, (model, input): Self::Input) -> Self::Output {
@@ -160,7 +160,7 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
             TrainingBatch {
                 tokens: Tensor::arange(0..self.shape.num_elements() as i64, &self.device)
                     .reshape(self.shape.clone()),
-                labels: Tensor::arange(0..self.shape.dims[0] as i64, &self.device),
+                labels: Tensor::arange(0..self.shape.to_vec()[0] as i64, &self.device),
                 mask_pad: Tensor::<B, 2>::zeros(self.shape.clone(), &self.device).equal_elem(0.0),
             },
         )
@@ -180,7 +180,7 @@ impl<B: Backend> Benchmark for TransformerEncoderBenchmark<B, false> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, (model, input): Self::Input) -> Self::Output {
