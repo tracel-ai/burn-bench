@@ -36,7 +36,7 @@ impl<B: Backend, const D: usize> Benchmark for BoolSelectBenchmark<B, D> {
         let tensor = Tensor::<B, D, Bool>::from_data(tensor_data, &self.device);
 
         // Generate valid random indices for the specified dimension
-        let max_index = self.shape.to_vec()[self.dim];
+        let max_index = self.shape[self.dim];
         let indices_data: Vec<i32> = (0..self.indices_count)
             .map(|_| rng().random_range(0..max_index) as i32)
             .collect();

@@ -160,7 +160,7 @@ impl<B: AutodiffBackend> Benchmark for TransformerEncoderBenchmark<B, true> {
             TrainingBatch {
                 tokens: Tensor::arange(0..self.shape.num_elements() as i64, &self.device)
                     .reshape(self.shape.clone()),
-                labels: Tensor::arange(0..self.shape.to_vec()[0] as i64, &self.device),
+                labels: Tensor::arange(0..self.shape[0] as i64, &self.device),
                 mask_pad: Tensor::<B, 2>::zeros(self.shape.clone(), &self.device).equal_elem(0.0),
             },
         )

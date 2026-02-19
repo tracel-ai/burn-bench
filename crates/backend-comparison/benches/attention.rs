@@ -1,7 +1,9 @@
 use std::fmt::Display;
 
 use burn::tensor::{
-    Bool, Distribution, Element, Shape, Tensor, backend::Backend, module::attention,
+    Bool, Distribution, Element, Shape, Tensor,
+    backend::Backend,
+    module::{attention, attention_fallback},
     ops::AttentionOptions,
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
@@ -44,14 +46,14 @@ impl AttentionProblem {
 
 enum AttentionKind {
     Flash,
-    Naive,
+    Fallback,
 }
 
 impl Display for AttentionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AttentionKind::Flash => f.write_str("flash"),
-            AttentionKind::Naive => f.write_str("naive"),
+            AttentionKind::Fallback => f.write_str("fallback"),
         }
     }
 }
@@ -90,14 +92,24 @@ impl<B: Backend> Benchmark for AttentionBenchmark<B> {
     }
 
     fn execute(&self, input: Self::Input) -> Self::Output {
-        attention(
-            input.query,
-            input.key,
-            input.value,
-            input.mask,
-            None,
-            self.problem.options,
-        )
+        match self.kind {
+            AttentionKind::Flash => attention(
+                input.query,
+                input.key,
+                input.value,
+                input.mask,
+                None,
+                self.problem.options,
+            ),
+            AttentionKind::Fallback => attention_fallback(
+                input.query,
+                input.key,
+                input.value,
+                input.mask,
+                None,
+                self.problem.options,
+            ),
+        }
     }
 
     fn prepare(&self) -> Self::Input {
@@ -134,7 +146,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let benchmark_naive = AttentionBenchmark::<B> {
         device: device.clone(),
         problem: small_problem,
-        kind: AttentionKind::Naive,
+        kind: AttentionKind::Fallback,
     };
 
     vec![
