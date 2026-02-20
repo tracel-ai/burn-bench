@@ -4,7 +4,7 @@ use burn::tensor::{
     Bool, Distribution, Element, Shape, Tensor,
     backend::Backend,
     module::{attention, attention_fallback},
-    ops::AttentionOptions,
+    ops::AttentionModuleOptions,
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
@@ -23,7 +23,7 @@ struct AttentionProblem {
     seq_kv: usize,
     val_dim: usize,
     mask: bool,
-    options: AttentionOptions,
+    options: AttentionModuleOptions,
 }
 
 impl AttentionProblem {
@@ -131,7 +131,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         seq_kv: 2048,
         val_dim: 128,
         mask: false,
-        options: AttentionOptions {
+        options: AttentionModuleOptions {
             scale: None,
             softcap: None,
             is_causal: false,
@@ -143,7 +143,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         problem: small_problem.clone(),
         kind: AttentionKind::Flash,
     };
-    let benchmark_naive = AttentionBenchmark::<B> {
+    let benchmark_fallback = AttentionBenchmark::<B> {
         device: device.clone(),
         problem: small_problem,
         kind: AttentionKind::Fallback,
@@ -151,7 +151,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 
     vec![
         run_benchmark(benchmark_flash),
-        run_benchmark(benchmark_naive),
+        run_benchmark(benchmark_fallback),
     ]
 }
 
