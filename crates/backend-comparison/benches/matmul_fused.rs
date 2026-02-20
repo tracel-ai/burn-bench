@@ -22,7 +22,7 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape_lhs.dims.clone(), self.shape_rhs.dims.clone()]
+        vec![self.shape_lhs.to_vec(), self.shape_rhs.to_vec()]
     }
 
     fn execute(&self, (lhs, rhs, bias): Self::Input) -> Self::Output {
@@ -32,11 +32,7 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     fn prepare(&self) -> Self::Input {
         let lhs = Tensor::random(self.shape_lhs.clone(), Distribution::Default, &self.device);
         let rhs = Tensor::random(self.shape_rhs.clone(), Distribution::Default, &self.device);
-        let bias = Tensor::random(
-            [self.shape_rhs.dims[2]],
-            Distribution::Default,
-            &self.device,
-        );
+        let bias = Tensor::random([self.shape_rhs[2]], Distribution::Default, &self.device);
 
         (lhs, rhs, bias)
     }

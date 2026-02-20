@@ -22,9 +22,9 @@ impl<B: Backend> Benchmark for ConvTranspose3dBenchmark<B> {
 
     fn shapes(&self) -> Vec<Vec<usize>> {
         vec![
-            self.input_shape.dims.clone(),
-            self.weight_shape.dims.clone(),
-            self.bias_shape.dims.clone(),
+            self.input_shape.to_vec(),
+            self.weight_shape.to_vec(),
+            self.bias_shape.to_vec(),
         ]
     }
 

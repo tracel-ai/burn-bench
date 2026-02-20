@@ -17,7 +17,7 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, (): Self::Input) -> Self::Output {

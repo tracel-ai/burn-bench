@@ -87,7 +87,7 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 }
 
