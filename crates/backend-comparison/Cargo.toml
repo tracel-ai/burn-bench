@@ -48,7 +48,7 @@ distributed = ["server", "remote"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
-# burn = { path = "../../../burn/crates/burn", default-features = false }
+# burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
 burn = { path = "../../../burn/crates/burn", default-features = false }
 
 burnbench = { path = "../burnbench" }
@@ -95,6 +95,11 @@ name = "unary"
 [[bench]]
 harness = false
 name = "binary"
+
+[[bench]]
+harness = false
+name = "launch-overhead"
+path = "benches/launch_overhead.rs"
 
 [[bench]]
 harness = false
