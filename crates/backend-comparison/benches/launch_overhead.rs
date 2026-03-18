@@ -69,8 +69,7 @@ impl<B: Backend, const D: usize> LaunchOverhead<B, D> {
             let func = move || {
                 let mut tmp = lhs.clone();
                 for i in 0..repetition {
-                    // let new = Tensor::<B, D>::random(shape.clone(), Distribution::Default, &device);
-                    let new = tmp.clone().log();
+                    let new = Tensor::<B, D>::ones(shape.clone(), &device) * i as f32;
 
                     if i % 2 == 0 {
                         tmp = tmp.clone().mul(rhs.clone()) + new;
@@ -107,10 +106,9 @@ impl<B: Backend, const D: usize> LaunchOverhead<B, D> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let mut results = Vec::new();
 
-    for num_threads in [1, 4] {
-        // for shape in [[1, 8, 8, 8], [1, 32, 32, 32], [1, 128, 128, 128]] {
-        for shape in [[1, 8, 8, 8]] {
-            for repetition in [1024] {
+    for num_threads in [1, 4, 8, 16] {
+        for shape in [[1, 4, 4, 4], [1, 8, 8, 8]] {
+            for repetition in [512, 1024] {
                 let benchmark = LaunchOverhead::<B, 4> {
                     shape: shape.into(),
                     device: device.clone(),
