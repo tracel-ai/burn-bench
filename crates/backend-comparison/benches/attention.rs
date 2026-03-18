@@ -88,15 +88,20 @@ impl<B: Backend> Benchmark for AttentionBenchmark<B> {
     type Output = Tensor<B, 4>;
 
     fn name(&self) -> String {
-        format!("attention_{}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "attention_{}_{}-{:?}",
+            self.kind,
+            self.problem.num_heads,
+            B::FloatElem::dtype()
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
         vec![vec![
             self.problem.batch_size,
             self.problem.seq_q,
-            self.problem.num_heads,
-            self.problem.val_dim,
+            self.problem.num_heads * self.problem.head_dim,
         ]]
     }
 
@@ -134,37 +139,35 @@ impl<B: Backend> Benchmark for AttentionBenchmark<B> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let mut results = Vec::new();
     for batch_size in [1] {
-        for seq_length in [1024, 4096, 4096 * 2] {
-            for num_heads in [8] {
-                for d_model in [2048] {
-                    let dim = d_model / num_heads;
-                    let problem = AttentionProblem {
-                        batch_size,
-                        num_heads: num_heads,
-                        seq_q: seq_length,
-                        head_dim: dim,
-                        seq_kv: seq_length,
-                        val_dim: dim,
-                        mask: false,
-                        options: AttentionModuleOptions {
-                            scale: None,
-                            softcap: None,
-                            is_causal: false,
-                        },
-                    };
-                    let benchmark_flash = AttentionBenchmark::<B> {
-                        device: device.clone(),
-                        problem: problem.clone(),
-                        kind: AttentionKind::Flash,
-                    };
-                    results.push(run_benchmark(benchmark_flash));
-                    let benchmark_fallback = AttentionBenchmark::<B> {
-                        device: device.clone(),
-                        problem: problem,
-                        kind: AttentionKind::Fallback,
-                    };
-                    results.push(run_benchmark(benchmark_fallback));
-                }
+        for seq_length in [1024, 2048, 4096] {
+            for (num_heads, d_model) in [(8, 2048), (8, 4096), (32, 2048), (32, 4096)] {
+                let dim = d_model / num_heads;
+                let problem = AttentionProblem {
+                    batch_size,
+                    num_heads: num_heads,
+                    seq_q: seq_length,
+                    head_dim: dim,
+                    seq_kv: seq_length,
+                    val_dim: dim,
+                    mask: false,
+                    options: AttentionModuleOptions {
+                        scale: None,
+                        softcap: None,
+                        is_causal: false,
+                    },
+                };
+                let benchmark_flash = AttentionBenchmark::<B> {
+                    device: device.clone(),
+                    problem: problem.clone(),
+                    kind: AttentionKind::Flash,
+                };
+                results.push(run_benchmark(benchmark_flash));
+                let benchmark_fallback = AttentionBenchmark::<B> {
+                    device: device.clone(),
+                    problem: problem,
+                    kind: AttentionKind::Fallback,
+                };
+                results.push(run_benchmark(benchmark_fallback));
             }
         }
     }
