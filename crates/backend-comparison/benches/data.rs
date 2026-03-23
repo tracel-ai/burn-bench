@@ -164,7 +164,7 @@ impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.data.shape.clone()]
+        vec![self.data.shape.to_vec()]
     }
 
     fn execute(&self, data: Self::Input) -> Self::Output {
