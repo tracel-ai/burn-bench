@@ -232,6 +232,7 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_backend_comparison_benchmarks(
     info: &CrateInfo,
     benches: &[String],
@@ -310,8 +311,8 @@ fn run_backend_comparison_benchmarks(
     }
     println!("{output_results}");
     // 'complete' webhook
-    if inputs_file.is_ok() {
-        send_output_results(&inputs_file.unwrap(), &table, share_link.as_deref());
+    if let Ok(inputs_file) = inputs_file {
+        send_output_results(&inputs_file, &table, share_link.as_deref());
     }
 }
 
@@ -319,7 +320,7 @@ fn get_required_features(info: &CrateInfo, target_bench: &str) -> Vec<String> {
     let cargo_file_path = Path::new(&info.path).join("Cargo.toml");
 
     let content = fs::read_to_string(&cargo_file_path).expect("Failed to read Cargo.toml");
-    let parsed: toml::Value = content.parse().expect("Invalid TOML");
+    let parsed: toml::Table = content.parse().expect("Invalid TOML");
 
     let benches = parsed.get("bench").and_then(|b| b.as_array()).unwrap();
 
@@ -344,6 +345,7 @@ fn get_required_features(info: &CrateInfo, target_bench: &str) -> Vec<String> {
     vec![]
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_cargo(
     info: &CrateInfo,
     benches: &[String],
@@ -435,26 +437,26 @@ fn run_cargo(
 /// Take cake of special version names of the form PR#number_sha1 and return sha1.
 /// Otherwise just return version untouched.
 fn get_version(version: &str) -> String {
-    if let Some(suffix) = version.strip_prefix("PR#") {
-        if let Some((_, sha)) = suffix.split_once('_') {
-            return sha.to_string();
-        }
+    if let Some(suffix) = version.strip_prefix("PR#")
+        && let Some((_, sha)) = suffix.split_once('_')
+    {
+        return sha.to_string();
     }
     version.to_string()
 }
 
 fn web_results_url(token: Option<&str>, versions: &[String]) -> Option<String> {
-    if let Some(t) = token {
-        if let Ok(user) = get_username(t) {
-            let sysinfo = BenchmarkSystemInfo::new();
-            let encoded_os = utf8_percent_encode(&sysinfo.os.name, NON_ALPHANUMERIC).to_string();
-            let versions = utf8_percent_encode(&versions.join(","), NON_ALPHANUMERIC).to_string();
+    if let Some(t) = token
+        && let Ok(user) = get_username(t)
+    {
+        let sysinfo = BenchmarkSystemInfo::new();
+        let encoded_os = utf8_percent_encode(&sysinfo.os.name, NON_ALPHANUMERIC).to_string();
+        let versions = utf8_percent_encode(&versions.join(","), NON_ALPHANUMERIC).to_string();
 
-            return Some(format!(
-                "{}benchmarks/community-benchmarks?user={}&sysHardware=Any&os={}&burnVersions={}",
-                BENCHMARK_WEBSITE_URL, user.nickname, encoded_os, versions
-            ));
-        }
+        return Some(format!(
+            "{}benchmarks/community-benchmarks?user={}&sysHardware=Any&os={}&burnVersions={}",
+            BENCHMARK_WEBSITE_URL, user.nickname, encoded_os, versions
+        ));
     }
     None
 }

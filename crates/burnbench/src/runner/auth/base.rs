@@ -9,11 +9,11 @@ use std::{
     thread, time,
 };
 
-pub(crate) const CLIENT_ID: &'static str = "Iv1.692f6a61b6086810";
+pub(crate) const CLIENT_ID: &str = "Iv1.692f6a61b6086810";
 const FIVE_SECONDS: time::Duration = time::Duration::new(5, 0);
-const GITHUB_API_VERSION_HEADER: &'static str = "X-GitHub-Api-Version";
-const GITHUB_API_VERSION: &'static str = "2022-11-28";
-const GITHUB_BOT_TOKEN_ENV_VAR: &'static str = "GITHUB_BOT_TOKEN";
+const GITHUB_API_VERSION_HEADER: &str = "X-GitHub-Api-Version";
+const GITHUB_API_VERSION: &str = "2022-11-28";
+const GITHUB_BOT_TOKEN_ENV_VAR: &str = "GITHUB_BOT_TOKEN";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Tokens {
@@ -128,10 +128,10 @@ fn auth() -> Option<Tokens> {
     println!("\n    {}\n", flow.verification_uri.clone().unwrap());
     let user_code = flow.user_code.clone().unwrap();
     println!("👉 And enter code: {}", &user_code);
-    if let Ok(mut clipboard) = Clipboard::new() {
-        if clipboard.set_text(user_code).is_ok() {
-            println!("📋 Code has been successfully copied to clipboard.")
-        };
+    if let Ok(mut clipboard) = Clipboard::new()
+        && clipboard.set_text(user_code).is_ok()
+    {
+        println!("📋 Code has been successfully copied to clipboard.")
     };
     // Wait for the minimum allowed interval to poll for authentication update
     // see: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#step-3-app-polls-github-to-check-if-the-user-authorized-the-device

@@ -111,6 +111,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
                 );
                 results.push(run_benchmark(inference));
 
+                #[allow(clippy::single_element_loop)]
                 for (scheme, tag) in [(
                     QuantScheme {
                         value: QuantValue::Q4F,
