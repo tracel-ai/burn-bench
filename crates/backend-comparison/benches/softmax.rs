@@ -44,15 +44,14 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         (256, 256, 256),
     ]
     .into_iter()
-    .map(|(a, b, c)| {
+    .flat_map(|(a, b, c)| {
         let shape: Shape = [a, b, c].into();
 
         (0..shape.rank())
             .map(|dim| SoftmaxBenchmark::<B, 3>::new(shape.clone(), dim, device.clone()))
             .collect::<Vec<_>>()
     })
-    .flatten()
-    .map(|a| run_benchmark(a))
+    .map(run_benchmark)
     .collect()
 }
 

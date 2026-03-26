@@ -36,10 +36,10 @@ pub fn init_log() -> Result<(), String> {
         .with_writer(std::io::stderr)
         .with_filter(LevelFilter::INFO)
         .with_filter(filter_fn(|m| {
-            if let Some(path) = m.module_path() {
-                if path.starts_with("wgpu") {
-                    return false;
-                }
+            if let Some(path) = m.module_path()
+                && path.starts_with("wgpu")
+            {
+                return false;
             }
             true
         }));

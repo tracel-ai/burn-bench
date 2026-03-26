@@ -24,9 +24,7 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
         Tensor::<B, 3, Float>::random(self.shape.clone(), self.distribution, &self.device)
     }
 
-    fn prepare(&self) -> Self::Input {
-        ()
-    }
+    fn prepare(&self) -> Self::Input {}
 
     fn sync(&self) {
         B::sync(&self.device).unwrap();

@@ -1,5 +1,4 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burnbench;
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
 struct GridSampleBenchmark<B: Backend> {

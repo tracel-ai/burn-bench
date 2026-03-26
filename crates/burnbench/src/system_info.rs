@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use wgpu::{self, Backends};
+use wgpu::{self};
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct BenchmarkSystemInfo {
@@ -48,8 +48,9 @@ impl BenchmarkSystemInfo {
 
     fn enumerate_gpus() -> Vec<String> {
         let instance = wgpu::Instance::default();
-        let adapters: Vec<wgpu::Adapter> = instance
-            .enumerate_adapters({
+        let adapters: Vec<wgpu::Adapter> =
+            futures_lite::future::block_on(instance.enumerate_adapters({
+                #[allow(clippy::needless_late_init)]
                 let backend;
                 cfg_if::cfg_if! {
                     if #[cfg(target_family = "wasm")] {
@@ -60,8 +61,8 @@ impl BenchmarkSystemInfo {
                         backend = wgpu::Backend::Vulkan;
                     }
                 };
-                Backends::from_bits(1 << backend as u32).unwrap()
-            })
+                backend.into()
+            }))
             .into_iter()
             .filter(|adapter| {
                 let info = adapter.get_info();

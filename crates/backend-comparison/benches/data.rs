@@ -70,7 +70,7 @@ impl<B: Backend, const D: usize> FromFileBenchmark<B, D> {
         std::fs::remove_file(&path).ok();
 
         let mut file = std::fs::File::create_new(&path).unwrap();
-        file.write(&data.bytes).unwrap();
+        file.write_all(&data.bytes).unwrap();
 
         Self {
             path,
@@ -121,9 +121,7 @@ impl<B: Backend, const D: usize> Benchmark for FromFileBenchmark<B, D> {
         }
     }
 
-    fn prepare(&self) -> Self::Input {
-        ()
-    }
+    fn prepare(&self) -> Self::Input {}
 
     fn sync(&self) {
         B::sync(&self.device).unwrap();
