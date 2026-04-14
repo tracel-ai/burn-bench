@@ -147,6 +147,8 @@ enum BackendValues {
     Metal,
     #[strum(to_string = "metal-fusion")]
     MetalFusion,
+    #[strum(to_string = "flex")]
+    Flex,
 }
 
 /// Execute burnbench on the provided crate located at the provided path.

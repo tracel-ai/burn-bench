@@ -19,7 +19,7 @@ struct ReduceBenchmark<B: Backend> {
 
 impl<B: Backend> ReduceBenchmark<B> {
     pub fn new(instruction: Instruction, device: B::Device) -> Self {
-        let shape = Shape::new([32, 512, 4096]);
+        let shape = Shape::new([1, 4096, 4096]);
         let tensor = Tensor::random(shape.clone(), Distribution::Default, &device);
         Self {
             instruction,
@@ -94,26 +94,31 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let mut benchmarks = Vec::new();
 
-    for axis in 0..3 {
-        benchmarks.push(ReduceBenchmark::<B>::new(
-            Instruction::ArgMin(axis),
-            device.clone(),
-        ));
-        benchmarks.push(ReduceBenchmark::<B>::new(
-            Instruction::ArgMinFused(axis),
-            device.clone(),
-        ));
-        benchmarks.push(ReduceBenchmark::<B>::new(
-            Instruction::SumDim(axis),
-            device.clone(),
-        ));
-        benchmarks.push(ReduceBenchmark::<B>::new(
-            Instruction::SumDimFused(axis),
-            device.clone(),
-        ));
-    }
+    // for axis in 0..3 {
+    //     benchmarks.push(ReduceBenchmark::<B>::new(
+    //         Instruction::ArgMin(axis),
+    //         device.clone(),
+    //     ));
+    //     benchmarks.push(ReduceBenchmark::<B>::new(
+    //         Instruction::ArgMinFused(axis),
+    //         device.clone(),
+    //     ));
+    //     benchmarks.push(ReduceBenchmark::<B>::new(
+    //         Instruction::SumDim(axis),
+    //         device.clone(),
+    //     ));
+    //     benchmarks.push(ReduceBenchmark::<B>::new(
+    //         Instruction::SumDimFused(axis),
+    //         device.clone(),
+    //     ));
+    // }
 
-    benchmarks.push(ReduceBenchmark::<B>::new(Instruction::Sum, device.clone()));
+    // benchmarks.push(ReduceBenchmark::<B>::new(Instruction::Sum, device.clone()));
+    benchmarks.push(ReduceBenchmark::<B>::new(
+        Instruction::SumDim(1),
+        device.clone(),
+    ));
+
     benchmarks.into_iter().map(run_benchmark).collect()
 }
 

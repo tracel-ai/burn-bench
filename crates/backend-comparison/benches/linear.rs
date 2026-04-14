@@ -1,10 +1,13 @@
 use burn::{
     module::Quantizer,
+    nn::LinearLayout,
     prelude::*,
-    tensor::Element,
-    tensor::quantization::{
-        BlockSize, Calibration, QuantLevel, QuantMode, QuantParam, QuantScheme, QuantStore,
-        QuantValue,
+    tensor::{
+        Element,
+        quantization::{
+            BlockSize, Calibration, QuantLevel, QuantMode, QuantParam, QuantScheme, QuantStore,
+            QuantValue,
+        },
     },
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
@@ -61,7 +64,7 @@ impl<B: Backend> LinearBench<B> {
             true => "linear-bias",
             false => "linear",
         };
-        let name = format!("{name}_{:?}", B::FloatElem::dtype());
+        let name = format!("{name}_{}_{:?}", config.layout, B::FloatElem::dtype());
         let linear = config.init(device);
 
         (linear, signal_shape, name)
@@ -101,35 +104,40 @@ impl<B: Backend> Benchmark for LinearBench<B> {
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let mut results = Vec::new();
 
-    for (d_input, d_output) in [(4096, 4096)] {
-        for bias in [true, false] {
-            for batch_sizes in [[1, 1], [32, 1], [1, 32]] {
-                let inference = LinearBench::<B>::inference(
-                    nn::LinearConfig::new(d_input, d_output).with_bias(bias),
-                    device,
-                    batch_sizes,
-                );
-                results.push(run_benchmark(inference));
+    for layout in [LinearLayout::Row, LinearLayout::Col] {
+        for (d_input, d_output) in [(4096, 4096)] {
+            for bias in [true, false] {
+                // for batch_sizes in [[1, 1], [32, 1], [1, 32]] {
+                for batch_sizes in [[1, 1]] {
+                    let config = nn::LinearConfig::new(d_input, d_output)
+                        .with_bias(bias)
+                        .with_layout(layout);
 
-                #[allow(clippy::single_element_loop)]
-                for (scheme, tag) in [(
-                    QuantScheme {
-                        value: QuantValue::Q4F,
-                        param: QuantParam::F16,
-                        store: QuantStore::PackedU32(0),
-                        level: QuantLevel::Block(BlockSize::new([32])),
-                        mode: QuantMode::Symmetric,
-                    },
-                    "q4b32",
-                )] {
-                    let inference = LinearBench::<B>::q_inference(
-                        nn::LinearConfig::new(d_input, d_output).with_bias(bias),
+                    results.push(run_benchmark(LinearBench::<B>::inference(
+                        config.clone(),
                         device,
-                        scheme,
-                        tag,
                         batch_sizes,
-                    );
-                    results.push(run_benchmark(inference));
+                    )));
+
+                    // #[allow(clippy::single_element_loop)]
+                    // for (scheme, tag) in [(
+                    //     QuantScheme {
+                    //         value: QuantValue::Q4F,
+                    //         param: QuantParam::F16,
+                    //         store: QuantStore::PackedU32(0),
+                    //         level: QuantLevel::Block(BlockSize::new([32])),
+                    //         mode: QuantMode::Symmetric,
+                    //     },
+                    //     "q4b32",
+                    // )] {
+                    //     results.push(run_benchmark(LinearBench::<B>::q_inference(
+                    //         config.clone(),
+                    //         device,
+                    //         scheme,
+                    //         tag,
+                    //         batch_sizes,
+                    //     )));
+                    // }
                 }
             }
         }

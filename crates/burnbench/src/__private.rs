@@ -246,6 +246,14 @@ macro_rules! bench_on_backend {
             let device = Default::default();
             $crate::bench_on_backend!($fn_name, Rocm<$dtype>, device);
         }
+
+        #[cfg(feature = "flex")]
+        {
+            use burn::backend::Flex;
+
+            let device = Default::default();
+            $crate::bench_on_backend!($fn_name, Flex<$dtype>, device);
+        }
     }};
 
     ($fn_name:ident, $backend:ty, $device:ident) => {
@@ -301,6 +309,8 @@ macro_rules! bench_on_backend {
         let feature_name = "rocm";
         #[cfg(feature = "rocm-fusion")]
         let feature_name = "rocm-fusion";
+        #[cfg(feature = "flex")]
+        let feature_name = "flex";
 
         let device_name = format!("{:?}", &$device);
         #[cfg(not(feature = "legacy-v16"))]

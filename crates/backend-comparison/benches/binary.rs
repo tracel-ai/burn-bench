@@ -1,9 +1,5 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Distribution, Element, ElementConversion, Shape, Tensor, backend::Backend};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
-use rand::{
-    SeedableRng as _,
-    rngs::{StdRng, SysRng},
-};
 use std::marker::PhantomData;
 
 pub struct BinaryBenchmark<B: Backend, const D: usize> {
@@ -63,10 +59,7 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
 
     fn prepare(&self) -> Self::Input {
         let lhs = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);
-        let rhs = E::random(
-            Distribution::Default,
-            &mut StdRng::try_from_rng(&mut SysRng).unwrap(),
-        );
+        let rhs = 5.0f32.elem();
 
         (lhs, rhs)
     }
@@ -79,11 +72,11 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
 #[allow(dead_code)]
 fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let benchmark = BinaryBenchmark::<B, 3> {
-        shape: [512, 512, 1024].into(),
+        shape: [1, 4096, 4096].into(),
         device: device.clone(),
     };
     let benchmark_scalar = BinaryScalarBenchmark::<B, 3, B::FloatElem> {
-        shape: [512, 512, 1024].into(),
+        shape: [1, 4096, 4096].into(),
         device: device.clone(),
         _ty: PhantomData,
     };
