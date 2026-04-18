@@ -71,9 +71,9 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
         let (shape_lhs, shape_rhs) = self.problem.shapes();
 
         if shape_lhs == shape_rhs {
-            vec![shape_lhs.dims]
+            vec![shape_lhs.to_vec()]
         } else {
-            vec![shape_lhs.dims, shape_rhs.dims]
+            vec![shape_lhs.to_vec(), shape_rhs.to_vec()]
         }
     }
 

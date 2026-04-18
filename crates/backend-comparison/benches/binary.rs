@@ -1,11 +1,10 @@
 use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
+use rand::{
+    SeedableRng as _,
+    rngs::{StdRng, SysRng},
+};
 use std::marker::PhantomData;
-
-#[cfg(not(feature = "legacy-v16"))]
-use rand::rng;
-#[cfg(feature = "legacy-v16")]
-use rand::thread_rng as rng;
 
 pub struct BinaryBenchmark<B: Backend, const D: usize> {
     shape: Shape,
@@ -21,7 +20,7 @@ impl<B: Backend, const D: usize> Benchmark for BinaryBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
@@ -55,7 +54,7 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
@@ -64,7 +63,10 @@ impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark
 
     fn prepare(&self) -> Self::Input {
         let lhs = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);
-        let rhs = E::random(Distribution::Default, &mut rng());
+        let rhs = E::random(
+            Distribution::Default,
+            &mut StdRng::try_from_rng(&mut SysRng).unwrap(),
+        );
 
         (lhs, rhs)
     }

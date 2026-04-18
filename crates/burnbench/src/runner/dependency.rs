@@ -57,7 +57,7 @@ impl DependencyContent {
         match &self.workspace {
             Some(content) => DependencyContentUpdate {
                 benches: None,
-                workspace: Some(update(&content)),
+                workspace: Some(update(content)),
             },
             None => DependencyContentUpdate {
                 benches: Some(update(&self.benches)),
@@ -74,21 +74,15 @@ struct DependencyContentUpdate {
 
 impl DependencyContentUpdate {
     fn create_guard(&self, content: &DependencyContent) -> CargoDependencyGuard {
-        let benches = match self.benches {
-            Some(_) => Some(TomlDependencyGuard {
-                cargo_file_path: content.benches_path.clone(),
-                original_content: content.benches.clone(),
-            }),
-            None => None,
-        };
+        let benches = self.benches.as_ref().map(|_| TomlDependencyGuard {
+            cargo_file_path: content.benches_path.clone(),
+            original_content: content.benches.clone(),
+        });
 
-        let workspace = match self.workspace {
-            Some(_) => Some(TomlDependencyGuard {
-                cargo_file_path: content.workspace_path.clone().unwrap(),
-                original_content: content.workspace.clone().unwrap(),
-            }),
-            None => None,
-        };
+        let workspace = self.workspace.as_ref().map(|_| TomlDependencyGuard {
+            cargo_file_path: content.workspace_path.clone().unwrap(),
+            original_content: content.workspace.clone().unwrap(),
+        });
 
         CargoDependencyGuard { benches, workspace }
     }
@@ -243,7 +237,7 @@ impl Dependency {
 
         match &content.workspace {
             Some(original) => {
-                let workspace = update_version(&original);
+                let workspace = update_version(original);
                 let benches = Self::update_feature_flags(version, content.benches.clone());
 
                 Ok(DependencyContentUpdate {

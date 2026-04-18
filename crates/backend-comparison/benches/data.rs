@@ -30,7 +30,7 @@ impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, args: Self::Input) -> Self::Output {
@@ -70,7 +70,7 @@ impl<B: Backend, const D: usize> FromFileBenchmark<B, D> {
         std::fs::remove_file(&path).ok();
 
         let mut file = std::fs::File::create_new(&path).unwrap();
-        file.write(&data.bytes).unwrap();
+        file.write_all(&data.bytes).unwrap();
 
         Self {
             path,
@@ -104,7 +104,7 @@ impl<B: Backend, const D: usize> Benchmark for FromFileBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.desc.shape.dims.clone()]
+        vec![self.desc.shape.to_vec()]
     }
 
     fn execute(&self, _input: Self::Input) -> Self::Output {
@@ -121,9 +121,7 @@ impl<B: Backend, const D: usize> Benchmark for FromFileBenchmark<B, D> {
         }
     }
 
-    fn prepare(&self) -> Self::Input {
-        ()
-    }
+    fn prepare(&self) -> Self::Input {}
 
     fn sync(&self) {
         B::sync(&self.device).unwrap();
@@ -164,7 +162,7 @@ impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.data.shape.clone()]
+        vec![self.data.shape.to_vec()]
     }
 
     fn execute(&self, data: Self::Input) -> Self::Output {
@@ -214,7 +212,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
             Some(QuantScheme {
                 value: QuantValue::Q4F,
                 param: QuantParam::F16,
-                store: QuantStore::U32,
+                store: QuantStore::PackedU32(0),
                 level: QuantLevel::Block(BlockSize::new([32])),
                 mode: QuantMode::Symmetric,
             }),

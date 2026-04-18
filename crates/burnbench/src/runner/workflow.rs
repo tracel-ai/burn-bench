@@ -16,12 +16,11 @@ fn get_webhook_url() -> String {
 }
 
 pub(crate) fn send_output_results(inputs_file: &str, table: &str, share_link: Option<&str>) {
-    if let Some((json, pr_number)) = load_inputs(inputs_file) {
-        if let Some(cleaned_table) = clean_output(table, share_link) {
-            if let Some(payload) = serialize_result(json, pr_number, cleaned_table, "complete") {
-                send_event("complete", payload);
-            }
-        }
+    if let Some((json, pr_number)) = load_inputs(inputs_file)
+        && let Some(cleaned_table) = clean_output(table, share_link)
+        && let Some(payload) = serialize_result(json, pr_number, cleaned_table, "complete")
+    {
+        send_event("complete", payload);
     }
 }
 
@@ -112,7 +111,7 @@ fn serialize_result(
 fn build_req_body(payload: &[u8]) -> Result<(String, String), String> {
     let secret = env::var("WEBHOOK_PAYLOAD_SECRET")
         .map_err(|_| "Missing WEBHOOK_PAYLOAD_SECRET".to_string())?;
-    let mac = HMAC::mac(&payload, secret.as_bytes());
+    let mac = HMAC::mac(payload, secret.as_bytes());
     let signature = format!("sha256={}", hex::encode(mac));
     let delivery_id = Uuid::new_v4().to_string();
     Ok((signature, delivery_id))

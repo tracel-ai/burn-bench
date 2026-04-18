@@ -1,12 +1,7 @@
 use burn::tensor::{Bool, Int, Shape, Tensor, TensorData, backend::Backend};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
-use rand::Rng;
-
-#[cfg(not(feature = "legacy-v16"))]
-use rand::rng;
-#[cfg(feature = "legacy-v16")]
-use rand::thread_rng as rng;
+use rand::{RngExt as _, rng};
 
 #[derive(new)]
 struct BoolSelectBenchmark<B: Backend, const D: usize> {
@@ -25,7 +20,7 @@ impl<B: Backend, const D: usize> Benchmark for BoolSelectBenchmark<B, D> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone(), vec![self.indices_count]]
+        vec![self.shape.to_vec(), vec![self.indices_count]]
     }
 
     fn execute(&self, (tensor, indices): Self::Input) -> Self::Output {
@@ -41,7 +36,7 @@ impl<B: Backend, const D: usize> Benchmark for BoolSelectBenchmark<B, D> {
         let tensor = Tensor::<B, D, Bool>::from_data(tensor_data, &self.device);
 
         // Generate valid random indices for the specified dimension
-        let max_index = self.shape.dims[self.dim];
+        let max_index = self.shape[self.dim];
         let indices_data: Vec<i32> = (0..self.indices_count)
             .map(|_| rng().random_range(0..max_index) as i32)
             .collect();

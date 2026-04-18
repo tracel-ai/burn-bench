@@ -17,16 +17,14 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.dims.clone()]
+        vec![self.shape.to_vec()]
     }
 
     fn execute(&self, (): Self::Input) -> Self::Output {
         Tensor::<B, 3, Float>::random(self.shape.clone(), self.distribution, &self.device)
     }
 
-    fn prepare(&self) -> Self::Input {
-        ()
-    }
+    fn prepare(&self) -> Self::Input {}
 
     fn sync(&self) {
         B::sync(&self.device).unwrap();

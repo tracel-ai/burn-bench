@@ -1,4 +1,3 @@
-
 [package]
 authors = ["Tracel Technologies Inc."]
 categories = ["science"]
@@ -11,49 +10,48 @@ repository = "https://github.com/tracel-ai/burn-bench/tree/main/backend-comparis
 version = "0.1.0"
 
 [features]
-default = ["burn/std", "burn/autodiff"]
+bf16 = []
 candle-accelerate = ["burn/candle", "burn/accelerate"]
 candle-cpu = ["burn/candle"]
 candle-cuda = ["burn/candle-cuda"]
 candle-metal = ["burn/candle", "burn/candle-metal"]
-cuda = ["burn/cuda", "burn/autotune"]
-cuda-fusion = ["cuda", "burn/fusion"]
 cpu = ["burn/cpu", "burn/autotune"]
 cpu-fusion = ["cpu", "burn/fusion"]
-rocm = ["burn/rocm", "burn/autotune"]
-rocm-fusion = ["rocm", "burn/fusion"]
+cuda = ["burn/cuda", "burn/autotune"]
+cuda-fusion = ["cuda", "burn/fusion"]
+default = ["burn/std", "burn/autodiff"]
+distributed = ["server", "remote"]
+f16 = []
+f32 = []
+flex32 = []
+legacy-v16 = []
+legacy-v17 = []
+metal = ["burn/metal", "burn/autotune"]
+metal-fusion = ["metal", "burn/fusion"]
 ndarray = ["burn/ndarray"]
 ndarray-blas-accelerate = ["ndarray", "burn/accelerate"]
 ndarray-blas-netlib = ["ndarray", "burn/blas-netlib"]
 ndarray-blas-openblas = ["ndarray", "burn/openblas"]
 ndarray-simd = ["ndarray", "burn/simd"]
+remote = ["burn/remote"]
+rocm = ["burn/rocm", "burn/autotune"]
+rocm-fusion = ["rocm", "burn/fusion"]
+server = ["burn/server"]
 tch-cpu = ["burn/tch"]
 tch-cuda = ["burn/tch"]
 tch-metal = ["burn/tch"]
-wgpu = ["burn/wgpu", "burn/autotune"]
-wgpu-fusion = ["wgpu", "burn/fusion"]
 vulkan = ["burn/vulkan", "burn/autotune"]
 vulkan-fusion = ["vulkan", "burn/fusion"]
-metal = ["burn/metal", "burn/autotune"]
-metal-fusion = ["metal", "burn/fusion"]
-f32 = []
-f16 = []
-bf16 = []
-flex32 = []
-legacy-v16 = []
-legacy-v17 = []
-server = ["burn/server"]
-remote = ["burn/remote"]
-distributed = ["server", "remote"]
+wgpu = ["burn/wgpu", "burn/autotune"]
+wgpu-fusion = ["wgpu", "burn/fusion"]
 
 [dependencies]
 # Use the last released version to avoid possible breaking changes
-# burn = { path = "../../../burn/crates/burn", default-features = false }
-burn = { path = "../../../burn/crates/burn", default-features = false }
+# burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
 
 burnbench = { path = "../burnbench" }
 
-semver = { workspace = true }
 arboard = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
@@ -63,29 +61,30 @@ dirs = { workspace = true }
 indicatif = { workspace = true }
 log = { workspace = true }
 os_info = { workspace = true }
-phf = { workspace = true }
 percent-encoding = { workspace = true }
-rand = { version = "0.9.2" }                                 # pull the same version as burn
+phf = { workspace = true }
+rand = { version = "0.10.0" }                                # pull the same version as burn
+regex = { workspace = true }
 reqwest = { workspace = true }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["std"] }
 strum = { workspace = true, features = ["derive"] }
 sysinfo = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing-subscriber = { workspace = true }
-regex = { workspace = true }
 wgpu = { workspace = true }
 wsl = { workspace = true }
-tempfile = { workspace = true }
-tokio = { version = "1.47", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
 serial_test = { workspace = true }
 
 [build-dependencies]
+semver = { workspace = true }
 serde = { workspace = true, features = ["std", "derive"] }
 serde_json = { workspace = true, features = ["std"] }
-semver = { workspace = true }
 tempfile = { workspace = true }
 
 [[bench]]
@@ -184,3 +183,7 @@ name = "grid_sample"
 [[bench]]
 harness = false
 name = "bool_select"
+
+[[bench]]
+harness = false
+name = "attention"

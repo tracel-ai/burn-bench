@@ -111,11 +111,12 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
                 );
                 results.push(run_benchmark(inference));
 
+                #[allow(clippy::single_element_loop)]
                 for (scheme, tag) in [(
                     QuantScheme {
                         value: QuantValue::Q4F,
                         param: QuantParam::F16,
-                        store: QuantStore::U32,
+                        store: QuantStore::PackedU32(0),
                         level: QuantLevel::Block(BlockSize::new([32])),
                         mode: QuantMode::Symmetric,
                     },
