@@ -62,26 +62,14 @@ impl<B: Backend + DistributedBackend> Benchmark for AllReduceBenchmark<B> {
 
 #[allow(dead_code)]
 fn bench<B: Backend + DistributedBackend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
-    let all_reduce1 = AllReduceBenchmark::<B, 3> {
-        shape: [32, 512, 1024].into(),
-        devices: devices.clone(),
-    };
-
-    let all_reduce2 = AllReduceBenchmark::<B, 3> {
-        shape: [128, 512, 2048].into(),
-        devices: devices.clone(),
-    };
-
-    let benches = vec![all_reduce1, all_reduce2];
-    let mut results = Vec::new();
-
-    for bench in benches {
-        println!("Running {}", bench.name());
-        let result = run_benchmark(bench);
-        results.push(result);
-    }
-
-    results
+    [[32, 512, 1024], [128, 512, 2048]]
+        .into_iter()
+        .map(|shape| AllReduceBenchmark::<B> {
+            shape: shape.into(),
+            devices: devices.clone(),
+        })
+        .map(run_benchmark)
+        .collect()
 }
 
 fn main() {
