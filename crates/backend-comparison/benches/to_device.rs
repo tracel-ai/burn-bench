@@ -48,7 +48,13 @@ fn bench<B: Backend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
         device_dst: devices[1].clone(),
     };
 
-    let benches = vec![to_device1];
+    let to_device2 = ToDeviceBenchmark::<B, 3> {
+        shape: [128, 512, 2048].into(),
+        device_src: devices[0].clone(),
+        device_dst: devices[1].clone(),
+    };
+
+    let benches = vec![to_device1, to_device2];
     let mut results = Vec::new();
 
     for bench in benches {
