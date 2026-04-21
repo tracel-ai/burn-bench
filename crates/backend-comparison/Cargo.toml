@@ -187,3 +187,8 @@ name = "attention"
 harness = false
 name = "to-device"
 path = "benches/to_device.rs"
+
+[[bench]]
+harness = false
+name = "all-reduce"
+path = "benches/all_reduce.rs"

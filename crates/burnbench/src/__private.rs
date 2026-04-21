@@ -340,7 +340,16 @@ macro_rules! bench_on_backend_multi_device {
 
     ($fn_name:ident, $dtype:ty) => {{
         $crate::__private::init_log().unwrap();
+        use burn::prelude::DeviceOps;
+        use burn::tensor::backend::{Device, DeviceId};
         use std::env;
+
+        fn create_devices<B: Backend>(type_id: u16) -> Vec<B::Device> {
+            let device_count = B::device_count(type_id);
+            (0..device_count)
+                .map(|i| <B::Device>::from_id(DeviceId::new(type_id, i as u16)))
+                .collect()
+        }
 
         #[cfg(feature = "cuda")]
         {
@@ -348,16 +357,9 @@ macro_rules! bench_on_backend_multi_device {
             use burn::backend::Cuda;
             #[cfg(feature = "legacy-v16")]
             use burn::backend::CudaJit as Cuda;
-            use burn::prelude::DeviceOps;
-            use burn::tensor::backend::{Device, DeviceId};
 
             let type_id = 10u16;
-            let device_count = Cuda::<f32>::device_count(type_id);
-            let devices = (0..device_count)
-                .map(|i| {
-                    <<Cuda<f32> as Backend>::Device>::from_id(DeviceId::new(type_id, i as u16))
-                })
-                .collect::<Vec<_>>();
+            let devices = create_devices::<Cuda<f32>>(type_id);
             $crate::bench_on_backend_multi_device!($fn_name, Cuda<$dtype>, devices);
         }
 
