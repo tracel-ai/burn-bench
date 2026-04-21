@@ -42,13 +42,13 @@ impl<B: Backend, const D: usize> Benchmark for ToDeviceBenchmark<B, D> {
 
 #[allow(dead_code)]
 fn bench<B: Backend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
-    let conv1 = ToDeviceBenchmark::<B, 3> {
+    let to_device1 = ToDeviceBenchmark::<B, 3> {
         shape: [32, 512, 1024].into(),
         device_src: devices[0].clone(),
         device_dst: devices[1].clone(),
     };
 
-    let benches = vec![conv1];
+    let benches = vec![to_device1];
     let mut results = Vec::new();
 
     for bench in benches {
