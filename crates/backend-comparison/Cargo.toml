@@ -182,3 +182,8 @@ name = "bool_select"
 [[bench]]
 harness = false
 name = "attention"
+
+[[bench]]
+harness = false
+name = "to-device"
+path = "benches/to_device.rs"
