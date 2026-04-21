@@ -30,7 +30,7 @@ mod distributed_benchmarks {
         type Output = Vec<Tensor<B, 3>>;
 
         fn name(&self) -> String {
-            format!("to_device-{:?}", B::FloatElem::dtype()).to_lowercase()
+            format!("all_reduce-{:?}", B::FloatElem::dtype()).to_lowercase()
         }
 
         fn shapes(&self) -> Vec<Vec<usize>> {
