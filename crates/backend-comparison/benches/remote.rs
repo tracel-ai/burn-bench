@@ -5,7 +5,7 @@ use burnbench::BenchmarkResult;
 // cargo bb run -b remote --backends wgpu -V local
 
 #[cfg(all(
-    feature = "distributed",
+    feature = "remote",
     not(feature = "legacy-v16"),
     not(feature = "legacy-v17")
 ))]
@@ -145,7 +145,7 @@ mod remote_benchmarks {
 }
 
 #[cfg(all(
-    feature = "distributed",
+    feature = "remote",
     not(feature = "legacy-v16"),
     not(feature = "legacy-v17")
 ))]
@@ -155,7 +155,7 @@ fn bench<B: burn::backend::ir::BackendIr>(device: &B::Device) -> Vec<BenchmarkRe
 }
 
 #[cfg(any(
-    not(feature = "distributed"),
+    not(feature = "remote"),
     feature = "legacy-v16",
     feature = "legacy-v17"
 ))]

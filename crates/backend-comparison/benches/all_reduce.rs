@@ -1,7 +1,13 @@
 use burn::{
     Tensor,
     prelude::Backend,
-    tensor::{Distribution, Element, Shape},
+    tensor::{
+        Distribution, Element, Shape, TensorPrimitive,
+        backend::{
+            DeviceOps,
+            distributed::{DistributedBackend, ReduceOperation},
+        },
+    },
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
@@ -10,57 +16,69 @@ pub struct AllReduceBenchmark<B: Backend, const D: usize> {
     devices: Vec<B::Device>,
 }
 
-// impl<B: Backend, const D: usize> Benchmark for AllReduceBenchmark<B, D> {
-//     type Input = Tensor<B, D>;
-//     type Output = Tensor<B, D>;
+impl<B: Backend + DistributedBackend, const D: usize> Benchmark for AllReduceBenchmark<B, D> {
+    type Input = Vec<Tensor<B, D>>;
+    type Output = Vec<Tensor<B, D>>;
 
-//     fn name(&self) -> String {
-//         format!("to_device-{:?}", B::FloatElem::dtype()).to_lowercase()
-//     }
+    fn name(&self) -> String {
+        format!("to_device-{:?}", B::FloatElem::dtype()).to_lowercase()
+    }
 
-//     fn shapes(&self) -> Vec<Vec<usize>> {
-//         vec![self.shape.to_vec()]
-//     }
+    fn shapes(&self) -> Vec<Vec<usize>> {
+        vec![self.shape.to_vec()]
+    }
 
-//     fn execute(&self, input: Self::Input) -> Self::Output {
-//         for tensor in input {
-//            B::all_red
-//         }
-//     }
+    fn execute(&self, input: Self::Input) -> Self::Output {
+        let mut out = vec![];
+        let device_ids = self.devices.iter().map(|d| d.id()).collect::<Vec<_>>();
+        for tensor in input {
+            let result = B::all_reduce(
+                tensor.into_primitive().tensor(),
+                ReduceOperation::Sum,
+                device_ids.clone(),
+            );
+            out.push(Tensor::new(TensorPrimitive::Float(result.resolve())));
+        }
+        out
+    }
 
-//     fn prepare(&self) -> Self::Input {
-//         Tensor::random(self.shape.clone(), Distribution::Default, &self.device_src)
-//     }
+    fn prepare(&self) -> Self::Input {
+        self.devices
+            .iter()
+            .map(|device| Tensor::random(self.shape.clone(), Distribution::Default, device))
+            .collect()
+    }
 
-//     fn sync(&self) {
-//         B::sync(&self.device_dst).unwrap()
-//     }
+    fn sync(&self) {
+        self.devices
+            .iter()
+            .for_each(|device| B::sync(&device).unwrap());
+    }
 
-//     fn num_samples(&self) -> usize {
-//         40
-//     }
-// }
+    fn num_samples(&self) -> usize {
+        40
+    }
+}
 
-// #[allow(dead_code)]
-// fn bench<B: Backend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
-//     let conv1 = AllReduceBenchmark::<B, 3> {
-//         shape: [32, 512, 1024].into(),
-//         device_src: devices[0].clone(),
-//         device_dst: devices[1].clone(),
-//     };
+#[allow(dead_code)]
+fn bench<B: Backend + DistributedBackend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
+    let conv1 = AllReduceBenchmark::<B, 3> {
+        shape: [32, 512, 1024].into(),
+        devices: devices.clone(),
+    };
 
-//     let benches = vec![conv1];
-//     let mut results = Vec::new();
+    let benches = vec![conv1];
+    let mut results = Vec::new();
 
-//     for bench in benches {
-//         println!("Running {}", bench.name());
-//         let result = run_benchmark(bench);
-//         results.push(result);
-//     }
+    for bench in benches {
+        println!("Running {}", bench.name());
+        let result = run_benchmark(bench);
+        results.push(result);
+    }
 
-//     results
-// }
+    results
+}
 
-// fn main() {
-//     burnbench::bench_on_backend_multi_device!();
-// }
+fn main() {
+    burnbench::bench_on_backend_multi_device!();
+}
