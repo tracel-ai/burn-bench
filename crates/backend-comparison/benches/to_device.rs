@@ -5,15 +5,15 @@ use burn::{
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct ToDeviceBenchmark<B: Backend, const D: usize> {
+pub struct ToDeviceBenchmark<B: Backend> {
     shape: Shape,
     device_src: B::Device,
     device_dst: B::Device,
 }
 
-impl<B: Backend, const D: usize> Benchmark for ToDeviceBenchmark<B, D> {
-    type Input = Tensor<B, D>;
-    type Output = Tensor<B, D>;
+impl<B: Backend> Benchmark for ToDeviceBenchmark<B> {
+    type Input = Tensor<B, 3>;
+    type Output = Tensor<B, 3>;
 
     fn name(&self) -> String {
         format!("to_device-{:?}", B::FloatElem::dtype()).to_lowercase()
@@ -42,28 +42,16 @@ impl<B: Backend, const D: usize> Benchmark for ToDeviceBenchmark<B, D> {
 
 #[allow(dead_code)]
 fn bench<B: Backend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
-    let to_device1 = ToDeviceBenchmark::<B, 3> {
-        shape: [32, 512, 1024].into(),
-        device_src: devices[0].clone(),
-        device_dst: devices[1].clone(),
-    };
-
-    let to_device2 = ToDeviceBenchmark::<B, 3> {
-        shape: [128, 512, 2048].into(),
-        device_src: devices[0].clone(),
-        device_dst: devices[1].clone(),
-    };
-
-    let benches = vec![to_device1, to_device2];
-    let mut results = Vec::new();
-
-    for bench in benches {
-        println!("Running {}", bench.name());
-        let result = run_benchmark(bench);
-        results.push(result);
-    }
-
-    results
+    assert!(devices.len() >= 2);
+    [[32, 512, 1024], [128, 512, 2048]]
+        .into_iter()
+        .map(|shape| ToDeviceBenchmark::<B> {
+            shape: shape.into(),
+            device_src: devices[0].clone(),
+            device_dst: devices[1].clone(),
+        })
+        .map(run_benchmark)
+        .collect()
 }
 
 fn main() {

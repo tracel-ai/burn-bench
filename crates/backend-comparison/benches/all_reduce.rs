@@ -11,14 +11,14 @@ use burn::{
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct AllReduceBenchmark<B: Backend, const D: usize> {
+pub struct AllReduceBenchmark<B: Backend> {
     shape: Shape,
     devices: Vec<B::Device>,
 }
 
-impl<B: Backend + DistributedBackend, const D: usize> Benchmark for AllReduceBenchmark<B, D> {
-    type Input = Vec<Tensor<B, D>>;
-    type Output = Vec<Tensor<B, D>>;
+impl<B: Backend + DistributedBackend> Benchmark for AllReduceBenchmark<B> {
+    type Input = Vec<Tensor<B, 3>>;
+    type Output = Vec<Tensor<B, 3>>;
 
     fn name(&self) -> String {
         format!("to_device-{:?}", B::FloatElem::dtype()).to_lowercase()
