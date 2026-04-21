@@ -358,8 +358,8 @@ macro_rules! bench_on_backend_multi_device {
             #[cfg(feature = "legacy-v16")]
             use burn::backend::CudaJit as Cuda;
 
-            let type_id = 10u16;
-            let devices = create_devices::<Cuda<f32>>(type_id);
+            let type_id = 0u16;
+            let devices = create_devices::<Cuda<$dtype>>(type_id);
             $crate::bench_on_backend_multi_device!($fn_name, Cuda<$dtype>, devices);
         }
 
@@ -367,16 +367,14 @@ macro_rules! bench_on_backend_multi_device {
         {
             use burn::backend::Metal;
 
-            let device = Default::default();
-            $crate::bench_on_backend!($fn_name, Metal<$dtype>, device);
+            let type_id = 0u16;
+            let devices = create_devices::<Metal<$dtype>>(type_id);
+            $crate::bench_on_backend!($fn_name, Metal<$dtype>, devices);
         }
 
         #[cfg(feature = "cpu")]
         {
-            use burn::backend::Cpu;
-
-            let device = Default::default();
-            $crate::bench_on_backend!($fn_name, Cpu<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on cpu.");
         }
 
         #[cfg(all(target_os = "macos", feature = "vulkan"))]
@@ -388,64 +386,44 @@ macro_rules! bench_on_backend_multi_device {
         {
             use burn::backend::Wgpu;
 
-            let device = Default::default();
-            $crate::bench_on_backend!($fn_name, Wgpu<$dtype>, device);
+            let type_id = 0u16;
+            let devices = create_devices::<Wgpu<$dtype>>(type_id);
+            $crate::bench_on_backend!($fn_name, Wgpu<$dtype>, devices);
         }
 
         #[cfg(feature = "ndarray")]
         {
-            use burn::backend::NdArray;
-
-            let device = Default::default();
-            $crate::bench_on_backend!($fn_name, NdArray<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on ndarray");
         }
 
         #[cfg(feature = "tch-cpu")]
         {
-            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
-
-            let device = LibTorchDevice::Cpu;
-            $crate::bench_on_backend!($fn_name, LibTorch<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on torch");
         }
 
         #[cfg(feature = "tch-cuda")]
         {
-            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
-
-            let device = LibTorchDevice::Cuda(0);
-            $crate::bench_on_backend!($fn_name, LibTorch<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on torch");
         }
 
         #[cfg(feature = "tch-metal")]
         {
-            use burn::backend::{LibTorch, libtorch::LibTorchDevice};
-
-            let device = LibTorchDevice::Mps;
-            $crate::bench_on_backend!($fn_name, LibTorch<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on torch");
         }
 
         #[cfg(feature = "candle-cpu")]
         {
-            use burn::backend::candle::{Candle, CandleDevice};
-
-            let device = CandleDevice::Cpu;
-            $crate::bench_on_backend!($fn_name, Candle<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on candle");
         }
 
         #[cfg(feature = "candle-cuda")]
         {
-            use burn::backend::candle::{Candle, CandleDevice};
-
-            let device = CandleDevice::cuda(0);
-            $crate::bench_on_backend!($fn_name, Candle<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on candle");
         }
 
         #[cfg(feature = "candle-metal")]
         {
-            use burn::backend::candle::{Candle, CandleDevice};
-
-            let device = CandleDevice::metal(0);
-            $crate::bench_on_backend!($fn_name, Candle<$dtype>, device);
+            panic!("Multi-device benchmarks are not supported on candle");
         }
 
         #[cfg(feature = "rocm")]
@@ -455,8 +433,9 @@ macro_rules! bench_on_backend_multi_device {
             #[cfg(not(feature = "legacy-v16"))]
             use burn::backend::Rocm;
 
-            let device = Default::default();
-            $crate::bench_on_backend!($fn_name, Rocm<$dtype>, device);
+            let type_id = 0u16;
+            let devices = create_devices::<Rocm<$dtype>>(type_id);
+            $crate::bench_on_backend!($fn_name, Rocm<$dtype>, devices);
         }
     }};
 
