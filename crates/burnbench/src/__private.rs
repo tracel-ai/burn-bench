@@ -369,7 +369,7 @@ macro_rules! bench_on_backend_multi_device {
 
             let type_id = 0u16;
             let devices = create_devices::<Metal<$dtype>>(type_id);
-            $crate::bench_on_backend!($fn_name, Metal<$dtype>, devices);
+            $crate::bench_on_backend_multi_device!($fn_name, Metal<$dtype>, devices);
         }
 
         #[cfg(feature = "cpu")]
@@ -388,7 +388,7 @@ macro_rules! bench_on_backend_multi_device {
 
             let type_id = 0u16;
             let devices = create_devices::<Wgpu<$dtype>>(type_id);
-            $crate::bench_on_backend!($fn_name, Wgpu<$dtype>, devices);
+            $crate::bench_on_backend_multi_device!($fn_name, Wgpu<$dtype>, devices);
         }
 
         #[cfg(feature = "ndarray")]
@@ -435,7 +435,7 @@ macro_rules! bench_on_backend_multi_device {
 
             let type_id = 0u16;
             let devices = create_devices::<Rocm<$dtype>>(type_id);
-            $crate::bench_on_backend!($fn_name, Rocm<$dtype>, devices);
+            $crate::bench_on_backend_multi_device!($fn_name, Rocm<$dtype>, devices);
         }
     }};
 
