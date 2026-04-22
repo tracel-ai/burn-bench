@@ -52,7 +52,7 @@ serial_test = "3.2.0"
 # Build
 cfg-if = "1.0.0"
 semver = "1.0.26"
-tempfile = "3.17.1"
+tempfile = "3.24.0"
 
 
 [profile.dev]
