@@ -311,3 +311,201 @@ macro_rules! bench_on_backend {
         __save_result(benches, backend_name, device_name, url, token, feature_name);
     };
 }
+
+#[macro_export]
+macro_rules! bench_on_backend_multi_device {
+    () => {{
+        $crate::define_types!();
+
+        #[cfg(feature = "f32")]
+        {
+            $crate::bench_on_backend_multi_device!(bench, f32)
+        }
+
+        #[cfg(feature = "f16")]
+        {
+            $crate::bench_on_backend_multi_device!(bench, burn::tensor::f16)
+        }
+
+        #[cfg(feature = "bf16")]
+        {
+            $crate::bench_on_backend_multi_device!(bench, burn::tensor::bf16)
+        }
+
+        #[cfg(feature = "flex32")]
+        {
+            $crate::bench_on_backend_multi_device!(bench, burn::tensor::flex32)
+        }
+    }};
+
+    ($fn_name:ident, $dtype:ty) => {{
+        $crate::__private::init_log().unwrap();
+        use burn::prelude::DeviceOps;
+        use burn::tensor::backend::{Device, DeviceId};
+        use std::env;
+
+        fn create_devices<B: Backend>(type_id: u16) -> Vec<B::Device> {
+            let device_count = B::device_count(type_id);
+            (0..device_count)
+                .map(|i| <B::Device>::from_id(DeviceId::new(type_id, i as u16)))
+                .collect()
+        }
+
+        #[cfg(feature = "cuda")]
+        {
+            #[cfg(not(feature = "legacy-v16"))]
+            use burn::backend::Cuda;
+            #[cfg(feature = "legacy-v16")]
+            use burn::backend::CudaJit as Cuda;
+
+            let type_id = 0u16;
+            let devices = create_devices::<Cuda<$dtype>>(type_id);
+            $crate::bench_on_backend_multi_device!($fn_name, Cuda<$dtype>, devices);
+        }
+
+        #[cfg(feature = "metal")]
+        {
+            use burn::backend::Metal;
+
+            let type_id = 0u16;
+            let devices = create_devices::<Metal<$dtype>>(type_id);
+            $crate::bench_on_backend_multi_device!($fn_name, Metal<$dtype>, devices);
+        }
+
+        #[cfg(feature = "cpu")]
+        {
+            panic!("Multi-device benchmarks are not supported on cpu.");
+        }
+
+        #[cfg(all(target_os = "macos", feature = "vulkan"))]
+        {
+            panic!("vulkan benchmarks are not supported on macOS, use the wgpu backend instead.");
+        }
+
+        #[cfg(any(feature = "wgpu", feature = "vulkan"))]
+        {
+            use burn::backend::Wgpu;
+
+            let type_id = 0u16;
+            let devices = create_devices::<Wgpu<$dtype>>(type_id);
+            $crate::bench_on_backend_multi_device!($fn_name, Wgpu<$dtype>, devices);
+        }
+
+        #[cfg(feature = "ndarray")]
+        {
+            panic!("Multi-device benchmarks are not supported on ndarray");
+        }
+
+        #[cfg(feature = "tch-cpu")]
+        {
+            panic!("Multi-device benchmarks are not supported on torch");
+        }
+
+        #[cfg(feature = "tch-cuda")]
+        {
+            panic!("Multi-device benchmarks are not supported on torch");
+        }
+
+        #[cfg(feature = "tch-metal")]
+        {
+            panic!("Multi-device benchmarks are not supported on torch");
+        }
+
+        #[cfg(feature = "candle-cpu")]
+        {
+            panic!("Multi-device benchmarks are not supported on candle");
+        }
+
+        #[cfg(feature = "candle-cuda")]
+        {
+            panic!("Multi-device benchmarks are not supported on candle");
+        }
+
+        #[cfg(feature = "candle-metal")]
+        {
+            panic!("Multi-device benchmarks are not supported on candle");
+        }
+
+        #[cfg(feature = "rocm")]
+        {
+            #[cfg(feature = "legacy-v16")]
+            use burn::backend::HipJit as Hip;
+            #[cfg(not(feature = "legacy-v16"))]
+            use burn::backend::Rocm;
+
+            let type_id = 0u16;
+            let devices = create_devices::<Rocm<$dtype>>(type_id);
+            $crate::bench_on_backend_multi_device!($fn_name, Rocm<$dtype>, devices);
+        }
+    }};
+
+    ($fn_name:ident, $backend:ty, $devices:ident) => {
+        let args: Vec<String> = env::args().collect();
+        let url = $crate::__private::get_sharing_url(&args);
+        let token = $crate::__private::get_sharing_token(&args);
+
+        #[cfg(feature = "candle-accelerate")]
+        let feature_name = "candle-accelerate";
+        #[cfg(feature = "candle-cpu")]
+        let feature_name = "candle-cpu";
+        #[cfg(feature = "cpu")]
+        let feature_name = "cpu";
+        #[cfg(feature = "cpu-fusion")]
+        let feature_name = "cpu-fusion";
+        #[cfg(feature = "candle-cuda")]
+        let feature_name = "candle-cuda";
+        #[cfg(feature = "candle-metal")]
+        let feature_name = "candle-metal";
+        #[cfg(feature = "ndarray")]
+        let feature_name = "ndarray";
+        #[cfg(feature = "ndarray-simd")]
+        let feature_name = "ndarray-simd";
+        #[cfg(feature = "ndarray-blas-accelerate")]
+        let feature_name = "ndarray-blas-accelerate";
+        #[cfg(feature = "ndarray-blas-netlib")]
+        let feature_name = "ndarray-blas-netlib";
+        #[cfg(feature = "ndarray-blas-openblas")]
+        let feature_name = "ndarray-blas-openblas";
+        #[cfg(feature = "tch-cpu")]
+        let feature_name = "tch-cpu";
+        #[cfg(feature = "tch-cuda")]
+        let feature_name = "tch-cuda";
+        #[cfg(feature = "tch-metal")]
+        let feature_name = "tch-metal";
+        #[cfg(feature = "wgpu")]
+        let feature_name = "wgpu";
+        #[cfg(feature = "wgpu-fusion")]
+        let feature_name = "wgpu-fusion";
+        #[cfg(feature = "vulkan")]
+        let feature_name = "vulkan";
+        #[cfg(feature = "vulkan-fusion")]
+        let feature_name = "vulkan-fusion";
+        #[cfg(feature = "metal")]
+        let feature_name = "metal";
+        #[cfg(feature = "metal-fusion")]
+        let feature_name = "metal-fusion";
+        #[cfg(feature = "cuda")]
+        let feature_name = "cuda";
+        #[cfg(feature = "cuda-fusion")]
+        let feature_name = "cuda-fusion";
+        #[cfg(feature = "rocm")]
+        let feature_name = "rocm";
+        #[cfg(feature = "rocm-fusion")]
+        let feature_name = "rocm-fusion";
+
+        let devices_name = format!("{:?}", &$devices);
+        #[cfg(not(feature = "legacy-v16"))]
+        let backend_name = <$backend as Backend>::name(&$devices.first().unwrap());
+        #[cfg(feature = "legacy-v16")]
+        let backend_name = <$backend as Backend>::name();
+        let benches = $fn_name::<$backend>(&$devices);
+        __save_result(
+            benches,
+            backend_name,
+            devices_name,
+            url,
+            token,
+            feature_name,
+        );
+    };
+}
