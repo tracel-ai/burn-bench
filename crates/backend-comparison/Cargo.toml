@@ -98,6 +98,11 @@ name = "binary"
 
 [[bench]]
 harness = false
+name = "launch-overhead"
+path = "benches/launch_overhead.rs"
+
+[[bench]]
+harness = false
 name = "max-pool2d"
 path = "benches/max_pool2d.rs"
 

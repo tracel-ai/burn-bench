@@ -1,15 +1,18 @@
-[profiling]
+[fusion]
+logger = { file = "/tmp/fusion.log", level = "full", stdout = true }
+
+[cubecl.profiling]
 logger = { file = "/tmp/profiling.log", level = "disabled" }
 
-[autotune]
+[cubecl.autotune]
 logger = { file = "/tmp/autotune.log", level = "disabled" }
 
-[compilation]
+[cubecl.compilation]
 logger = { file = "/tmp/compilation.log", level = "disabled" }
 cache = "target"
 
-[memory]
+[cubecl.memory]
 logger = { file = "/tmp/memory.log", level = "disabled" }
 
-[streaming]
+[cubecl.streaming]
 max_streams = 4
