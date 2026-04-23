@@ -6,7 +6,6 @@ pub struct LaunchOverhead<B: Backend, const D: usize> {
     device: B::Device,
     repetition: usize,
     num_threads: usize,
-    scoped: bool,
 }
 
 impl<B: Backend, const D: usize> Benchmark for LaunchOverhead<B, D> {
@@ -15,11 +14,10 @@ impl<B: Backend, const D: usize> Benchmark for LaunchOverhead<B, D> {
 
     fn name(&self) -> String {
         format!(
-            "launch-overhead-{:?}-reps-{}-threads-{}-{}",
+            "launch-overhead-{:?}-reps-{}-threads-{}",
             B::FloatElem::dtype(),
             self.repetition,
             self.num_threads,
-            self.scoped,
         )
         .to_lowercase()
     }
@@ -29,13 +27,7 @@ impl<B: Backend, const D: usize> Benchmark for LaunchOverhead<B, D> {
     }
 
     fn execute(&self, input: Self::Input) -> Self::Output {
-        if self.scoped {
-            // We use memory_persistent_allocations since it put all the code executing on the
-            // server's thread.
-            B::memory_persistent_allocations(&self.device, input, |input| self.execute_inner(input))
-        } else {
-            self.execute_inner(input)
-        }
+        self.execute_inner(input)
     }
 
     fn prepare(&self) -> Self::Input {
@@ -114,7 +106,6 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
                     device: device.clone(),
                     repetition,
                     num_threads,
-                    scoped: false,
                 };
                 results.push(run_benchmark(benchmark));
             }
