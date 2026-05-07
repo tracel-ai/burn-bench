@@ -41,7 +41,7 @@ mod distributed_benchmarks {
                 recvs.push(result_recv);
                 let config_cloned = config.clone();
                 std::thread::spawn(move || {
-                    let peer_id = PeerId::from(tensor.device().id().index_id);
+                    let peer_id = PeerId::from(tensor.device().id().index_id as u32);
                     burn::collective::register::<B>(peer_id, tensor.device(), config_cloned)
                         .unwrap();
 
