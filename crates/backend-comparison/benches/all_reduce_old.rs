@@ -62,6 +62,9 @@ mod distributed_benchmarks {
 
             for recv in recvs {
                 let tensor = recv.recv().unwrap();
+                let data = tensor.to_data();
+                println!("tensor: {tensor}");
+                println!("data: {data}");
                 out.push(tensor);
             }
             out
