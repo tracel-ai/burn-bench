@@ -67,6 +67,7 @@ mod distributed_benchmarks {
 
         fn prepare(&self) -> Self::Input {
             let collective_config = CollectiveConfig::default()
+                .with_num_devices(self.devices.len())
                 .with_local_all_reduce_strategy(AllReduceStrategy::Tree(2));
 
             (
