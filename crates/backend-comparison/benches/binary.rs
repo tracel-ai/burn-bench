@@ -1,96 +1,96 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
-use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
-use rand::{
-    SeedableRng as _,
-    rngs::{StdRng, SysRng},
-};
-use std::marker::PhantomData;
+// use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+// use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
+// use rand::{
+//     SeedableRng as _,
+//     rngs::{StdRng, SysRng},
+// };
+// use std::marker::PhantomData;
 
-pub struct BinaryBenchmark<B: Backend, const D: usize> {
-    shape: Shape,
-    device: B::Device,
-}
+// pub struct BinaryBenchmark<B: Backend, const D: usize> {
+//     shape: Shape,
+//     device: B::Device,
+// }
 
-impl<B: Backend, const D: usize> Benchmark for BinaryBenchmark<B, D> {
-    type Input = (Tensor<B, D>, Tensor<B, D>);
-    type Output = Tensor<B, D>;
+// impl<B: Backend, const D: usize> Benchmark for BinaryBenchmark<B, D> {
+//     type Input = (Tensor<B, D>, Tensor<B, D>);
+//     type Output = Tensor<B, D>;
 
-    fn name(&self) -> String {
-        format!("binary-{:?}", B::FloatElem::dtype()).to_lowercase()
-    }
+//     fn name(&self) -> String {
+//         format!("binary-{:?}", B::FloatElem::dtype()).to_lowercase()
+//     }
 
-    fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.to_vec()]
-    }
+//     fn shapes(&self) -> Vec<Vec<usize>> {
+//         vec![self.shape.to_vec()]
+//     }
 
-    fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
-        lhs.mul(rhs)
-    }
+//     fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
+//         lhs.mul(rhs)
+//     }
 
-    fn prepare(&self) -> Self::Input {
-        let lhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
-        let rhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
+//     fn prepare(&self) -> Self::Input {
+//         let lhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
+//         let rhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
 
-        (lhs, rhs)
-    }
+//         (lhs, rhs)
+//     }
 
-    fn sync(&self) {
-        B::sync(&self.device).unwrap();
-    }
-}
+//     fn sync(&self) {
+//         B::sync(&self.device).unwrap();
+//     }
+// }
 
-pub struct BinaryScalarBenchmark<B: Backend, const D: usize, E: Element> {
-    shape: Shape,
-    device: B::Device,
-    _ty: PhantomData<E>,
-}
+// pub struct BinaryScalarBenchmark<B: Backend, const D: usize, E: Element> {
+//     shape: Shape,
+//     device: B::Device,
+//     _ty: PhantomData<E>,
+// }
 
-impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark<B, D, E> {
-    type Input = (Tensor<B, D>, E);
-    type Output = Tensor<B, D>;
+// impl<B: Backend, const D: usize, E: Element> Benchmark for BinaryScalarBenchmark<B, D, E> {
+//     type Input = (Tensor<B, D>, E);
+//     type Output = Tensor<B, D>;
 
-    fn name(&self) -> String {
-        format!("binary_scalar-{:?}", B::FloatElem::dtype()).to_lowercase()
-    }
+//     fn name(&self) -> String {
+//         format!("binary_scalar-{:?}", B::FloatElem::dtype()).to_lowercase()
+//     }
 
-    fn shapes(&self) -> Vec<Vec<usize>> {
-        vec![self.shape.to_vec()]
-    }
+//     fn shapes(&self) -> Vec<Vec<usize>> {
+//         vec![self.shape.to_vec()]
+//     }
 
-    fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
-        lhs.mul_scalar(rhs)
-    }
+//     fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
+//         lhs.mul_scalar(rhs)
+//     }
 
-    fn prepare(&self) -> Self::Input {
-        let lhs = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);
-        let rhs = E::random(
-            Distribution::Default,
-            &mut StdRng::try_from_rng(&mut SysRng).unwrap(),
-        );
+//     fn prepare(&self) -> Self::Input {
+//         let lhs = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);
+//         let rhs = E::random(
+//             Distribution::Default,
+//             &mut StdRng::try_from_rng(&mut SysRng).unwrap(),
+//         );
 
-        (lhs, rhs)
-    }
+//         (lhs, rhs)
+//     }
 
-    fn sync(&self) {
-        B::sync(&self.device).unwrap();
-    }
-}
+//     fn sync(&self) {
+//         B::sync(&self.device).unwrap();
+//     }
+// }
 
-#[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
-    let benchmark = BinaryBenchmark::<B, 3> {
-        shape: [512, 512, 1024].into(),
-        device: device.clone(),
-    };
-    let benchmark_scalar = BinaryScalarBenchmark::<B, 3, B::FloatElem> {
-        shape: [512, 512, 1024].into(),
-        device: device.clone(),
-        _ty: PhantomData,
-    };
+// #[allow(dead_code)]
+// fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+//     let benchmark = BinaryBenchmark::<B, 3> {
+//         shape: [512, 512, 1024].into(),
+//         device: device.clone(),
+//     };
+//     let benchmark_scalar = BinaryScalarBenchmark::<B, 3, B::FloatElem> {
+//         shape: [512, 512, 1024].into(),
+//         device: device.clone(),
+//         _ty: PhantomData,
+//     };
 
-    vec![run_benchmark(benchmark), run_benchmark(benchmark_scalar)]
-}
+//     vec![run_benchmark(benchmark), run_benchmark(benchmark_scalar)]
+// }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    // burnbench::bench_on_backend!();
 }

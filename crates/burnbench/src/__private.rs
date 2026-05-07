@@ -345,9 +345,9 @@ macro_rules! bench_on_backend_multi_device {
         use std::env;
 
         fn create_devices<B: Backend>(type_id: u16) -> Vec<B::Device> {
-            let device_count = B::device_count(type_id);
+            let device_count = B::Device::device_count(type_id);
             (0..device_count)
-                .map(|i| <B::Device>::from_id(DeviceId::new(type_id, i as u16)))
+                .map(|i| <B::Device>::from_id(DeviceId::new(type_id, i as u32)))
                 .collect()
         }
 
