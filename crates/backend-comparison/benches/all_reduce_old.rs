@@ -55,6 +55,8 @@ mod distributed_benchmarks {
                     result_send
                         .send(Tensor::new(TensorPrimitive::Float(result)))
                         .unwrap();
+
+                    burn::collective::finish_collective::<B>(peer_id).unwrap();
                 });
             }
 
