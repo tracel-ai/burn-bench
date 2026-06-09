@@ -18,21 +18,25 @@ identify regressions, improvements, and the best backend for a given workload.
 To run backend performance benchmarks, use the `burnbench` CLI:
 
 ```sh
-cargo run --release --bin burnbench -- run --benches unary --backends wgpu-fusion
+cargo run --release --bin burnbench -- run --benches unary --device wgpu
 ```
 
 Or use the shorthand alias:
 
 ```sh
-cargo bb run -b unary -B wgpu-fusion
+cargo bb run -b unary -D wgpu
 ```
+
+The device selects the backend at runtime; picking several (`--device wgpu cuda`) does not add
+builds. Compile-time framework decorators are chosen with `--build` (e.g. compare fusion on/off with
+`--build default no-fusion`).
 
 This will use the main branch of Burn by default.
 
 To benchmark performance across version(s):
 
 ```sh
-cargo bb run -b unary -B wgpu-fusion -V 0.18.0 main local
+cargo bb run -b unary -D wgpu -V 0.18.0 main local
 ```
 
 You can specify one or more versions and provide custom `burnbench` arguments to benchmark them.
@@ -65,7 +69,7 @@ cargo run --release --bin burnbench -- auth
 Then share results with:
 
 ```sh
-cargo bb run --share --benches unary --backends wgpu-fusion
+cargo bb run --share --benches unary --device wgpu
 ```
 
 ## Development
@@ -96,7 +100,8 @@ rust_toolchain = "stable"
 rust_version = "stable"
 
 [burn-bench]
-backends = ["wgpu"]
+devices = ["wgpu"]
+builds = ["default"]
 benches = ["matmul"]
 dtypes = ["f32"]
 ```

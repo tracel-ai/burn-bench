@@ -54,33 +54,37 @@ Available Backends:
 
 #### Run benchmarks
 
-To run a given benchmark against a specific backend we use the `run` command with the arguments
-`--benches` and `--backends` respectively. In the following example we execute the `unary` benchmark
-against the `wgpu-fusion` backend:
+To run a given benchmark we use the `run` command with the arguments `--benches` and `--device`. The
+device selects the backend at runtime. In the following example we execute the `unary` benchmark on
+the `wgpu` device:
 
 ```sh
-> cargo run --release --bin burnbench -- run --benches unary --backends wgpu-fusion
+> cargo run --release --bin burnbench -- run --benches unary --device wgpu
 ```
 
 Shorthands can be used, the following command line is the same:
 
 ```sh
-> cargo run --release --bin burnbench -- run -b unary -B wgpu-fusion
+> cargo run --release --bin burnbench -- run -b unary -D wgpu
 ```
 
-Multiple benchmarks and backends can be passed on the same command line. In this case, all the
-combinations of benchmarks with backends will be executed.
+Multiple benchmarks and devices can be passed on the same command line. Selecting more devices does
+not add builds — they all run on the same binary:
 
 ```sh
-> cargo run --bin burnbench -- run --benches unary binary --backends wgpu-fusion tch-cuda
-     Running `target/release/burnbench run --benches unary binary --backends wgpu-fusion wgpu`
-Executing the following benchmark and backend combinations (Total: 4):
-- Benchmark: unary, Backend: wgpu-fusion
-- Benchmark: binary, Backend: wgpu-fusion
-- Benchmark: unary, Backend: tch-cuda
-- Benchmark: binary, Backend: tch-cuda
-Running benchmarks...
+> cargo run --bin burnbench -- run --benches unary binary --device wgpu cuda
 ```
+
+Compile-time framework decorators are a separate concern, selected with `--build` (default
+`default`). Each profile is its own build, so this is how you compare e.g. fusion on vs off in a
+single report:
+
+```sh
+> cargo run --bin burnbench -- run --benches matmul --device vulkan --build default no-fusion
+```
+
+The number of builds is `benches × build profiles`; devices and dtypes are runtime reruns. Available
+build profiles: `default`, `no-fusion`, `no-autotune`, `no-anything`.
 
 By default `burnbench` uses a compact output with a progress bar which hides the compilation logs
 and benchmarks results as they are executed. If a benchmark failed to run, the `--verbose` flag can
@@ -96,7 +100,7 @@ Sharing results is opt-in and it is enabled with the `--share` arguments passed 
 command:
 
 ```sh
-> cargo run --release --bin burnbench -- run --share --benches unary --backends wgpu-fusion
+> cargo run --release --bin burnbench -- run --share --benches unary --device wgpu
 ```
 
 To be able to upload results you must be authenticated. We only support GitHub authentication. To
@@ -125,11 +129,15 @@ the application again except if your refresh token itself becomes invalid.
 
 ## Execute benchmarks with cargo
 
-To execute a benchmark against a given backend using only cargo is done with the `bench` command. In
-this case the backend is a feature of your crate.
+Using only cargo, the device is injected at runtime via `--device`, and the compile-time build
+profile is selected with cargo features (the `--build` profiles map to feature sets):
 
 ```sh
-> cargo bench --features wgpu-fusion
+# default profile (fusion + autotune) on the wgpu device
+> cargo bench --bench unary -- --device wgpu --dtype f32
+
+# no-fusion profile
+> cargo bench --bench unary --no-default-features --features autotune -- --device wgpu
 ```
 
 ## Add a new benchmark
@@ -143,24 +151,30 @@ harness = false
 ```
 
 Create a new file `mybench.rs` in the `benches` directory and implement the `Benchmark` trait over
-your benchmark structure. Then implement the `bench` function. At last call the macro
-`backend_comparison::bench_on_backend!()` in the `main` function.
+your benchmark structure. Then implement a `fn bench(device: &Device) -> Vec<BenchmarkResult>`. In
+`main`, inject the device and save the results:
 
-## Add a new backend
-
-You can easily register a new backend in the `BackendValues` enumeration:
-
-```rs
-
-#[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Display, EnumIter)]
-pub(crate) enum BackendValues {
-    // ...
-    #[strum(to_string = "mybackend")]
-    MyBackend,
-    // ...
+```rust
+fn main() {
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }
 ```
 
-Then update the macro `bench_on_backend` to support the newly registered backend.
+## Add a new device
+
+You can register a new device in the `DeviceValues` enumeration and map it to a `Device` in
+`backend_comparison::select_device` (in `backend-comparison/src/lib.rs`):
+
+```rs
+#[derive(Debug, Clone, PartialEq, Eq, ValueEnum, Display, EnumIter)]
+enum DeviceValues {
+    // ...
+    #[strum(to_string = "mydevice")]
+    MyDevice,
+    // ...
+}
+```
 
 [1]: https://burn.dev/benchmarks/community-benchmarks

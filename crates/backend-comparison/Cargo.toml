@@ -9,21 +9,27 @@ readme = "README.md"
 repository = "https://github.com/tracel-ai/burn-bench/tree/main/backend-comparison"
 version = "0.1.0"
 
-# Backends are no longer selected through feature flags: every backend that can
-# be compiled on the host is linked in by default (see the OS-conditional `burn`
-# dependency below) and the concrete backend is picked at runtime by injecting
-# the right `Device`. The features below only control compile-time decorators
-# (`fusion`), backends that need external libraries (`tch`, BLAS variants), and
-# special benchmark capabilities.
+# Two orthogonal concerns are kept separate:
+#
+# * Backend (the *device*) is a runtime choice. Every backend that can be
+#   compiled on the host is linked in by default (see the OS-conditional `burn`
+#   dependency below) and the concrete one is picked at runtime by injecting the
+#   right `Device`. Selecting more devices never adds builds.
+#
+# * Framework decorators (`fusion`, `autotune`) are compile-time, so each
+#   combination is a separate build. They are default-on features that the
+#   runner toggles through `--build` profiles (e.g. `no-fusion`). `std` is not
+#   toggleable here: the always-linked GPU backends require it.
 [features]
-default = []
+default = ["fusion", "autotune"]
 
-# Kernel fusion is a compile-time backend decorator (no runtime toggle), so the
-# fused variants require a dedicated build.
+# Compile-time framework decorators, toggled via `--build` profiles.
 fusion = ["burn/fusion"]
+autotune = ["burn/autotune"]
 
 # Backends that depend on external libraries, kept opt-in so the default build
-# stays self-contained.
+# stays self-contained. `tch` is enabled automatically by the runner when a
+# `tch-*` device is requested.
 tch = ["burn/tch"]
 ndarray-simd = ["burn/simd"]
 ndarray-blas-accelerate = ["burn/accelerate"]
@@ -39,12 +45,12 @@ server = ["burn/server"]
 [dependencies]
 # Backends that compile cleanly on every platform are always enabled; the
 # concrete one is selected at runtime via the device. Platform-specific backends
-# are enabled through the target-conditional tables below.
-# burn = { path = "../../../burn/crates/burn", default-features = false }
+# are enabled through the target-conditional tables below. `fusion`/`autotune`
+# are intentionally *not* listed here: they are toggleable `--build` features.
+# burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
 burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
     "std",
     "autodiff",
-    "autotune",
     "wgpu",
     "webgpu",
     "cpu",

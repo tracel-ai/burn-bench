@@ -5,9 +5,9 @@ on:
     # note: by design GitHub workflow dispatch events are limited to 10 inputs
     inputs:
       burn_bench_config_json:
-        description: "JSON config with backends, benches, dtypes, and versions"
+        description: "JSON config with devices, builds, benches, dtypes, and versions"
         required: false
-        default: '{"backends":["wgpu-fusion"],"benches":["matmul"],"dtypes":["f16"],"versions":["main"]}'
+        default: '{"devices":["wgpu"],"builds":["default"],"benches":["matmul"],"dtypes":["f16"],"versions":["main"]}'
       gcp_gpu_attached:
         description: "Must be true if the machine type has a GPU attached"
         type: boolean
@@ -116,7 +116,8 @@ jobs:
         id: burn_bench_config_json
         run: |
           echo '${{ inputs.burn_bench_config_json }}' > config.json
-          echo "BACKENDS=$(jq -r '.backends | join(" ")' config.json)" >> $GITHUB_ENV
+          echo "DEVICES=$(jq -r '(.devices // .backends) | join(" ")' config.json)" >> $GITHUB_ENV
+          echo "BUILDS=$(jq -r '(.builds // ["default"]) | join(" ")' config.json)" >> $GITHUB_ENV
           echo "BENCHES=$(jq -r '.benches | join(" ")' config.json)" >> $GITHUB_ENV
           echo "DTYPES=$(jq -r '.dtypes | join(" ")' config.json)" >> $GITHUB_ENV
           echo "VERSIONS=$(jq -r '.versions | join(" ")' config.json)" >> $GITHUB_ENV
@@ -124,7 +125,8 @@ jobs:
       - name: Print configuration
         run: |
           echo "Versions: $VERSIONS"
-          echo "Backends: $BACKENDS"
+          echo "Devices: $DEVICES"
+          echo "Builds: $BUILDS"
           echo "DTypes: $DTYPES"
           echo "Benchmarks: $BENCHES"
           echo "Repository: ${{ inputs.repo_full }}"
@@ -174,4 +176,4 @@ jobs:
           WEBHOOK_INPUTS_FILE: ${{ env.INPUTS_FILE }}
           WEBHOOK_PAYLOAD_SECRET: ${{ secrets.WEBHOOK_PAYLOAD_SECRET }}
         run: |
-          cargo bb run -b $BENCHES -B $BACKENDS -V $VERSIONS -v -d $DTYPES --share
+          cargo bb run -b $BENCHES -D $DEVICES --build $BUILDS -V $VERSIONS -v -d $DTYPES --share

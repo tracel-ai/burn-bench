@@ -18,7 +18,7 @@ impl fmt::Display for FailedBenchmark {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Run the benchmark with verbose enabled to see the error:\ncargo run --bin burnbench -- run --benches {} --backends {} --verbose",
+            "Run the benchmark with verbose enabled to see the error:\ncargo run --bin burnbench -- run --benches {} --verbose\n(failed on {})",
             self.bench, self.backend
         )
     }

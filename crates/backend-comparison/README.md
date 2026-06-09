@@ -4,22 +4,36 @@ This crate defines a set of benchmarks to run with `burnbench`.
 
 ## Run benchmarks
 
-To run a given benchmark against a specific backend we use the `run` command with the arguments
-`--benches` and `--backends` respectively. In the following example we execute the `unary` benchmark
-against the `wgpu-fusion` backend:
+To run a given benchmark we use the `run` command with the arguments `--benches` and `--device`. The
+device selects the backend at runtime. In the following example we execute the `unary` benchmark on
+the `wgpu` device:
 
 ```sh
-> cargo bb run --benches unary --backends wgpu-fusion
+> cargo bb run --benches unary --device wgpu
 ```
 
 Shorthands can be used, the following command line is the same:
 
 ```sh
-> cargo bb -- run -b unary -B wgpu-fusion
+> cargo bb -- run -b unary -D wgpu
 ```
 
-Multiple benchmarks and backends can be passed on the same command line. In this case, all the
-combinations of benchmarks with backends will be executed.
+Selecting several devices does **not** add builds — they all run on the same binary:
+
+```sh
+> cargo bb run --benches unary --device wgpu cuda vulkan
+```
+
+Compile-time framework decorators are selected with `--build` (default `default`). This is how you
+compare, for example, fusion on vs off — each profile is a separate build, but both appear in the
+same comparison table:
+
+```sh
+> cargo bb run --benches matmul --device vulkan --build default no-fusion
+```
+
+Available build profiles: `default`, `no-fusion`, `no-autotune`, `no-anything`. The number of builds
+is `benches × build profiles`; devices and dtypes are runtime reruns of those builds.
 
 By default `burnbench` uses a compact output with a progress bar which hides the compilation logs
 and benchmarks results as they are executed. If a benchmark failed to run, the `--verbose` flag can
@@ -35,7 +49,7 @@ Sharing results is opt-in and it is enabled with the `--share` arguments passed 
 command:
 
 ```sh
-> cargo bb run --share --benches unary --backends wgpu-fusion
+> cargo bb run --share --benches unary --device wgpu
 ```
 
 To be able to upload results you must be authenticated. We only support GitHub authentication. To

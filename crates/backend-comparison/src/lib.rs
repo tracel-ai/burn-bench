@@ -18,7 +18,8 @@ use burnbench::{BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, save_reco
 const DEFAULT_DEVICE: &str = "ndarray";
 
 /// Returns the raw backend label passed via `--device` (e.g. `cuda`,
-/// `wgpu-fusion`, `tch-cpu`). The label is recorded as-is in the results.
+/// `tch-cpu`). The device selects the backend at runtime; it is independent
+/// from the compile-time `--build` profile.
 fn device_label() -> String {
     let args: Vec<String> = std::env::args().collect();
     get_argument(&args, "--device")
@@ -26,10 +27,14 @@ fn device_label() -> String {
         .to_string()
 }
 
-/// Strips the `-fusion` suffix: fusion is a compile-time decorator (enabled
-/// through the `fusion` feature), so it does not change which device is built.
-fn base_label(label: &str) -> &str {
-    label.strip_suffix("-fusion").unwrap_or(label)
+/// Returns the compile-time build profile requested via `--build` (e.g.
+/// `default`, `no-fusion`). It is recorded in the result's `feature` column and
+/// does not affect which device is selected.
+fn build_label() -> String {
+    let args: Vec<String> = std::env::args().collect();
+    get_argument(&args, "--build")
+        .unwrap_or("default")
+        .to_string()
 }
 
 /// Returns the floating point dtype requested via `--dtype` (default `f32`).
@@ -87,8 +92,7 @@ fn build_device(base: &str) -> Device {
     }
 }
 
-/// Maps a base backend label to the [`DeviceType`] used for multi-device
-/// enumeration.
+/// Maps a device label to the [`DeviceType`] used for multi-device enumeration.
 fn device_type(base: &str) -> DeviceType {
     // The `DeviceType` variants are gated by the same backend features as the
     // device factories, so the arms mirror `build_device`'s `cfg` gating.
@@ -115,8 +119,7 @@ fn device_type(base: &str) -> DeviceType {
 /// Selects and configures the [`Device`] requested by the runtime arguments.
 pub fn select_device() -> Device {
     let _ = init_log();
-    let label = device_label();
-    let mut device = build_device(base_label(&label));
+    let mut device = build_device(&device_label());
     configure_dtype(&mut device, dtype_arg());
     device
 }
@@ -125,9 +128,8 @@ pub fn select_device() -> Device {
 /// for multi-device benchmarks.
 pub fn select_devices() -> Vec<Device> {
     let _ = init_log();
-    let label = device_label();
     let dtype = dtype_arg();
-    let mut devices: Vec<Device> = Device::enumerate(device_type(base_label(&label)))
+    let mut devices: Vec<Device> = Device::enumerate(device_type(&device_label()))
         .iter()
         .cloned()
         .collect();
@@ -143,7 +145,10 @@ pub fn save(results: Vec<BenchmarkResult>, device: impl core::fmt::Debug) {
     let args: Vec<String> = std::env::args().collect();
     let url = get_sharing_url(&args);
     let token = get_sharing_token(&args);
-    let label = device_label();
+    // The device selects the backend (runtime); the build profile is the
+    // compile-time feature configuration (e.g. `no-fusion`).
+    let backend = device_label();
+    let feature = build_label();
     let burn_version =
         std::env::var("BURN_BENCH_BURN_VERSION").unwrap_or_else(|_| "main".to_string());
     let device_name = format!("{device:?}");
@@ -151,9 +156,9 @@ pub fn save(results: Vec<BenchmarkResult>, device: impl core::fmt::Debug) {
     let records: Vec<BenchmarkRecord> = results
         .into_iter()
         .map(|results| BenchmarkRecord {
-            backend: label.clone(),
+            backend: backend.clone(),
             device: device_name.clone(),
-            feature: label.clone(),
+            feature: feature.clone(),
             burn_version: burn_version.clone(),
             system_info: BenchmarkSystemInfo::new(),
             results,
