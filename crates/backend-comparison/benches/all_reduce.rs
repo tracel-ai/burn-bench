@@ -1,36 +1,31 @@
-use burn::tensor::backend::Backend;
-#[cfg(all(feature = "distributed", feature = "multi-device"))]
-use burn::tensor::backend::distributed::DistributedBackend;
-use burnbench;
+use burn::tensor::Device;
 use burnbench::BenchmarkResult;
 
 #[cfg(all(feature = "distributed", feature = "multi-device"))]
 mod distributed_benchmarks {
-    use burn::{
-        Tensor,
-        prelude::Backend,
-        tensor::{
-            Distribution, Element, Shape, TensorPrimitive,
-            backend::{
-                DeviceOps,
-                distributed::{DistributedBackend, ReduceOperation},
-            },
+    use burn::tensor::{
+        Device, Distribution, Shape, Tensor,
+        distributed::{
+            DistributedConfig, DistributedContext, ReduceOperation, all_reduce,
         },
     };
-
     use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-    pub struct AllReduceBenchmark<B: Backend> {
+    pub struct AllReduceBenchmark {
         shape: Shape,
-        devices: Vec<B::Device>,
+        devices: Vec<Device>,
     }
 
-    impl<B: Backend + DistributedBackend> Benchmark for AllReduceBenchmark<B> {
-        type Input = Vec<Tensor<B, 3>>;
-        type Output = Vec<Tensor<B, 3>>;
+    impl Benchmark for AllReduceBenchmark {
+        type Input = Vec<Tensor<3>>;
+        type Output = Vec<Tensor<3>>;
 
         fn name(&self) -> String {
-            format!("all_reduce-{:?}", B::FloatElem::dtype()).to_lowercase()
+            format!(
+                "all_reduce-{:?}",
+                self.devices[0].settings().float_dtype
+            )
+            .to_lowercase()
         }
 
         fn shapes(&self) -> Vec<Vec<usize>> {
@@ -38,17 +33,12 @@ mod distributed_benchmarks {
         }
 
         fn execute(&self, input: Self::Input) -> Self::Output {
-            let mut out = vec![];
-            let device_ids = self.devices.iter().map(|d| d.id()).collect::<Vec<_>>();
-            for tensor in input {
-                let result = B::all_reduce(
-                    tensor.into_primitive().tensor(),
-                    ReduceOperation::Sum,
-                    device_ids.clone(),
-                );
-                out.push(Tensor::new(TensorPrimitive::Float(result.resolve())));
-            }
-            out
+            input
+                .into_iter()
+                .map(|tensor| {
+                    all_reduce(tensor, ReduceOperation::Sum, self.devices.clone()).resolve()
+                })
+                .collect()
         }
 
         fn prepare(&self) -> Self::Input {
@@ -61,7 +51,7 @@ mod distributed_benchmarks {
         fn sync(&self) {
             self.devices
                 .iter()
-                .for_each(|device| B::sync(&device).unwrap());
+                .for_each(|device| device.sync().unwrap());
         }
 
         fn num_samples(&self) -> usize {
@@ -69,14 +59,21 @@ mod distributed_benchmarks {
         }
     }
 
-    pub fn bench<B: Backend + DistributedBackend>(
-        devices: &Vec<B::Device>,
-    ) -> Vec<BenchmarkResult> {
+    pub fn bench(devices: &[Device]) -> Vec<BenchmarkResult> {
+        // The distributed context starts the communication server for the
+        // duration of the benchmark and tears it down on drop.
+        let _ctx = DistributedContext::init(
+            devices.to_vec(),
+            DistributedConfig {
+                all_reduce_op: ReduceOperation::Sum,
+            },
+        );
+
         [[32, 512, 1024], [128, 512, 2048]]
             .into_iter()
-            .map(|shape| AllReduceBenchmark::<B> {
+            .map(|shape| AllReduceBenchmark {
                 shape: shape.into(),
-                devices: devices.clone(),
+                devices: devices.to_vec(),
             })
             .map(run_benchmark)
             .collect()
@@ -85,16 +82,18 @@ mod distributed_benchmarks {
 
 #[cfg(all(feature = "distributed", feature = "multi-device"))]
 #[allow(dead_code)]
-fn bench<B: Backend + DistributedBackend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
-    distributed_benchmarks::bench::<B>(devices)
+fn bench(devices: &[Device]) -> Vec<BenchmarkResult> {
+    distributed_benchmarks::bench(devices)
 }
 
 #[cfg(any(not(feature = "distributed"), not(feature = "multi-device")))]
 #[allow(dead_code)]
-fn bench<B: Backend>(_device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(_devices: &[Device]) -> Vec<BenchmarkResult> {
     vec![]
 }
 
 fn main() {
-    burnbench::bench_on_backend_multi_device!();
+    let devices = backend_comparison::select_devices();
+    let results = bench(&devices);
+    backend_comparison::save(results, &devices);
 }

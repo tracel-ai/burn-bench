@@ -1,7 +1,7 @@
 use burn::{
     module::Quantizer,
+    nn,
     prelude::*,
-    tensor::Element,
     tensor::quantization::{
         BlockSize, Calibration, QuantLevel, QuantMode, QuantParam, QuantScheme, QuantStore,
         QuantValue,
@@ -9,15 +9,15 @@ use burn::{
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-struct LinearBench<B: Backend> {
+struct LinearBench {
     name: String,
-    linear: nn::Linear<B>,
+    linear: nn::Linear,
     signal_shape: Shape,
-    device: Device<B>,
+    device: Device,
 }
 
-impl<B: Backend> LinearBench<B> {
-    fn inference(config: nn::LinearConfig, device: &Device<B>, batch_sizes: [usize; 2]) -> Self {
+impl LinearBench {
+    fn inference(config: nn::LinearConfig, device: &Device, batch_sizes: [usize; 2]) -> Self {
         let (linear, signal_shape, name) = Self::init(config, batch_sizes, device);
 
         Self {
@@ -30,7 +30,7 @@ impl<B: Backend> LinearBench<B> {
 
     fn q_inference(
         config: nn::LinearConfig,
-        device: &Device<B>,
+        device: &Device,
         scheme: QuantScheme,
         scheme_tag: &str,
         batch_sizes: [usize; 2],
@@ -54,23 +54,23 @@ impl<B: Backend> LinearBench<B> {
     fn init(
         config: nn::LinearConfig,
         batch_sizes: [usize; 2],
-        device: &Device<B>,
-    ) -> (nn::Linear<B>, Shape, String) {
+        device: &Device,
+    ) -> (nn::Linear, Shape, String) {
         let signal_shape = Shape::new([batch_sizes[0], batch_sizes[1], config.d_input]);
         let name = match config.bias {
             true => "linear-bias",
             false => "linear",
         };
-        let name = format!("{name}_{:?}", B::FloatElem::dtype());
+        let name = format!("{name}_{:?}", device.settings().float_dtype);
         let linear = config.init(device);
 
         (linear, signal_shape, name)
     }
 }
 
-impl<B: Backend> Benchmark for LinearBench<B> {
-    type Input = Tensor<B, 3>;
-    type Output = Tensor<B, 3>;
+impl Benchmark for LinearBench {
+    type Input = Tensor<3>;
+    type Output = Tensor<3>;
 
     fn prepare(&self) -> Self::Input {
         Tensor::random(
@@ -89,7 +89,7 @@ impl<B: Backend> Benchmark for LinearBench<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
     fn shapes(&self) -> Vec<Vec<usize>> {
         let weights = self.linear.weight.shape();
@@ -98,13 +98,13 @@ impl<B: Backend> Benchmark for LinearBench<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let mut results = Vec::new();
 
     for (d_input, d_output) in [(4096, 4096)] {
         for bias in [true, false] {
             for batch_sizes in [[1, 1], [32, 1], [1, 32]] {
-                let inference = LinearBench::<B>::inference(
+                let inference = LinearBench::inference(
                     nn::LinearConfig::new(d_input, d_output).with_bias(bias),
                     device,
                     batch_sizes,
@@ -122,7 +122,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
                     },
                     "q4b32",
                 )] {
-                    let inference = LinearBench::<B>::q_inference(
+                    let inference = LinearBench::q_inference(
                         nn::LinearConfig::new(d_input, d_output).with_bias(bias),
                         device,
                         scheme,
@@ -139,5 +139,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

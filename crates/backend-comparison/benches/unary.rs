@@ -1,19 +1,19 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Device, Distribution, Shape, Tensor};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
-struct UnaryBenchmark<B: Backend, const D: usize> {
+struct UnaryBenchmark<const D: usize> {
     shape: Shape,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
-    type Input = Tensor<B, D>;
-    type Output = Tensor<B, D>;
+impl<const D: usize> Benchmark for UnaryBenchmark<D> {
+    type Input = Tensor<D>;
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
-        format!("unary-{:?}", B::FloatElem::dtype()).to_lowercase()
+        format!("unary-{:?}", self.device.settings().float_dtype).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -30,20 +30,22 @@ impl<B: Backend, const D: usize> Benchmark for UnaryBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     const D: usize = 3;
     let shape: Shape = [32, 512, 1024].into();
 
-    let benchmark = UnaryBenchmark::<B, D>::new(shape, device.clone());
+    let benchmark = UnaryBenchmark::<D>::new(shape, device.clone());
 
     vec![run_benchmark(benchmark)]
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

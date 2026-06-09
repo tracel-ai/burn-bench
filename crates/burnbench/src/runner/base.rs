@@ -99,12 +99,6 @@ enum BenchDType {
 enum BackendValues {
     #[strum(to_string = "all")]
     All,
-    #[strum(to_string = "candle-cpu")]
-    CandleCpu,
-    #[strum(to_string = "candle-cuda")]
-    CandleCuda,
-    #[strum(to_string = "candle-metal")]
-    CandleMetal,
     #[strum(to_string = "cuda")]
     Cuda,
     #[strum(to_string = "cuda-fusion")]
@@ -370,52 +364,56 @@ fn run_cargo(
     };
     let dependency_version = get_version(version);
     let dependency = Dependency::new(&dependency_version);
-    let mut features = String::new();
 
     let guard = dependency.patch(info.path.as_path()).unwrap();
     let name = &info.name;
-    features += &format!("{name}/{backend},{name}/{dtype}");
 
+    // Backends are selected at runtime by injecting the right device (see the
+    // `--device` argument below). Cargo features now only enable compile-time
+    // decorators (`fusion`), backends that need external libraries (`tch`, BLAS
+    // ndarray variants), and any benchmark-specific required features.
+    let mut feature_list: Vec<String> = Vec::new();
+    let base = backend.strip_suffix("-fusion").unwrap_or(backend);
+    if backend.ends_with("-fusion") {
+        feature_list.push(format!("{name}/fusion"));
+    }
+    if base.starts_with("tch") {
+        feature_list.push(format!("{name}/tch"));
+    } else if base == "ndarray-simd" || base.starts_with("ndarray-blas") {
+        feature_list.push(format!("{name}/{base}"));
+    }
     for bench in benches.iter() {
         for req_feature in get_required_features(info, bench) {
-            features += &format!(",{}", req_feature);
+            feature_list.push(format!("{name}/{req_feature}"));
         }
     }
+    let features = feature_list.join(",");
+    let dtype_str = dtype.to_string();
 
-    if version.starts_with("0.16") {
-        features += ",legacy-v16";
-    } else if version.starts_with("0.17") {
-        features += ",legacy-v17";
-    }
-
-    for bench in benches.iter() {
-        for req_feature in get_required_features(info, bench) {
-            features += &format!(",{name}/{req_feature}");
-        }
-    }
-
-    let mut args = vec![];
+    let mut args: Vec<&str> = Vec::new();
     if benches[0] == "all" {
-        args = vec![
-            "--benches",
-            "--features",
-            &features,
-            "--target-dir",
-            crate::BENCHMARKS_TARGET_DIR,
-        ]
+        args.push("--benches");
     } else {
         for bench in benches.iter() {
             args.push("--bench");
             args.push(bench);
         }
+    }
+    if !features.is_empty() {
         args.push("--features");
         args.push(&features);
-        args.push("--target-dir");
-        args.push(crate::BENCHMARKS_TARGET_DIR);
     }
+    args.push("--target-dir");
+    args.push(crate::BENCHMARKS_TARGET_DIR);
 
+    // Runtime arguments forwarded to the benchmark binary: which device to
+    // inject, which dtype to configure, and optional result sharing.
+    args.push("--");
+    args.push("--device");
+    args.push(backend);
+    args.push("--dtype");
+    args.push(&dtype_str);
     if let Some(t) = token {
-        args.push("--");
         args.push("--sharing-url");
         args.push(url);
         args.push("--sharing-token");

@@ -1,12 +1,11 @@
-use burn::tensor::backend::Backend;
-use burn::tensor::{Device, Element};
+use burn::tensor::Device;
 use burn::{config::Config, module::Module, nn};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(Module, Debug)]
-struct BenchmarkModule<B: Backend> {
-    linears: Vec<nn::Linear<B>>,
+struct BenchmarkModule {
+    linears: Vec<nn::Linear>,
 }
 
 #[derive(Config, Debug)]
@@ -16,14 +15,14 @@ struct BenchmarkConfig {
 }
 
 impl BenchmarkConfig {
-    pub fn init<B: Backend>(&self, device: &B::Device) -> BenchmarkModule<B> {
+    pub fn init(&self, device: &Device) -> BenchmarkModule {
         BenchmarkModule {
             linears: (0..self.num_layers)
                 .map(|_| self.linear.init(device))
                 .collect(),
         }
     }
-    pub fn init_with<B: Backend>(&self, record: BenchmarkModuleRecord<B>) -> BenchmarkModule<B> {
+    pub fn init_with(&self, record: BenchmarkModuleRecord) -> BenchmarkModule {
         BenchmarkModule {
             linears: record
                 .linears
@@ -45,18 +44,23 @@ enum Kind {
 }
 
 #[derive(new)]
-struct LoadRecordBenchmark<B: Backend> {
+struct LoadRecordBenchmark {
     config: BenchmarkConfig,
-    device: Device<B>,
+    device: Device,
     kind: Kind,
 }
 
-impl<B: Backend> Benchmark for LoadRecordBenchmark<B> {
-    type Input = BenchmarkModule<B>;
-    type Output = BenchmarkModule<B>;
+impl Benchmark for LoadRecordBenchmark {
+    type Input = BenchmarkModule;
+    type Output = BenchmarkModule;
 
     fn name(&self) -> String {
-        format!("load_record_{:?}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "load_record_{:?}-{:?}",
+            self.kind,
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -93,21 +97,23 @@ impl<B: Backend> Benchmark for LoadRecordBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let config = BenchmarkConfig::new(nn::LinearConfig::new(2048, 2048), 12);
 
     [Kind::Lazy, Kind::Sync, Kind::Manual]
         .into_iter()
-        .map(|kind| LoadRecordBenchmark::<B>::new(config.clone(), device.clone(), kind))
+        .map(|kind| LoadRecordBenchmark::new(config.clone(), device.clone(), kind))
         .map(run_benchmark)
         .collect()
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

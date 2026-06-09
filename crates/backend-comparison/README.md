@@ -64,12 +64,24 @@ the application again except if your refresh token itself becomes invalid.
 
 ## Execute benchmarks with cargo
 
-To execute a benchmark against a given backend using only cargo is done with the `bench` command. In
-this case the backend is a feature of this crate.
+Backends are no longer selected through cargo features: every backend that can be compiled on the
+host is linked in automatically, and the concrete backend is chosen at runtime by passing
+`--device` (and optionally `--dtype`) to the benchmark binary.
 
 ```sh
-> cargo bench --features wgpu-fusion
+# Run the unary benchmark on the wgpu backend in f32
+> cargo bench --bench unary -- --device wgpu --dtype f32
 ```
+
+Kernel fusion is a compile-time decorator, so the fused variants require the `fusion` feature:
+
+```sh
+> cargo bench --bench unary --features fusion -- --device wgpu
+```
+
+Backends that depend on external libraries are opt-in features: `tch` (LibTorch) and the BLAS
+ndarray variants (`ndarray-blas-accelerate`, `ndarray-blas-netlib`, `ndarray-blas-openblas`,
+`ndarray-simd`).
 
 ## Add a new benchmark
 
@@ -82,7 +94,18 @@ harness = false
 ```
 
 Create a new file `mybench.rs` in the `benches` directory and implement the `Benchmark` trait over
-your benchmark structure. Then implement the `bench` function. At last call the macro
-`backend_comparison::bench_on_backend!()` in the `main` function.
+your benchmark structure. Then implement a `fn bench(device: &Device) -> Vec<BenchmarkResult>`
+function. Finally, in `main`, inject the device and save the results:
+
+```rust
+fn main() {
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
+}
+```
+
+For multi-device benchmarks, use `backend_comparison::select_devices()` to obtain every available
+device of the selected backend.
 
 [1]: https://burn.dev/benchmarks/community-benchmarks

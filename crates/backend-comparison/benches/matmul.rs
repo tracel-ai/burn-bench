@@ -1,11 +1,11 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Device, Distribution, Shape, Tensor};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
-struct MatmulBenchmark<B: Backend, const D: usize> {
+struct MatmulBenchmark<const D: usize> {
     problem: Problem,
-    device: B::Device,
+    device: Device,
 }
 
 #[derive(Clone, Copy)]
@@ -59,12 +59,17 @@ impl Problem {
     }
 }
 
-impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
-    type Input = (Tensor<B, D>, Tensor<B, D>);
-    type Output = Tensor<B, D>;
+impl<const D: usize> Benchmark for MatmulBenchmark<D> {
+    type Input = (Tensor<D>, Tensor<D>);
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
-        format!("matmul-{}-{:?}", self.problem.name(), B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "matmul-{}-{:?}",
+            self.problem.name(),
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -90,12 +95,12 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     [
         // General benches
         Problem::General {
@@ -192,11 +197,13 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         },
     ]
     .into_iter()
-    .map(|problem| MatmulBenchmark::<B, 3>::new(problem, device.clone()))
+    .map(|problem| MatmulBenchmark::<3>::new(problem, device.clone()))
     .map(run_benchmark)
     .collect()
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

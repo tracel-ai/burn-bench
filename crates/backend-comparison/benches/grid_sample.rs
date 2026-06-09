@@ -1,17 +1,17 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Device, Distribution, Shape, Tensor};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-struct GridSampleBenchmark<B: Backend> {
+struct GridSampleBenchmark {
     n_batch: usize,
     channels: usize,
     width_in: usize,
     height_in: usize,
     width_out: usize,
     height_out: usize,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend> GridSampleBenchmark<B> {
+impl GridSampleBenchmark {
     pub fn new(
         n_batch: usize,
         channels: usize,
@@ -19,7 +19,7 @@ impl<B: Backend> GridSampleBenchmark<B> {
         height_in: usize,
         width_out: usize,
         height_out: usize,
-        device: B::Device,
+        device: Device,
     ) -> Self {
         Self {
             n_batch,
@@ -33,9 +33,9 @@ impl<B: Backend> GridSampleBenchmark<B> {
     }
 }
 
-impl<B: Backend> Benchmark for GridSampleBenchmark<B> {
-    type Input = (Tensor<B, 4>, Tensor<B, 4>);
-    type Output = Tensor<B, 4>;
+impl Benchmark for GridSampleBenchmark {
+    type Input = (Tensor<4>, Tensor<4>);
+    type Output = Tensor<4>;
 
     fn prepare(&self) -> Self::Input {
         let tensor = Tensor::random(
@@ -67,12 +67,12 @@ impl<B: Backend> Benchmark for GridSampleBenchmark<B> {
             self.height_in,
             self.width_out,
             self.height_out,
-            B::FloatElem::dtype()
+            self.device.settings().float_dtype
         )
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -88,15 +88,17 @@ impl<B: Backend> Benchmark for GridSampleBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let benchmarks = vec![
-        GridSampleBenchmark::<B>::new(1, 1, 64, 64, 4, 4, device.clone()),
-        GridSampleBenchmark::<B>::new(1, 1, 4, 4, 64, 64, device.clone()),
+        GridSampleBenchmark::new(1, 1, 64, 64, 4, 4, device.clone()),
+        GridSampleBenchmark::new(1, 1, 4, 4, 64, 64, device.clone()),
     ];
 
     benchmarks.into_iter().map(run_benchmark).collect()
 }
 
 fn main() {
-    burnbench::bench_on_backend!()
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

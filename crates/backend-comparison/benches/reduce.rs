@@ -1,5 +1,5 @@
 use burn::tensor::Int;
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Device, Distribution, Shape, Tensor};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
 enum Instruction {
@@ -10,15 +10,15 @@ enum Instruction {
     Sum,
 }
 
-struct ReduceBenchmark<B: Backend> {
+struct ReduceBenchmark {
     instruction: Instruction,
     shape: Shape,
-    device: B::Device,
-    tensor: Tensor<B, 3>,
+    device: Device,
+    tensor: Tensor<3>,
 }
 
-impl<B: Backend> ReduceBenchmark<B> {
-    pub fn new(instruction: Instruction, device: B::Device) -> Self {
+impl ReduceBenchmark {
+    pub fn new(instruction: Instruction, device: Device) -> Self {
         let shape = Shape::new([32, 512, 4096]);
         let tensor = Tensor::random(shape.clone(), Distribution::Default, &device);
         Self {
@@ -30,15 +30,15 @@ impl<B: Backend> ReduceBenchmark<B> {
     }
 }
 
-pub enum ReduceOutput<B: Backend, const D: usize> {
-    Arg(Tensor<B, D, Int>),
-    Dim(Tensor<B, D>),
-    Full(Tensor<B, 1>),
+pub enum ReduceOutput<const D: usize> {
+    Arg(Tensor<D, Int>),
+    Dim(Tensor<D>),
+    Full(Tensor<1>),
 }
 
-impl<B: Backend> Benchmark for ReduceBenchmark<B> {
+impl Benchmark for ReduceBenchmark {
     type Input = ();
-    type Output = ReduceOutput<B, 3>;
+    type Output = ReduceOutput<3>;
 
     fn prepare(&self) -> Self::Input {}
 
@@ -67,22 +67,35 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
     fn name(&self) -> String {
         match self.instruction {
             Instruction::ArgMin(axis) => {
-                format!("reduce-argmin-{axis}-{:?}", B::FloatElem::dtype())
+                format!(
+                    "reduce-argmin-{axis}-{:?}",
+                    self.device.settings().float_dtype
+                )
             }
             Instruction::ArgMinFused(axis) => {
-                format!("reduce-argmin-{axis}-fused-{:?}", B::FloatElem::dtype())
+                format!(
+                    "reduce-argmin-{axis}-fused-{:?}",
+                    self.device.settings().float_dtype
+                )
             }
-            Instruction::SumDim(axis) => format!("reduce-sum-{axis}-{:?}", B::FloatElem::dtype()),
+            Instruction::SumDim(axis) => {
+                format!("reduce-sum-{axis}-{:?}", self.device.settings().float_dtype)
+            }
             Instruction::SumDimFused(axis) => {
-                format!("reduce-sum-{axis}-fused-{:?}", B::FloatElem::dtype())
+                format!(
+                    "reduce-sum-{axis}-fused-{:?}",
+                    self.device.settings().float_dtype
+                )
             }
-            Instruction::Sum => format!("reduce-sum-full-{:?}", B::FloatElem::dtype()),
+            Instruction::Sum => {
+                format!("reduce-sum-full-{:?}", self.device.settings().float_dtype)
+            }
         }
         .to_lowercase()
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -91,32 +104,34 @@ impl<B: Backend> Benchmark for ReduceBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let mut benchmarks = Vec::new();
 
     for axis in 0..3 {
-        benchmarks.push(ReduceBenchmark::<B>::new(
+        benchmarks.push(ReduceBenchmark::new(
             Instruction::ArgMin(axis),
             device.clone(),
         ));
-        benchmarks.push(ReduceBenchmark::<B>::new(
+        benchmarks.push(ReduceBenchmark::new(
             Instruction::ArgMinFused(axis),
             device.clone(),
         ));
-        benchmarks.push(ReduceBenchmark::<B>::new(
+        benchmarks.push(ReduceBenchmark::new(
             Instruction::SumDim(axis),
             device.clone(),
         ));
-        benchmarks.push(ReduceBenchmark::<B>::new(
+        benchmarks.push(ReduceBenchmark::new(
             Instruction::SumDimFused(axis),
             device.clone(),
         ));
     }
 
-    benchmarks.push(ReduceBenchmark::<B>::new(Instruction::Sum, device.clone()));
+    benchmarks.push(ReduceBenchmark::new(Instruction::Sum, device.clone()));
     benchmarks.into_iter().map(run_benchmark).collect()
 }
 
 fn main() {
-    burnbench::bench_on_backend!()
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

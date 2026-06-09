@@ -1,19 +1,24 @@
-use burn::tensor::{Distribution, Element, Float, Shape, Tensor, backend::Backend};
+use burn::tensor::{Device, Distribution, Float, Shape, Tensor};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use std::hint::black_box;
 
-pub struct RandomBenchmark<B: Backend> {
+pub struct RandomBenchmark {
     shape: Shape,
     distribution: Distribution,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend> Benchmark for RandomBenchmark<B> {
+impl Benchmark for RandomBenchmark {
     type Input = ();
-    type Output = Tensor<B, 3>;
+    type Output = Tensor<3>;
 
     fn name(&self) -> String {
-        format!("random-{:?}-{:?}", self.distribution, B::FloatElem::dtype(),).to_lowercase()
+        format!(
+            "random-{:?}-{:?}",
+            self.distribution,
+            self.device.settings().float_dtype,
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -21,13 +26,13 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
     }
 
     fn execute(&self, (): Self::Input) -> Self::Output {
-        Tensor::<B, 3, Float>::random(self.shape.clone(), self.distribution, &self.device)
+        Tensor::<3, Float>::random(self.shape.clone(), self.distribution, &self.device)
     }
 
     fn prepare(&self) -> Self::Input {}
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 
     fn num_samples(&self) -> usize {
@@ -36,8 +41,8 @@ impl<B: Backend> Benchmark for RandomBenchmark<B> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
-    let rand0 = RandomBenchmark::<B> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
+    let rand0 = RandomBenchmark {
         shape: [1, 512, 512, 512].into(),
         distribution: Distribution::Default,
         device: device.clone(),
@@ -68,7 +73,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         (1, 2048, Distribution::Uniform(5., 12.)),
     ]
     .into_iter()
-    .map(|(batch_num, shape, distribution)| RandomBenchmark::<B> {
+    .map(|(batch_num, shape, distribution)| RandomBenchmark {
         shape: [batch_num, shape, shape].into(),
         distribution,
         device: device.clone(),
@@ -78,5 +83,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

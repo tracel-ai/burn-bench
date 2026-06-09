@@ -1,73 +1,47 @@
-use burn::tensor::backend::Backend;
-use burnbench;
+use burn::tensor::Device;
 use burnbench::BenchmarkResult;
 
 // cargo bb run -b remote --backends wgpu -V local
 
-#[cfg(all(
-    feature = "remote",
-    not(feature = "legacy-v16"),
-    not(feature = "legacy-v17")
-))]
+#[cfg(feature = "remote")]
 mod remote_benchmarks {
-    use super::*;
-
-    use burnbench::{Benchmark, run_benchmark};
-    use std::marker::PhantomData;
-
-    use burn::backend::remote::{self, RemoteDevice};
-    use burn::{
-        backend::ir::BackendIr,
-        tensor::{Distribution, Shape, Tensor, backend::Backend},
+    use burn::tensor::{
+        Device, Distribution, Shape, Tensor,
+        server::{Channel, start_async},
     };
+    use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
     use tokio::runtime::Runtime;
 
-    struct LocalServer<B: BackendIr> {
-        port: u16,
+    /// Hosts a backend `device` behind a local WebSocket server, exposing a
+    /// matching remote `Device` for clients to connect to.
+    struct LocalServer {
         runtime: Runtime,
-        _phantom_data: PhantomData<B>,
+        device: Device,
     }
 
-    impl<B: BackendIr> LocalServer<B> {
-        pub fn new(port: u16) -> Self {
+    impl LocalServer {
+        pub fn new(host: Device, port: u16) -> Self {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_io()
                 .build()
                 .unwrap();
 
-            runtime.spawn(burn::server::start_async::<B>(Default::default(), port));
+            runtime.spawn(start_async(host, Channel::WebSocket { port }));
 
             Self {
-                port,
                 runtime,
-                _phantom_data: Default::default(),
+                device: Device::remote(&format!("ws://localhost:{port}")),
             }
-        }
-
-        pub fn get_device(&self) -> RemoteDevice {
-            remote::RemoteDevice::new(&format!("ws://localhost:{}", self.port))
         }
     }
 
-    struct RemoteBenchmark<'a, B: BackendIr> {
+    struct RemoteBenchmark {
         shape: Shape,
-        device_a: &'a RemoteDevice,
-        device_b: &'a RemoteDevice,
-        _phantom_data: PhantomData<B>,
+        device_a: Device,
+        device_b: Device,
     }
 
-    impl<'a, B: BackendIr> RemoteBenchmark<'a, B> {
-        pub fn new(shape: Shape, device_a: &'a RemoteDevice, device_b: &'a RemoteDevice) -> Self {
-            Self {
-                shape,
-                device_a,
-                device_b,
-                _phantom_data: Default::default(),
-            }
-        }
-    }
-
-    impl<'a, B: burn::backend::ir::BackendIr> Benchmark for RemoteBenchmark<'a, B> {
+    impl Benchmark for RemoteBenchmark {
         type Input = ();
         type Output = ();
 
@@ -75,60 +49,53 @@ mod remote_benchmarks {
 
         fn execute(&self, _: Self::Input) -> Self::Output {
             // Some random input
-            let input = Tensor::<remote::RemoteBackend, 3>::random(
-                self.shape.clone(),
-                Distribution::Default,
-                &self.device_a,
-            );
+            let input =
+                Tensor::<3>::random(self.shape.clone(), Distribution::Default, &self.device_a);
             let numbers_expected: Vec<f32> = input.to_data().to_vec().unwrap();
 
             // Move tensor to device 2
-            let input = input.to_device(self.device_b);
+            let input = input.to_device(&self.device_b);
             let numbers: Vec<f32> = input.to_data().to_vec().unwrap();
             assert_eq!(numbers, numbers_expected);
 
             // Move tensor back to device 1
-            let input = input.to_device(self.device_a);
+            let input = input.to_device(&self.device_a);
             let numbers: Vec<f32> = input.to_data().to_vec().unwrap();
             assert_eq!(numbers, numbers_expected);
         }
 
         fn name(&self) -> String {
-            format!("remote")
+            "remote".to_string()
         }
 
         fn sync(&self) {
-            remote::RemoteBackend::sync(self.device_a);
-            remote::RemoteBackend::sync(self.device_b);
+            self.device_a.sync().unwrap();
+            self.device_b.sync().unwrap();
         }
 
         fn shapes(&self) -> Vec<Vec<usize>> {
-            vec![self.shape.dims.clone()]
+            vec![self.shape.to_vec()]
         }
     }
 
     #[allow(dead_code)]
-    pub fn bench<B: burn::backend::ir::BackendIr>(_device: &B::Device) -> Vec<BenchmarkResult> {
-        let server_a = LocalServer::<B>::new(3000);
-        let server_b = LocalServer::<B>::new(3001);
+    pub fn bench(host: &Device) -> Vec<BenchmarkResult> {
+        let server_a = LocalServer::new(host.clone(), 3000);
+        let server_b = LocalServer::new(host.clone(), 3001);
 
-        let device_a = server_a.get_device();
-        let device_b = server_b.get_device();
+        let device_a = server_a.device.clone();
+        let device_b = server_b.device.clone();
         let benches = vec![
-            RemoteBenchmark::<B>::new(
-                Shape {
-                    dims: vec![1, 16, 16],
-                },
-                &device_a,
-                &device_b,
-            ),
-            RemoteBenchmark::<B>::new(
-                Shape {
-                    dims: vec![1, 8, 8],
-                },
-                &device_a,
-                &device_b,
-            ),
+            RemoteBenchmark {
+                shape: [1, 16, 16].into(),
+                device_a: device_a.clone(),
+                device_b: device_b.clone(),
+            },
+            RemoteBenchmark {
+                shape: [1, 8, 8].into(),
+                device_a,
+                device_b,
+            },
         ];
 
         let mut results = vec![];
@@ -144,26 +111,20 @@ mod remote_benchmarks {
     }
 }
 
-#[cfg(all(
-    feature = "remote",
-    not(feature = "legacy-v16"),
-    not(feature = "legacy-v17")
-))]
+#[cfg(feature = "remote")]
 #[allow(dead_code)]
-fn bench<B: burn::backend::ir::BackendIr>(device: &B::Device) -> Vec<BenchmarkResult> {
-    remote_benchmarks::bench::<B>(device)
+fn bench(host: &Device) -> Vec<BenchmarkResult> {
+    remote_benchmarks::bench(host)
 }
 
-#[cfg(any(
-    not(feature = "remote"),
-    feature = "legacy-v16",
-    feature = "legacy-v17"
-))]
+#[cfg(not(feature = "remote"))]
 #[allow(dead_code)]
-fn bench<B: Backend>(_device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(_host: &Device) -> Vec<BenchmarkResult> {
     vec![]
 }
 
 fn main() {
-    burnbench::bench_on_backend!()
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

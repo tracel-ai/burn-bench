@@ -1,8 +1,7 @@
 use std::io::{Read, Write};
 
 use burn::tensor::{
-    Bytes, DType, Distribution, Element, Shape, Tensor, TensorData,
-    backend::Backend,
+    Bytes, DType, Device, Distribution, Shape, Tensor, TensorData,
     quantization::{
         BlockSize, QuantLevel, QuantMode, QuantParam, QuantScheme, QuantStore, QuantValue,
     },
@@ -11,9 +10,9 @@ use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
-struct ToDataBenchmark<B: Backend, const D: usize> {
+struct ToDataBenchmark<const D: usize> {
     shape: Shape,
-    device: B::Device,
+    device: Device,
 }
 
 struct TensorDesc {
@@ -21,12 +20,12 @@ struct TensorDesc {
     quant: Option<QuantScheme>,
 }
 
-impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
-    type Input = Tensor<B, D>;
+impl<const D: usize> Benchmark for ToDataBenchmark<D> {
+    type Input = Tensor<D>;
     type Output = TensorData;
 
     fn name(&self) -> String {
-        format!("to_data-{:?}", B::FloatElem::dtype()).to_lowercase()
+        format!("to_data-{:?}", self.device.settings().float_dtype).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -42,22 +41,22 @@ impl<B: Backend, const D: usize> Benchmark for ToDataBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
-struct FromFileBenchmark<B: Backend, const D: usize> {
+struct FromFileBenchmark<const D: usize> {
     path: String,
     desc: TensorDesc,
     dtype: DType,
     len: usize,
-    device: B::Device,
+    device: Device,
     lazy: bool,
 }
 
-impl<B: Backend, const D: usize> FromFileBenchmark<B, D> {
-    pub fn new(shape: Shape, device: B::Device, lazy: bool, quant: Option<QuantScheme>) -> Self {
-        let tensor = Tensor::<B, 3>::random(shape.clone(), Distribution::Default, &device);
+impl<const D: usize> FromFileBenchmark<D> {
+    pub fn new(shape: Shape, device: Device, lazy: bool, quant: Option<QuantScheme>) -> Self {
+        let tensor = Tensor::<3>::random(shape.clone(), Distribution::Default, &device);
         let tensor = match quant {
             Some(scheme) => tensor.quantize_dynamic(&scheme),
             None => tensor,
@@ -66,7 +65,7 @@ impl<B: Backend, const D: usize> FromFileBenchmark<B, D> {
         let len = data.bytes.len();
         let dtype = data.dtype;
 
-        let path = format!("/tmp/{:?}-{:?}", B::name(&device), shape);
+        let path = format!("/tmp/{:?}-{:?}", device, shape);
         std::fs::remove_file(&path).ok();
 
         let mut file = std::fs::File::create_new(&path).unwrap();
@@ -83,14 +82,14 @@ impl<B: Backend, const D: usize> FromFileBenchmark<B, D> {
     }
 }
 
-impl<B: Backend, const D: usize> Benchmark for FromFileBenchmark<B, D> {
+impl<const D: usize> Benchmark for FromFileBenchmark<D> {
     type Input = ();
-    type Output = Tensor<B, D>;
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
         format!(
             "load-from-file-{:?}{}{}",
-            B::FloatElem::dtype(),
+            self.device.settings().float_dtype,
             match self.lazy {
                 true => "-lazy",
                 false => "",
@@ -111,32 +110,32 @@ impl<B: Backend, const D: usize> Benchmark for FromFileBenchmark<B, D> {
         if self.lazy {
             let bytes = Bytes::from_file(&self.path, self.len as u64, 0);
             let data = TensorData::from_bytes(bytes, self.desc.shape.clone(), self.dtype);
-            Tensor::<B, D>::from_data(data, &self.device)
+            Tensor::<D>::from_data(data, &self.device)
         } else {
             let mut file = std::fs::File::open(&self.path).unwrap();
             let mut buf = vec![0; self.len];
             file.read_exact(&mut buf).unwrap();
             let data = TensorData::from_bytes_vec(buf, self.desc.shape.clone(), self.dtype);
-            Tensor::<B, D>::from_data(data, &self.device)
+            Tensor::<D>::from_data(data, &self.device)
         }
     }
 
     fn prepare(&self) -> Self::Input {}
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
-struct FromMemoryBenchmark<B: Backend, const D: usize> {
+struct FromMemoryBenchmark<const D: usize> {
     data: TensorData,
     staging: bool,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend, const D: usize> FromMemoryBenchmark<B, D> {
-    pub fn new(shape: Shape, device: B::Device, staging: bool) -> Self {
-        let tensor = Tensor::<B, 3>::random(shape.clone(), Distribution::Default, &device);
+impl<const D: usize> FromMemoryBenchmark<D> {
+    pub fn new(shape: Shape, device: Device, staging: bool) -> Self {
+        let tensor = Tensor::<3>::random(shape.clone(), Distribution::Default, &device);
         let data = tensor.into_data();
 
         Self {
@@ -147,9 +146,9 @@ impl<B: Backend, const D: usize> FromMemoryBenchmark<B, D> {
     }
 }
 
-impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
+impl<const D: usize> Benchmark for FromMemoryBenchmark<D> {
     type Input = TensorData;
-    type Output = Tensor<B, D>;
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
         format!(
@@ -166,20 +165,20 @@ impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
     }
 
     fn execute(&self, data: Self::Input) -> Self::Output {
-        Tensor::<B, D>::from_data(data, &self.device)
+        Tensor::<D>::from_data(data, &self.device)
     }
 
     fn prepare(&self) -> Self::Input {
         let mut data = [self.data.clone()];
         if self.staging {
-            B::staging(data.iter_mut(), &self.device);
+            self.device.staging(data.iter_mut());
         }
         let [data] = data;
         data
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 
     fn prepare_cloned(&self) -> bool {
@@ -188,18 +187,18 @@ impl<B: Backend, const D: usize> Benchmark for FromMemoryBenchmark<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     const D: usize = 3;
     let shape: Shape = [32, 512, 2048].into();
     let mut results = Vec::new();
 
-    results.push(run_benchmark(ToDataBenchmark::<B, D>::new(
+    results.push(run_benchmark(ToDataBenchmark::<D>::new(
         shape.clone(),
         device.clone(),
     )));
 
     for staging in [true, false] {
-        results.push(run_benchmark(FromMemoryBenchmark::<B, D>::new(
+        results.push(run_benchmark(FromMemoryBenchmark::<D>::new(
             shape.clone(),
             device.clone(),
             staging,
@@ -217,7 +216,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
                 mode: QuantMode::Symmetric,
             }),
         ] {
-            results.push(run_benchmark(FromFileBenchmark::<B, D>::new(
+            results.push(run_benchmark(FromFileBenchmark::<D>::new(
                 shape.clone(),
                 device.clone(),
                 lazy,
@@ -230,5 +229,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

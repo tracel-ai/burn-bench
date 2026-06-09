@@ -9,47 +9,48 @@ readme = "README.md"
 repository = "https://github.com/tracel-ai/burn-bench/tree/main/backend-comparison"
 version = "0.1.0"
 
+# Backends are no longer selected through feature flags: every backend that can
+# be compiled on the host is linked in by default (see the OS-conditional `burn`
+# dependency below) and the concrete backend is picked at runtime by injecting
+# the right `Device`. The features below only control compile-time decorators
+# (`fusion`), backends that need external libraries (`tch`, BLAS variants), and
+# special benchmark capabilities.
 [features]
-bf16 = []
-candle-accelerate = ["burn/candle", "burn/accelerate"]
-candle-cpu = ["burn/candle"]
-candle-cuda = ["burn/candle-cuda"]
-candle-metal = ["burn/candle", "burn/candle-metal"]
-cpu = ["burn/cpu", "burn/autotune"]
-cpu-fusion = ["cpu", "burn/fusion"]
-cuda = ["burn/cuda", "burn/autotune"]
-cuda-fusion = ["cuda", "burn/fusion"]
-default = ["burn/std", "burn/autodiff"]
-remote = ["server", "burn/remote"]
+default = []
+
+# Kernel fusion is a compile-time backend decorator (no runtime toggle), so the
+# fused variants require a dedicated build.
+fusion = ["burn/fusion"]
+
+# Backends that depend on external libraries, kept opt-in so the default build
+# stays self-contained.
+tch = ["burn/tch"]
+ndarray-simd = ["burn/simd"]
+ndarray-blas-accelerate = ["burn/accelerate"]
+ndarray-blas-netlib = ["burn/blas-netlib"]
+ndarray-blas-openblas = ["burn/openblas"]
+
+# Special benchmark capabilities.
+multi-device = []
 distributed = ["burn/distributed"]
-multi-device= []
-f16 = []
-f32 = []
-flex32 = []
-legacy-v16 = []
-legacy-v17 = []
-metal = ["burn/metal", "burn/autotune"]
-metal-fusion = ["metal", "burn/fusion"]
-ndarray = ["burn/ndarray"]
-ndarray-blas-accelerate = ["ndarray", "burn/accelerate"]
-ndarray-blas-netlib = ["ndarray", "burn/blas-netlib"]
-ndarray-blas-openblas = ["ndarray", "burn/openblas"]
-ndarray-simd = ["ndarray", "burn/simd"]
-rocm = ["burn/rocm", "burn/autotune"]
-rocm-fusion = ["rocm", "burn/fusion"]
+remote = ["server", "burn/remote"]
 server = ["burn/server"]
-tch-cpu = ["burn/tch"]
-tch-cuda = ["burn/tch"]
-tch-metal = ["burn/tch"]
-vulkan = ["burn/vulkan", "burn/autotune"]
-vulkan-fusion = ["vulkan", "burn/fusion"]
-wgpu = ["burn/wgpu", "burn/autotune"]
-wgpu-fusion = ["wgpu", "burn/fusion"]
 
 [dependencies]
-# Use the last released version to avoid possible breaking changes
+# Backends that compile cleanly on every platform are always enabled; the
+# concrete one is selected at runtime via the device. Platform-specific backends
+# are enabled through the target-conditional tables below.
 # burn = { path = "../../../burn/crates/burn", default-features = false }
-burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
+    "std",
+    "autodiff",
+    "autotune",
+    "wgpu",
+    "webgpu",
+    "cpu",
+    "flex",
+    "ndarray",
+] }
 
 burnbench = { path = "../burnbench" }
 
@@ -77,6 +78,28 @@ tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing-subscriber = { workspace = true }
 wgpu = { workspace = true }
 wsl = { workspace = true }
+
+# CUDA, ROCm and Vulkan compile on Linux (they don't necessarily run on every
+# machine, but linking them in lets the device be selected at runtime).
+[target.'cfg(target_os = "linux")'.dependencies]
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
+    "cuda",
+    "rocm",
+    "vulkan",
+] }
+
+# Windows: CUDA and Vulkan (ROCm is Linux-only).
+[target.'cfg(target_os = "windows")'.dependencies]
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
+    "cuda",
+    "vulkan",
+] }
+
+# macOS: Metal (CUDA/ROCm/Vulkan don't make sense here).
+[target.'cfg(target_os = "macos")'.dependencies]
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
+    "metal",
+] }
 
 [dev-dependencies]
 rstest = { workspace = true }

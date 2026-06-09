@@ -1,24 +1,27 @@
 use burn::tensor::{
-    Distribution, Element, Shape, Tensor,
+    Device, Distribution, Shape, Tensor,
     activation::{gelu, relu},
-    backend::Backend,
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
-struct MatmulBenchmark<B: Backend, const D: usize> {
+struct MatmulBenchmark<const D: usize> {
     shape_lhs: Shape,
     shape_rhs: Shape,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
-    type Input = (Tensor<B, D>, Tensor<B, D>, Tensor<B, 1>);
-    type Output = Tensor<B, D>;
+impl<const D: usize> Benchmark for MatmulBenchmark<D> {
+    type Input = (Tensor<D>, Tensor<D>, Tensor<1>);
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
-        format!("matmul_relu_bias_gelu-{:?}", B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "matmul_relu_bias_gelu-{:?}",
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -38,12 +41,12 @@ impl<B: Backend, const D: usize> Benchmark for MatmulBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     [
         (2, 4096, 4096, 4096),
         (16, 2048, 2048, 2048),
@@ -55,12 +58,14 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         let shape_lhs = [b, m, k].into();
         let shape_rhs = [b, k, n].into();
 
-        MatmulBenchmark::<B, 3>::new(shape_lhs, shape_rhs, device.clone())
+        MatmulBenchmark::<3>::new(shape_lhs, shape_rhs, device.clone())
     })
     .map(run_benchmark)
     .collect()
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

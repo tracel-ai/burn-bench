@@ -1,25 +1,26 @@
 use burn::{
     module::Module,
     nn,
-    tensor::{
-        Distribution, Element, Tensor,
-        backend::{AutodiffBackend, Backend},
-    },
+    tensor::{Device, Distribution, Tensor},
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct AutodiffOverheadBenchmark<B: AutodiffBackend> {
+pub struct AutodiffOverheadBenchmark {
     config: nn::LstmConfig,
-    lstm: nn::Lstm<B>,
-    device: B::Device,
+    lstm: nn::Lstm,
+    device: Device,
 }
 
-impl<B: AutodiffBackend> Benchmark for AutodiffOverheadBenchmark<B> {
-    type Input = Tensor<B, 3>;
+impl Benchmark for AutodiffOverheadBenchmark {
+    type Input = Tensor<3>;
     type Output = ();
 
     fn name(&self) -> String {
-        format!("autodiff_overhead-{:?}", B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "autodiff_overhead-{:?}",
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -47,23 +48,27 @@ impl<B: AutodiffBackend> Benchmark for AutodiffOverheadBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let config = nn::LstmConfig::new(3, 3, true);
-    let lstm = config.init(device);
-    let benchmark = AutodiffOverheadBenchmark::<burn::backend::Autodiff<B>> {
+    // Autodiff is now a property of the device.
+    let device = device.clone().autodiff();
+    let lstm = config.init(&device);
+    let benchmark = AutodiffOverheadBenchmark {
         lstm,
         config,
-        device: device.clone(),
+        device,
     };
 
     vec![run_benchmark(benchmark)]
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

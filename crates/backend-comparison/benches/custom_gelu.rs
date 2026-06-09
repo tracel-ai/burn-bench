@@ -1,11 +1,7 @@
-use burn::backend::Autodiff;
-use burn::backend::autodiff::checkpoint::strategy::{
-    BalancedCheckpointing, CheckpointStrategy, NoCheckpointing,
-};
 use burn::tensor::quantization::{
     BlockSize, QuantLevel, QuantMode, QuantParam, QuantScheme, QuantStore, QuantValue,
 };
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Device, Distribution, Shape, Tensor};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use core::f64::consts::SQRT_2;
 
@@ -18,31 +14,23 @@ enum GeluKind {
 
 /// Benchmark how well a backend executes a custom activation function with a lot of basic tensor
 /// operations.
-struct CustomGeluBenchmark<B: Backend, const D: usize> {
+struct CustomGeluBenchmark<const D: usize> {
     shape: Shape,
-    device: B::Device,
+    device: Device,
     kind: GeluKind,
     mode: Mode,
 }
 
 #[derive(Clone, Copy)]
 enum Mode {
-    Autodiff { gradient_checkpointing: bool },
+    Autodiff,
     Inference(Option<QuantScheme>),
 }
 
 impl core::fmt::Debug for Mode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Mode::Autodiff {
-                gradient_checkpointing,
-            } => {
-                if *gradient_checkpointing {
-                    f.write_str("autodiff-checkpointing")
-                } else {
-                    f.write_str("autodiff")
-                }
-            }
+            Mode::Autodiff => f.write_str("autodiff"),
             Mode::Inference(scheme) => match scheme {
                 Some(_) => f.write_str("inference-q4"),
                 None => f.write_str("inference"),
@@ -51,9 +39,10 @@ impl core::fmt::Debug for Mode {
     }
 }
 
-impl<B: Backend, const D: usize> CustomGeluBenchmark<B, D> {
-    fn execute_autodiff<C: CheckpointStrategy>(&self, tensor: Tensor<B, D>) -> Tensor<B, D> {
-        let tensor: Tensor<Autodiff<B, C>, D> = Tensor::from_inner(tensor).require_grad();
+impl<const D: usize> CustomGeluBenchmark<D> {
+    fn execute_autodiff(&self, tensor: Tensor<D>) -> Tensor<D> {
+        // The input tensor is created on an autodiff-enabled device (see `bench`).
+        let tensor = tensor.require_grad();
         let output = match self.kind {
             GeluKind::Reference => burn::tensor::activation::gelu(tensor.clone()),
             GeluKind::WithReferenceErf => gelu_custom(tensor.clone(), Tensor::erf),
@@ -64,16 +53,16 @@ impl<B: Backend, const D: usize> CustomGeluBenchmark<B, D> {
     }
 }
 
-impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
-    type Input = Tensor<B, D>;
-    type Output = Tensor<B, D>;
+impl<const D: usize> Benchmark for CustomGeluBenchmark<D> {
+    type Input = Tensor<D>;
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
         format!(
             "gelu-{:?}-{:?}-{:?}",
             self.kind,
             self.mode,
-            B::FloatElem::dtype()
+            self.device.settings().float_dtype
         )
         .to_lowercase()
     }
@@ -88,15 +77,7 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
 
     fn execute(&self, tensor: Self::Input) -> Self::Output {
         match self.mode {
-            Mode::Autodiff {
-                gradient_checkpointing,
-            } => {
-                if gradient_checkpointing {
-                    self.execute_autodiff::<BalancedCheckpointing>(tensor)
-                } else {
-                    self.execute_autodiff::<NoCheckpointing>(tensor)
-                }
-            }
+            Mode::Autodiff => self.execute_autodiff(tensor),
             Mode::Inference(_scheme) => match self.kind {
                 GeluKind::Reference => burn::tensor::activation::gelu(tensor),
                 GeluKind::WithReferenceErf => gelu_custom(tensor, Tensor::erf),
@@ -109,7 +90,7 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
         let input = Tensor::random(self.shape.clone(), Distribution::Default, &self.device);
 
         match &self.mode {
-            Mode::Autodiff { .. } => input,
+            Mode::Autodiff => input,
             Mode::Inference(scheme) => match scheme {
                 Some(scheme) => input.quantize_dynamic(scheme),
                 None => input,
@@ -118,7 +99,7 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 
     fn num_samples(&self) -> usize {
@@ -126,16 +107,15 @@ impl<B: Backend, const D: usize> Benchmark for CustomGeluBenchmark<B, D> {
     }
 }
 
-fn gelu_custom<B, const D: usize, Erf>(x: Tensor<B, D>, erf: Erf) -> Tensor<B, D>
+fn gelu_custom<const D: usize, Erf>(x: Tensor<D>, erf: Erf) -> Tensor<D>
 where
-    B: Backend,
-    Erf: Fn(Tensor<B, D>) -> Tensor<B, D>,
+    Erf: Fn(Tensor<D>) -> Tensor<D>,
 {
     let x = x.clone() * (erf(x / SQRT_2) + 1);
     x / 2
 }
 
-fn erf_custom<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
+fn erf_custom<const D: usize>(x: Tensor<D>) -> Tensor<D> {
     let x1 = -erf_positive(-x.clone());
     let x2 = erf_positive(x.clone());
     let mask = x.greater_elem(0);
@@ -147,7 +127,7 @@ fn erf_custom<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
 ///
 /// > (maximum error: 1.5×10−7)
 /// > All of these approximations are valid for x ≥ 0. To use these approximations for negative x, use the fact that erf x is an odd function, so erf x = −erf(−x).
-fn erf_positive<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
+fn erf_positive<const D: usize>(x: Tensor<D>) -> Tensor<D> {
     let p = 0.3275911;
     let a1 = 0.254829592;
     let a2 = -0.284496736;
@@ -163,25 +143,30 @@ fn erf_positive<B: Backend, const D: usize>(x: Tensor<B, D>) -> Tensor<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     const D: usize = 3;
     let shape: Shape = [32, 512, 2048].into();
 
     let mut benches = Vec::new();
     let mut run = |mode: Mode| {
-        let reference_gelu = CustomGeluBenchmark::<B, D> {
+        // Autodiff is a property of the device.
+        let device = match mode {
+            Mode::Autodiff => device.clone().autodiff(),
+            Mode::Inference(_) => device.clone(),
+        };
+        let reference_gelu = CustomGeluBenchmark::<D> {
             shape: shape.clone(),
             device: device.clone(),
             kind: GeluKind::Reference,
             mode,
         };
-        let reference_erf_gelu = CustomGeluBenchmark::<B, D> {
+        let reference_erf_gelu = CustomGeluBenchmark::<D> {
             shape: shape.clone(),
             device: device.clone(),
             kind: GeluKind::WithReferenceErf,
             mode,
         };
-        let custom_erf_gelu = CustomGeluBenchmark::<B, D> {
+        let custom_erf_gelu = CustomGeluBenchmark::<D> {
             shape: shape.clone(),
             device: device.clone(),
             kind: GeluKind::WithCustomErf,
@@ -201,16 +186,13 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         level: QuantLevel::Block(BlockSize::new([32])),
         mode: QuantMode::Symmetric,
     })));
-    run(Mode::Autodiff {
-        gradient_checkpointing: false,
-    });
-    run(Mode::Autodiff {
-        gradient_checkpointing: true,
-    });
+    run(Mode::Autodiff);
 
     benches
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

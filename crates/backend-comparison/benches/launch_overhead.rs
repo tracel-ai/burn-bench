@@ -1,21 +1,21 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend};
+use burn::tensor::{Device, Distribution, Shape, Tensor};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct LaunchOverhead<B: Backend, const D: usize> {
+pub struct LaunchOverhead<const D: usize> {
     shape: Shape,
-    device: B::Device,
+    device: Device,
     repetition: usize,
     num_threads: usize,
 }
 
-impl<B: Backend, const D: usize> Benchmark for LaunchOverhead<B, D> {
-    type Input = (Tensor<B, D>, Tensor<B, D>);
-    type Output = Tensor<B, D>;
+impl<const D: usize> Benchmark for LaunchOverhead<D> {
+    type Input = (Tensor<D>, Tensor<D>);
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
         format!(
             "launch-overhead-{:?}-reps-{}-threads-{}",
-            B::FloatElem::dtype(),
+            self.device.settings().float_dtype,
             self.repetition,
             self.num_threads,
         )
@@ -31,24 +31,24 @@ impl<B: Backend, const D: usize> Benchmark for LaunchOverhead<B, D> {
     }
 
     fn prepare(&self) -> Self::Input {
-        let lhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
-        let rhs = Tensor::<B, D>::random(self.shape.clone(), Distribution::Default, &self.device);
+        let lhs = Tensor::<D>::random(self.shape.clone(), Distribution::Default, &self.device);
+        let rhs = Tensor::<D>::random(self.shape.clone(), Distribution::Default, &self.device);
 
         (lhs, rhs)
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
-impl<B: Backend, const D: usize> LaunchOverhead<B, D> {
-    fn execute_inner(&self, (lhs, rhs): (Tensor<B, D>, Tensor<B, D>)) -> Tensor<B, D> {
+impl<const D: usize> LaunchOverhead<D> {
+    fn execute_inner(&self, (lhs, rhs): (Tensor<D>, Tensor<D>)) -> Tensor<D> {
         let mut handles = Vec::with_capacity(self.num_threads);
 
-        enum Task<B: Backend, const D: usize> {
-            Async(std::thread::JoinHandle<Tensor<B, D>>),
-            Sync(Tensor<B, D>),
+        enum Task<const D: usize> {
+            Async(std::thread::JoinHandle<Tensor<D>>),
+            Sync(Tensor<D>),
         }
 
         for _ in 0..self.num_threads {
@@ -61,7 +61,7 @@ impl<B: Backend, const D: usize> LaunchOverhead<B, D> {
             let func = move || {
                 let mut tmp = lhs.clone();
                 for i in 0..repetition {
-                    let new = Tensor::<B, D>::ones(shape.clone(), &device) * i as f32;
+                    let new = Tensor::<D>::ones(shape.clone(), &device) * i as f32;
 
                     if i % 2 == 0 {
                         tmp = tmp.clone().mul(rhs.clone()) + new;
@@ -95,13 +95,13 @@ impl<B: Backend, const D: usize> LaunchOverhead<B, D> {
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let mut results = Vec::new();
 
     for num_threads in [1, 4, 8, 16] {
         for shape in [[1, 4, 4, 4], [1, 8, 8, 8]] {
             for repetition in [512, 1024] {
-                let benchmark = LaunchOverhead::<B, 4> {
+                let benchmark = LaunchOverhead::<4> {
                     shape: shape.into(),
                     device: device.clone(),
                     repetition,
@@ -116,5 +116,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

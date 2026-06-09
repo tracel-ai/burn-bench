@@ -1,20 +1,25 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, activation::softmax, backend::Backend};
+use burn::tensor::{Device, Distribution, Shape, Tensor, activation::softmax};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
-struct SoftmaxBenchmark<B: Backend, const D: usize> {
+struct SoftmaxBenchmark<const D: usize> {
     shape: Shape,
     dim: usize,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend, const D: usize> Benchmark for SoftmaxBenchmark<B, D> {
-    type Input = Tensor<B, D>;
-    type Output = Tensor<B, D>;
+impl<const D: usize> Benchmark for SoftmaxBenchmark<D> {
+    type Input = Tensor<D>;
+    type Output = Tensor<D>;
 
     fn name(&self) -> String {
-        format!("softmax-{:?}-{:?}", self.dim, B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "softmax-{:?}-{:?}",
+            self.dim,
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -30,12 +35,12 @@ impl<B: Backend, const D: usize> Benchmark for SoftmaxBenchmark<B, D> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     [
         (2, 6144, 6144),
         (4, 4096, 4096),
@@ -48,7 +53,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         let shape: Shape = [a, b, c].into();
 
         (0..shape.rank())
-            .map(|dim| SoftmaxBenchmark::<B, 3>::new(shape.clone(), dim, device.clone()))
+            .map(|dim| SoftmaxBenchmark::<3>::new(shape.clone(), dim, device.clone()))
             .collect::<Vec<_>>()
     })
     .map(run_benchmark)
@@ -56,5 +61,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

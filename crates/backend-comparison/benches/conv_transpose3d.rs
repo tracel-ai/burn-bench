@@ -1,23 +1,23 @@
 use burn::tensor::{
-    Distribution, Element, Shape, Tensor, backend::Backend, module::conv_transpose3d,
+    Device, Distribution, Shape, Tensor, module::conv_transpose3d,
     ops::ConvTransposeOptions,
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct ConvTranspose3dBenchmark<B: Backend> {
+pub struct ConvTranspose3dBenchmark {
     input_shape: Shape,
     weight_shape: Shape,
     bias_shape: Shape,
     options: ConvTransposeOptions<3>,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend> Benchmark for ConvTranspose3dBenchmark<B> {
-    type Input = (Tensor<B, 5>, Tensor<B, 5>, Tensor<B, 1>);
-    type Output = Tensor<B, 5>;
+impl Benchmark for ConvTranspose3dBenchmark {
+    type Input = (Tensor<5>, Tensor<5>, Tensor<1>);
+    type Output = Tensor<5>;
 
     fn name(&self) -> String {
-        format!("conv_transpose3d-{:?}", B::FloatElem::dtype()).to_lowercase()
+        format!("conv_transpose3d-{:?}", self.device.settings().float_dtype).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -49,12 +49,12 @@ impl<B: Backend> Benchmark for ConvTranspose3dBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     // Shapes
     let batch_size = 16;
     let channels_in = 16;
@@ -73,7 +73,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
     let dilations = [1, 1, 1];
     let groups = 1;
     let options = ConvTransposeOptions::new(strides, padding, padding_out, dilations, groups);
-    let benchmark = ConvTranspose3dBenchmark::<B> {
+    let benchmark = ConvTranspose3dBenchmark {
         input_shape: [batch_size, channels_in, depth_in, height_in, width_in].into(),
         weight_shape: [
             channels_in,
@@ -92,5 +92,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

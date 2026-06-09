@@ -1,17 +1,16 @@
 use std::fmt::Display;
 
 use burn::tensor::{
-    Bool, Distribution, Element, Shape, Tensor,
-    backend::Backend,
+    Bool, Device, Distribution, Shape, Tensor,
     module::{attention, attention_fallback},
     ops::AttentionModuleOptions,
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct AttentionBenchmark<B: Backend> {
+pub struct AttentionBenchmark {
     problem: AttentionProblem,
     kind: AttentionKind,
-    device: B::Device,
+    device: Device,
 }
 
 #[derive(Clone)]
@@ -59,20 +58,20 @@ impl Display for AttentionKind {
 }
 
 #[derive(Clone)]
-pub struct AttentionInput<B: Backend> {
-    query: Tensor<B, 4>,
-    key: Tensor<B, 4>,
-    value: Tensor<B, 4>,
-    mask: Option<Tensor<B, 4, Bool>>,
+pub struct AttentionInput {
+    query: Tensor<4>,
+    key: Tensor<4>,
+    value: Tensor<4>,
+    mask: Option<Tensor<4, Bool>>,
 }
 
-impl<B: Backend> AttentionInput<B> {
-    fn new(problem: &AttentionProblem, device: &B::Device) -> Self {
+impl AttentionInput {
+    fn new(problem: &AttentionProblem, device: &Device) -> Self {
         let query = Tensor::random(problem.query_shape(), Distribution::Default, device);
         let key = Tensor::random(problem.key_shape(), Distribution::Default, device);
         let value = Tensor::random(problem.value_shape(), Distribution::Default, device);
         let mask = problem.mask.then(|| {
-            Tensor::<B, 4>::random(problem.mask_shape(), Distribution::Default, device).bool()
+            Tensor::<4>::random(problem.mask_shape(), Distribution::Default, device).bool()
         });
         AttentionInput {
             query,
@@ -83,12 +82,17 @@ impl<B: Backend> AttentionInput<B> {
     }
 }
 
-impl<B: Backend> Benchmark for AttentionBenchmark<B> {
-    type Input = AttentionInput<B>;
-    type Output = Tensor<B, 4>;
+impl Benchmark for AttentionBenchmark {
+    type Input = AttentionInput;
+    type Output = Tensor<4>;
 
     fn name(&self) -> String {
-        format!("attention_{}-{:?}", self.kind, B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "attention_{}-{:?}",
+            self.kind,
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn execute(&self, input: Self::Input) -> Self::Output {
@@ -117,12 +121,12 @@ impl<B: Backend> Benchmark for AttentionBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let small_problem = AttentionProblem {
         batch_size: 1,
         num_heads: 4,
@@ -138,12 +142,12 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         },
     };
 
-    let benchmark_flash = AttentionBenchmark::<B> {
+    let benchmark_flash = AttentionBenchmark {
         device: device.clone(),
         problem: small_problem.clone(),
         kind: AttentionKind::Flash,
     };
-    let benchmark_fallback = AttentionBenchmark::<B> {
+    let benchmark_fallback = AttentionBenchmark {
         device: device.clone(),
         problem: small_problem,
         kind: AttentionKind::Fallback,
@@ -156,5 +160,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

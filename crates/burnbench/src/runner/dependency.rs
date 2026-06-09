@@ -217,22 +217,7 @@ impl Dependency {
         // Update burn versions
 
         let update_version = |content: &str| {
-            let mut content = content.to_string();
-            for base in BURN_BASE {
-                let regex = base.to_string() + REGEX_BASE;
-                let burn_re = Regex::new(&regex).unwrap();
-                content = burn_re
-                    .replace_all(
-                        content.as_str(),
-                        format!(
-                            "{base} = {{ version = \"={}\", default-features = false }}",
-                            version_str
-                        ),
-                    )
-                    .to_string();
-            }
-
-            content
+            rewrite_burn_deps(content, |_base| format!("version = \"={version_str}\""))
         };
 
         match &content.workspace {
@@ -269,17 +254,9 @@ impl Dependency {
 
         // Update burn git reference
         let update = |content: &str| {
-            let mut content = content.to_string();
-            for base in BURN_BASE {
-                let regex = base.to_string() + REGEX_BASE;
-                let burn_re = Regex::new(&regex).unwrap();
-                content = burn_re.replace_all(
-                    content.as_str(),
-                    format!("{base} = {{ git = \"https://github.com/tracel-ai/burn\", {}, default-features = false }}", reference)
-                ).to_string();
-            }
-
-            content
+            rewrite_burn_deps(content, |_base| {
+                format!("git = \"https://github.com/tracel-ai/burn\", {reference}")
+            })
         };
 
         Ok(content.update(update))
@@ -298,24 +275,10 @@ impl Dependency {
             None => Path::new("../").join(repo_path),
         };
         let update = |content: &str| {
-            let mut content = content.to_string();
             let repo_path = repo_path.as_path();
-
-            for base in BURN_BASE {
-                let regex = base.to_string() + REGEX_BASE;
-                let burn_re = Regex::new(&regex).unwrap();
-                content = burn_re
-                    .replace_all(
-                        &content,
-                        format!(
-                            "{base} = {{ path = \"{}crates/{base}\", default-features = false }}",
-                            repo_path.to_str().unwrap()
-                        ),
-                    )
-                    .to_string();
-            }
-
-            content
+            rewrite_burn_deps(content, |base| {
+                format!("path = \"{}crates/{base}\"", repo_path.to_str().unwrap())
+            })
         };
 
         Ok(content.update(update))
@@ -326,4 +289,34 @@ fn is_commit_hash(reference: &str) -> bool {
     // Check if the reference is a valid commit hash (7 to 40 hexadecimal characters)
     let re = Regex::new(r"^[0-9a-f]{7,40}$").unwrap();
     re.is_match(reference)
+}
+
+/// Rewrites the source specifier (git/path/version) of every `burn*` dependency
+/// block, preserving any `features = [...]` array already declared on that block.
+///
+/// Backends are now selected through features declared directly on the `burn`
+/// dependency (including OS-conditional target tables), so the patch must keep
+/// them instead of collapsing every block to a feature-less `default-features =
+/// false` declaration.
+fn rewrite_burn_deps(content: &str, source_for: impl Fn(&str) -> String) -> String {
+    let features_re = Regex::new(r"features\s*=\s*\[[^\]]*\]").unwrap();
+    let mut content = content.to_string();
+    for base in BURN_BASE {
+        let regex = base.to_string() + REGEX_BASE;
+        let burn_re = Regex::new(&regex).unwrap();
+        content = burn_re
+            .replace_all(&content, |caps: &regex::Captures| {
+                let matched = &caps[0];
+                let features = features_re
+                    .find(matched)
+                    .map(|m| format!(", {}", m.as_str()))
+                    .unwrap_or_default();
+                format!(
+                    "{base} = {{ {}, default-features = false{features} }}",
+                    source_for(base)
+                )
+            })
+            .to_string();
+    }
+    content
 }

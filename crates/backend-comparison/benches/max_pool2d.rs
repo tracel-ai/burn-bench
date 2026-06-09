@@ -1,22 +1,27 @@
-use burn::tensor::{Distribution, Element, Shape, Tensor, backend::Backend, module::max_pool2d};
+use burn::tensor::{Device, Distribution, Shape, Tensor, module::max_pool2d};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct MaxPool2dBenchmark<B: Backend> {
+pub struct MaxPool2dBenchmark {
     shape: Shape,
     kernel_size: [usize; 2],
     stride: [usize; 2],
     padding: [usize; 2],
     dilation: [usize; 2],
     name: &'static str,
-    device: B::Device,
+    device: Device,
 }
 
-impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
-    type Input = Tensor<B, 4>;
-    type Output = Tensor<B, 4>;
+impl Benchmark for MaxPool2dBenchmark {
+    type Input = Tensor<4>;
+    type Output = Tensor<4>;
 
     fn name(&self) -> String {
-        format!("max_pool2d_{}-{:?}", self.name, B::FloatElem::dtype()).to_lowercase()
+        format!(
+            "max_pool2d_{}-{:?}",
+            self.name,
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
@@ -41,13 +46,13 @@ impl<B: Backend> Benchmark for MaxPool2dBenchmark<B> {
     }
 
     fn sync(&self) {
-        B::sync(&self.device).unwrap();
+        self.device.sync().unwrap();
     }
 }
 
 #[allow(dead_code)]
-fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
-    let benchmark = MaxPool2dBenchmark::<B> {
+fn bench(device: &Device) -> Vec<BenchmarkResult> {
+    let benchmark = MaxPool2dBenchmark {
         name: "default",
         shape: [2, 128, 512, 512].into(),
         kernel_size: [5, 5],
@@ -56,7 +61,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
         dilation: [2, 2],
         device: device.clone(),
     };
-    let benchmark2 = MaxPool2dBenchmark::<B> {
+    let benchmark2 = MaxPool2dBenchmark {
         name: "unit_stride",
         shape: [2, 32, 512, 512].into(),
         kernel_size: [5, 5],
@@ -70,5 +75,7 @@ fn bench<B: Backend>(device: &B::Device) -> Vec<BenchmarkResult> {
 }
 
 fn main() {
-    burnbench::bench_on_backend!();
+    let device = backend_comparison::select_device();
+    let results = bench(&device);
+    backend_comparison::save(results, &device);
 }

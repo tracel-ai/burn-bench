@@ -1,28 +1,23 @@
-use burn::tensor::backend::Backend;
-use burnbench;
+use burn::tensor::Device;
 use burnbench::BenchmarkResult;
 
 #[cfg(feature = "multi-device")]
 mod to_device_benchmarks {
-    use burn::{
-        Tensor,
-        prelude::Backend,
-        tensor::{Distribution, Element, Shape},
-    };
+    use burn::tensor::{Device, Distribution, Shape, Tensor};
     use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-    pub struct ToDeviceBenchmark<B: Backend> {
+    pub struct ToDeviceBenchmark {
         shape: Shape,
-        device_src: B::Device,
-        device_dst: B::Device,
+        device_src: Device,
+        device_dst: Device,
     }
 
-    impl<B: Backend> Benchmark for ToDeviceBenchmark<B> {
-        type Input = Tensor<B, 3>;
-        type Output = Tensor<B, 3>;
+    impl Benchmark for ToDeviceBenchmark {
+        type Input = Tensor<3>;
+        type Output = Tensor<3>;
 
         fn name(&self) -> String {
-            format!("to_device-{:?}", B::FloatElem::dtype()).to_lowercase()
+            format!("to_device-{:?}", self.device_src.settings().float_dtype).to_lowercase()
         }
 
         fn shapes(&self) -> Vec<Vec<usize>> {
@@ -38,7 +33,7 @@ mod to_device_benchmarks {
         }
 
         fn sync(&self) {
-            B::sync(&self.device_dst).unwrap()
+            self.device_dst.sync().unwrap()
         }
 
         fn num_samples(&self) -> usize {
@@ -47,11 +42,11 @@ mod to_device_benchmarks {
     }
 
     #[allow(dead_code)]
-    pub fn bench<B: Backend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
+    pub fn bench(devices: &[Device]) -> Vec<BenchmarkResult> {
         assert!(devices.len() >= 2);
         [[32, 512, 1024], [128, 512, 2048]]
             .into_iter()
-            .map(|shape| ToDeviceBenchmark::<B> {
+            .map(|shape| ToDeviceBenchmark {
                 shape: shape.into(),
                 device_src: devices[0].clone(),
                 device_dst: devices[1].clone(),
@@ -63,16 +58,18 @@ mod to_device_benchmarks {
 
 #[cfg(feature = "multi-device")]
 #[allow(dead_code)]
-fn bench<B: Backend>(devices: &Vec<B::Device>) -> Vec<BenchmarkResult> {
-    to_device_benchmarks::bench::<B>(devices)
+fn bench(devices: &[Device]) -> Vec<BenchmarkResult> {
+    to_device_benchmarks::bench(devices)
 }
 
 #[cfg(not(feature = "multi-device"))]
 #[allow(dead_code)]
-fn bench<B: Backend>(_device: &B::Device) -> Vec<BenchmarkResult> {
+fn bench(_devices: &[Device]) -> Vec<BenchmarkResult> {
     vec![]
 }
 
 fn main() {
-    burnbench::bench_on_backend_multi_device!();
+    let devices = backend_comparison::select_devices();
+    let results = bench(&devices);
+    backend_comparison::save(results, &devices);
 }
