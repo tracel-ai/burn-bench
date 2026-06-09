@@ -10,7 +10,9 @@
 //! (`--device <label> --dtype <dtype>`); [`select_device`] / [`select_devices`]
 //! turn those into a configured [`Device`].
 
-use burn::tensor::{Device, DeviceConfig, DeviceIndex, DeviceKind, DeviceType, FloatDType};
+use burn::tensor::{
+    Device, DeviceConfig, DeviceError, DeviceIndex, DeviceKind, DeviceType, FloatDType,
+};
 use burnbench::__private::{get_argument, get_sharing_token, get_sharing_url, init_log};
 use burnbench::{BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, save_records};
 
@@ -49,10 +51,17 @@ fn dtype_arg() -> FloatDType {
 }
 
 /// Applies the requested float dtype as the device default. This must happen
-/// before any tensor is created on the device; errors (e.g. already initialized)
-/// are ignored so repeated calls are harmless.
+/// before any tensor is created on the device.
+///
+/// `AlreadyInitialized` is ignored so repeated calls are harmless, but an
+/// unsupported dtype is surfaced as a panic: silently falling back to the
+/// default would mislabel the results (the recorded dtype is read back from the
+/// device settings).
 fn configure_dtype(device: &mut Device, dtype: FloatDType) {
-    let _ = device.configure(DeviceConfig::default().float_dtype(dtype));
+    match device.configure(DeviceConfig::default().float_dtype(dtype)) {
+        Ok(()) | Err(DeviceError::AlreadyInitialized { .. }) => {}
+        Err(err) => panic!("Failed to configure device dtype: {err}"),
+    }
 }
 
 /// Builds the [`Device`] for the given base backend label.

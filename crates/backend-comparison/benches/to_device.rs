@@ -43,7 +43,15 @@ mod to_device_benchmarks {
 
     #[allow(dead_code)]
     pub fn bench(devices: &[Device]) -> Vec<BenchmarkResult> {
-        assert!(devices.len() >= 2);
+        // Needs at least two devices to move tensors between; skip gracefully on
+        // hosts that expose fewer (e.g. a single GPU) instead of panicking.
+        if devices.len() < 2 {
+            eprintln!(
+                "Skipping to_device benchmark: requires at least 2 devices, found {}.",
+                devices.len()
+            );
+            return vec![];
+        }
         [[32, 512, 1024], [128, 512, 2048]]
             .into_iter()
             .map(|shape| ToDeviceBenchmark {

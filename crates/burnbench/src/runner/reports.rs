@@ -1,5 +1,4 @@
 use comfy_table::{Cell, CellAlignment, Color, Table};
-use core::fmt;
 use std::{
     fmt::Display,
     fs,
@@ -9,19 +8,14 @@ use std::{
 
 use crate::persistence::BenchmarkRecord;
 
+/// A single benchmark/device/build/dtype combination that failed to build or
+/// run. Each one is listed as its own row in the report table.
 pub(crate) struct FailedBenchmark {
     pub(crate) bench: String,
-    pub(crate) backend: String,
-}
-
-impl fmt::Display for FailedBenchmark {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Run the benchmark with verbose enabled to see the error:\ncargo run --bin burnbench -- run --benches {} --verbose\n(failed on {})",
-            self.bench, self.backend
-        )
-    }
+    pub(crate) version: String,
+    pub(crate) build: String,
+    pub(crate) device: String,
+    pub(crate) dtype: String,
 }
 
 pub(crate) struct BenchmarkCollection {
@@ -133,14 +127,18 @@ impl BenchmarkCollection {
             ]);
         }
 
-        // failed benchmarks
+        // failed benchmarks: one row per failed combination, mirroring the
+        // success columns (Feature = build profile, Backend = device).
+        if !self.failed_benchmarks.is_empty() && !records.is_empty() {
+            table.add_row(vec![Cell::new("----").fg(Color::DarkGrey); 7]);
+        }
         for benchmark in &self.failed_benchmarks {
             table.add_row(vec![
-                Cell::new(&benchmark.bench).fg(Color::Red),
+                Cell::new(format!("{}-{}", benchmark.bench, benchmark.dtype)).fg(Color::Red),
+                Cell::new(&benchmark.version).fg(Color::Red),
                 Cell::new("-"),
-                Cell::new("-"),
-                Cell::new("-"),
-                Cell::new(format!("`{}`", &benchmark.backend)).fg(Color::Red),
+                Cell::new(&benchmark.build).fg(Color::Red),
+                Cell::new(format!("`{}`", &benchmark.device)).fg(Color::Red),
                 Cell::new("-"),
                 Cell::new("FAILED").fg(Color::Red),
             ]);

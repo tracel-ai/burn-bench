@@ -162,50 +162,6 @@ impl Dependency {
         Ok(guard)
     }
 
-    fn update_feature_flags(version: &Version, content: String) -> String {
-        if version < &Version::new(0, 17, 0) {
-            let content = content
-                .replace("cuda = [\"burn/cuda\"]", "cuda = [\"burn/cuda-jit\"]")
-                .replace("rocm = [\"burn/rocm\"]", "rocm = [\"burn/hip-jit\"]")
-                .replace(
-                    "ndarray-simd = [\"ndarray\", \"burn/simd\"]",
-                    "ndarray-simd = [\"ndarray\"]",
-                )
-                .replace(
-                    "vulkan = [\"burn/vulkan\", \"burn/autotune\"]",
-                    "vulkan = [\"burn/wgpu-spirv\", \"burn/autotune\"]",
-                )
-                .replace(
-                    "metal = [\"burn/vulkan\", \"burn/autotune\"]",
-                    "metal = [\"burn/wgpu\", \"burn/autotune\"]",
-                )
-                .replace(
-                    "ndarray-simd = [\"burn/ndarray\", \"burn/simd\"]",
-                    "ndarray-simd = [\"burn/ndarray\"]",
-                )
-                .replace(
-                    "candle-metal = [\"burn/candle\", \"burn/candle-metal\"]",
-                    "candle-metal = [\"burn/candle\", \"burn/metal\"]",
-                )
-                // Use matching `rand` version (binary and data benchmarks)
-                .replace(
-                    "rand = { version = \"0.9.0\" }",
-                    "rand = { version = \"0.8.5\" }",
-                );
-
-            if (version < &Version::new(0, 16, 1)) & !content.contains("bincode = \"=2.0.0-rc.3\"")
-            {
-                content.replace(
-                    "[dependencies]",
-                    "[dependencies]\nbincode = \"=2.0.0-rc.3\"\nbincode_derive = \"=2.0.0-rc.3\"",
-                )
-            } else {
-                content
-            }
-        } else {
-            content
-        }
-    }
     fn update_burn_version(
         &self,
         content: &DependencyContent,
@@ -215,31 +171,11 @@ impl Dependency {
         log::info!("Applying Burn version: {version_str}");
 
         // Update burn versions
-
-        let update_version = |content: &str| {
+        let update = |content: &str| {
             rewrite_burn_deps(content, |_base| format!("version = \"={version_str}\""))
         };
 
-        match &content.workspace {
-            Some(original) => {
-                let workspace = update_version(original);
-                let benches = Self::update_feature_flags(version, content.benches.clone());
-
-                Ok(DependencyContentUpdate {
-                    benches: Some(benches),
-                    workspace: Some(workspace),
-                })
-            }
-            None => {
-                let benches = update_version(&content.benches);
-                let benches = Self::update_feature_flags(version, benches);
-
-                Ok(DependencyContentUpdate {
-                    benches: Some(benches),
-                    workspace: None,
-                })
-            }
-        }
+        Ok(content.update(update))
     }
 
     // NOTE: [patch] can only be applied at the root of the workspace
@@ -302,7 +238,9 @@ fn rewrite_burn_deps(content: &str, source_for: impl Fn(&str) -> String) -> Stri
     let features_re = Regex::new(r"features\s*=\s*\[[^\]]*\]").unwrap();
     let mut content = content.to_string();
     for base in BURN_BASE {
-        let regex = base.to_string() + REGEX_BASE;
+        // Anchor the dependency name to the start of a line so commented-out
+        // template lines (`# burn = { ... }`) are left untouched.
+        let regex = format!("(?m)^{base}{REGEX_BASE}");
         let burn_re = Regex::new(&regex).unwrap();
         content = burn_re
             .replace_all(&content, |caps: &regex::Captures| {

@@ -60,6 +60,15 @@ mod distributed_benchmarks {
     }
 
     pub fn bench(devices: &[Device]) -> Vec<BenchmarkResult> {
+        // Needs at least two devices to all-reduce across; skip gracefully on
+        // hosts that expose fewer instead of panicking (e.g. on `devices[0]`).
+        if devices.len() < 2 {
+            eprintln!(
+                "Skipping all_reduce benchmark: requires at least 2 devices, found {}.",
+                devices.len()
+            );
+            return vec![];
+        }
         // The distributed context starts the communication server for the
         // duration of the benchmark and tears it down on drop.
         let _ctx = DistributedContext::init(

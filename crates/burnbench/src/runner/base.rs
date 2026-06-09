@@ -231,12 +231,25 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
         tokens = get_tokens();
     }
     // Expand `all` to every device except the LibTorch ones: `tch` requires an
-    // external libtorch, so it is only pulled in when explicitly requested.
+    // external libtorch, so it is only pulled in when explicitly requested. Any
+    // device the user listed explicitly alongside `all` (e.g. `all tch-cpu`) is
+    // preserved.
     let mut devices = run_args.devices.clone();
     if devices.contains(&DeviceValues::All) {
-        devices = DeviceValues::iter()
-            .filter(|d| d != &DeviceValues::All && !d.is_tch())
+        let explicit: Vec<DeviceValues> = devices
+            .iter()
+            .filter(|&d| *d != DeviceValues::All)
+            .cloned()
             .collect();
+        let mut expanded: Vec<DeviceValues> = DeviceValues::iter()
+            .filter(|d| *d != DeviceValues::All && !d.is_tch())
+            .collect();
+        for device in explicit {
+            if !expanded.contains(&device) {
+                expanded.push(device);
+            }
+        }
+        devices = expanded;
     }
     let tch_requested = devices.iter().any(DeviceValues::is_tch);
     let access_token = tokens.map(|t| t.access_token);
@@ -340,10 +353,17 @@ fn run_backend_comparison_benchmarks(
                         if let Some(ref pb) = runner_pb {
                             pb.lock().unwrap().failed_inc();
                         }
-                        report_collection.push_failed_benchmark(FailedBenchmark {
-                            bench: bench_str.clone(),
-                            backend: label.clone(),
-                        })
+                        // A failed `cargo bench` invocation fails every bench it
+                        // covers; list each failed combination as its own row.
+                        for bench in benches.iter() {
+                            report_collection.push_failed_benchmark(FailedBenchmark {
+                                bench: bench.clone(),
+                                version: version.clone(),
+                                build: build_str.clone(),
+                                device: device_str.clone(),
+                                dtype: dtype.to_string(),
+                            });
+                        }
                     }
                     if verbose {
                         endgroup!();
