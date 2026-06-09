@@ -5,9 +5,7 @@ use burnbench::BenchmarkResult;
 mod distributed_benchmarks {
     use burn::tensor::{
         Device, Distribution, Shape, Tensor,
-        distributed::{
-            DistributedConfig, DistributedContext, ReduceOperation, all_reduce,
-        },
+        distributed::{DistributedConfig, DistributedContext, ReduceOperation, all_reduce},
     };
     use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
@@ -21,11 +19,7 @@ mod distributed_benchmarks {
         type Output = Vec<Tensor<3>>;
 
         fn name(&self) -> String {
-            format!(
-                "all_reduce-{:?}",
-                self.devices[0].settings().float_dtype
-            )
-            .to_lowercase()
+            format!("all_reduce-{:?}", self.devices[0].settings().float_dtype).to_lowercase()
         }
 
         fn shapes(&self) -> Vec<Vec<usize>> {

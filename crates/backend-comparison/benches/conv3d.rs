@@ -1,6 +1,4 @@
-use burn::tensor::{
-    Device, Distribution, Shape, Tensor, module::conv3d, ops::ConvOptions,
-};
+use burn::tensor::{Device, Distribution, Shape, Tensor, module::conv3d, ops::ConvOptions};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
 pub struct Conv3dBenchmark {

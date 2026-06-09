@@ -1,6 +1,5 @@
 use burn::tensor::{
-    Device, Distribution, Shape, Tensor, module::conv_transpose3d,
-    ops::ConvTransposeOptions,
+    Device, Distribution, Shape, Tensor, module::conv_transpose3d, ops::ConvTransposeOptions,
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 

@@ -16,11 +16,7 @@ impl Benchmark for AutodiffOverheadBenchmark {
     type Output = ();
 
     fn name(&self) -> String {
-        format!(
-            "autodiff_overhead-{:?}",
-            self.device.settings().float_dtype
-        )
-        .to_lowercase()
+        format!("autodiff_overhead-{:?}", self.device.settings().float_dtype).to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {

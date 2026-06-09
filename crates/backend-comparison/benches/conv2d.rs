@@ -1,6 +1,4 @@
-use burn::tensor::{
-    Device, Distribution, Shape, Tensor, module::conv2d, ops::ConvOptions,
-};
+use burn::tensor::{Device, Distribution, Shape, Tensor, module::conv2d, ops::ConvOptions};
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 use std::hint::black_box;
 
@@ -18,7 +16,12 @@ impl Benchmark for Conv2dBenchmark {
     type Output = Tensor<4>;
 
     fn name(&self) -> String {
-        format!("conv2d-{}-{:?}", self.suffix, self.device.settings().float_dtype).to_lowercase()
+        format!(
+            "conv2d-{}-{:?}",
+            self.suffix,
+            self.device.settings().float_dtype
+        )
+        .to_lowercase()
     }
 
     fn shapes(&self) -> Vec<Vec<usize>> {
