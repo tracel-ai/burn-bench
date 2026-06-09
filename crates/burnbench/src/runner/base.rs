@@ -59,13 +59,13 @@ struct RunArgs {
 
     /// Space separated list of devices (backends) to run on. Selecting more
     /// devices does not add builds; they all run on the same binary.
-    #[clap(short = 'D', long = "device", num_args(1..), required = true)]
+    #[clap(short = 'D', long = "devices", num_args(1..), required = true)]
     devices: Vec<DeviceValues>,
 
     /// Space separated list of build profiles (compile-time framework
     /// decorators), e.g. `default no-fusion`. Each profile is a separate build.
     /// Defaults to `default`.
-    #[clap(long = "build", num_args(0..))]
+    #[clap(long = "builds", num_args(0..))]
     builds: Vec<BuildValues>,
 
     /// Space separated list of benches to run
