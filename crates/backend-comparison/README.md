@@ -4,12 +4,12 @@ This crate defines a set of benchmarks to run with `burnbench`.
 
 ## Run benchmarks
 
-To run a given benchmark we use the `run` command with the arguments `--benches` and `--device`. The
+To run a given benchmark we use the `run` command with the arguments `--benches` and `--devices`. The
 device selects the backend at runtime. In the following example we execute the `unary` benchmark on
 the `wgpu` device:
 
 ```sh
-> cargo bb run --benches unary --device wgpu
+> cargo bb run --benches unary --devices wgpu
 ```
 
 Shorthands can be used, the following command line is the same:
@@ -21,15 +21,15 @@ Shorthands can be used, the following command line is the same:
 Selecting several devices does **not** add builds — they all run on the same binary:
 
 ```sh
-> cargo bb run --benches unary --device wgpu cuda vulkan
+> cargo bb run --benches unary --devices wgpu cuda vulkan
 ```
 
-Compile-time framework decorators are selected with `--build` (default `default`). This is how you
+Compile-time framework decorators are selected with `--builds` (default `default`). This is how you
 compare, for example, fusion on vs off — each profile is a separate build, but both appear in the
 same comparison table:
 
 ```sh
-> cargo bb run --benches matmul --device vulkan --build default no-fusion
+> cargo bb run --benches matmul --devices vulkan --builds default no-fusion
 ```
 
 Available build profiles: `default`, `no-fusion`, `no-autotune`, `no-anything`. The number of builds
@@ -49,7 +49,7 @@ Sharing results is opt-in and it is enabled with the `--share` arguments passed 
 command:
 
 ```sh
-> cargo bb run --share --benches unary --device wgpu
+> cargo bb run --share --benches unary --devices wgpu
 ```
 
 To be able to upload results you must be authenticated. We only support GitHub authentication. To
@@ -80,17 +80,17 @@ the application again except if your refresh token itself becomes invalid.
 
 Backends are no longer selected through cargo features: every backend that can be compiled on the
 host is linked in automatically, and the concrete backend is chosen at runtime by passing
-`--device` (and optionally `--dtype`) to the benchmark binary.
+`--devices` (and optionally `--dtype`) to the benchmark binary.
 
 ```sh
 # Run the unary benchmark on the wgpu backend in f32
-> cargo bench --bench unary -- --device wgpu --dtype f32
+> cargo bench --bench unary -- --devices wgpu --dtype f32
 ```
 
 Kernel fusion is a compile-time decorator, so the fused variants require the `fusion` feature:
 
 ```sh
-> cargo bench --bench unary --features fusion -- --device wgpu
+> cargo bench --bench unary --features fusion -- --devices wgpu
 ```
 
 Backends that depend on external libraries are opt-in features: `tch` (LibTorch) and the BLAS

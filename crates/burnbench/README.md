@@ -54,12 +54,12 @@ Available Backends:
 
 #### Run benchmarks
 
-To run a given benchmark we use the `run` command with the arguments `--benches` and `--device`. The
+To run a given benchmark we use the `run` command with the arguments `--benches` and `--devices`. The
 device selects the backend at runtime. In the following example we execute the `unary` benchmark on
 the `wgpu` device:
 
 ```sh
-> cargo run --release --bin burnbench -- run --benches unary --device wgpu
+> cargo run --release --bin burnbench -- run --benches unary --devices wgpu
 ```
 
 Shorthands can be used, the following command line is the same:
@@ -72,15 +72,15 @@ Multiple benchmarks and devices can be passed on the same command line. Selectin
 not add builds — they all run on the same binary:
 
 ```sh
-> cargo run --bin burnbench -- run --benches unary binary --device wgpu cuda
+> cargo run --bin burnbench -- run --benches unary binary --devices wgpu cuda
 ```
 
-Compile-time framework decorators are a separate concern, selected with `--build` (default
+Compile-time framework decorators are a separate concern, selected with `--builds` (default
 `default`). Each profile is its own build, so this is how you compare e.g. fusion on vs off in a
 single report:
 
 ```sh
-> cargo run --bin burnbench -- run --benches matmul --device vulkan --build default no-fusion
+> cargo run --bin burnbench -- run --benches matmul --devices vulkan --builds default no-fusion
 ```
 
 The number of builds is `benches × build profiles`; devices and dtypes are runtime reruns. Available
@@ -100,7 +100,7 @@ Sharing results is opt-in and it is enabled with the `--share` arguments passed 
 command:
 
 ```sh
-> cargo run --release --bin burnbench -- run --share --benches unary --device wgpu
+> cargo run --release --bin burnbench -- run --share --benches unary --devices wgpu
 ```
 
 To be able to upload results you must be authenticated. We only support GitHub authentication. To
@@ -129,15 +129,15 @@ the application again except if your refresh token itself becomes invalid.
 
 ## Execute benchmarks with cargo
 
-Using only cargo, the device is injected at runtime via `--device`, and the compile-time build
-profile is selected with cargo features (the `--build` profiles map to feature sets):
+Using only cargo, the device is injected at runtime via `--devices`, and the compile-time build
+profile is selected with cargo features (the `--builds` profiles map to feature sets):
 
 ```sh
 # default profile (fusion + autotune) on the wgpu device
-> cargo bench --bench unary -- --device wgpu --dtype f32
+> cargo bench --bench unary -- --devices wgpu --dtype f32
 
 # no-fusion profile
-> cargo bench --bench unary --no-default-features --features autotune -- --device wgpu
+> cargo bench --bench unary --no-default-features --features autotune -- --devices wgpu
 ```
 
 ## Add a new benchmark

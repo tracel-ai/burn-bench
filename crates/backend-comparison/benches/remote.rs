@@ -1,7 +1,7 @@
 use burn::tensor::Device;
 use burnbench::BenchmarkResult;
 
-// cargo bb run -b remote --device wgpu -V local
+// cargo bb run -b remote --devices wgpu -V local
 
 #[cfg(feature = "remote")]
 mod remote_benchmarks {

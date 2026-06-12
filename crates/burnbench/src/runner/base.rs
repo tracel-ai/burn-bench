@@ -147,6 +147,9 @@ impl DeviceValues {
             DeviceValues::TchCpu | DeviceValues::TchCuda | DeviceValues::TchMetal
         )
     }
+    fn is_rocm(&self) -> bool {
+        matches!(self, DeviceValues::Rocm)
+    }
 }
 
 /// A compile-time build profile: which framework decorators (`fusion`,
@@ -233,7 +236,7 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
     // Expand `all` to every device except the LibTorch ones: `tch` requires an
     // external libtorch, so it is only pulled in when explicitly requested. Any
     // device the user listed explicitly alongside `all` (e.g. `all tch-cpu`) is
-    // preserved.
+    // preserved. Similarly, `rocm` is only pulled in when explicitly requested.
     let mut devices = run_args.devices.clone();
     if devices.contains(&DeviceValues::All) {
         let explicit: Vec<DeviceValues> = devices
@@ -242,7 +245,7 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
             .cloned()
             .collect();
         let mut expanded: Vec<DeviceValues> = DeviceValues::iter()
-            .filter(|d| *d != DeviceValues::All && !d.is_tch())
+            .filter(|d| *d != DeviceValues::All && !d.is_tch() && !d.is_rocm())
             .collect();
         for device in explicit {
             if !expanded.contains(&device) {
@@ -252,6 +255,7 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
         devices = expanded;
     }
     let tch_requested = devices.iter().any(DeviceValues::is_tch);
+    let rocm_requested = devices.iter().any(DeviceValues::is_rocm);
     let access_token = tokens.map(|t| t.access_token);
 
     // Set the defaults
@@ -282,6 +286,7 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
         &devices,
         &run_args.builds,
         tch_requested,
+        rocm_requested,
         &run_args.versions,
         &run_args.dtypes,
         access_token.as_deref(),
@@ -297,6 +302,7 @@ fn run_backend_comparison_benchmarks(
     devices: &[DeviceValues],
     builds: &[BuildValues],
     tch_requested: bool,
+    rocm_requested: bool,
     versions: &[String],
     dtypes: &[BenchDType],
     token: Option<&str>,
@@ -336,6 +342,7 @@ fn run_backend_comparison_benchmarks(
                         &device_str,
                         build,
                         tch_requested,
+                        rocm_requested,
                         dtype,
                         &url,
                         token,
@@ -427,6 +434,7 @@ fn run_cargo(
     device: &str,
     build: &BuildValues,
     tch_requested: bool,
+    rocm_requested: bool,
     dtype: &BenchDType,
     url: &str,
     token: Option<&str>,
@@ -453,7 +461,7 @@ fn run_cargo(
     let name = &info.name;
 
     // Backends are selected at runtime by injecting the right device (the
-    // `--device` argument below), so cargo features only control the compile-
+    // `--devices` argument below), so cargo features only control the compile-
     // time build profile (framework decorators), `tch` (when a LibTorch device
     // is requested), and any benchmark-specific required features.
     let (no_default_features, kept_features) = build.features();
@@ -463,6 +471,9 @@ fn run_cargo(
         .collect();
     if tch_requested {
         feature_list.push(format!("{name}/tch"));
+    }
+    if rocm_requested {
+        feature_list.push(format!("{name}/rocm"));
     }
     for bench in benches.iter() {
         for req_feature in get_required_features(info, bench) {
@@ -494,11 +505,11 @@ fn run_cargo(
     // Runtime arguments forwarded to the benchmark binary: which device to
     // inject, which dtype to configure, the build label, and optional sharing.
     args.push("--");
-    args.push("--device");
+    args.push("--devices");
     args.push(device);
     args.push("--dtype");
     args.push(&dtype_str);
-    args.push("--build");
+    args.push("--builds");
     args.push(&build_str);
     if let Some(t) = token {
         args.push("--sharing-url");

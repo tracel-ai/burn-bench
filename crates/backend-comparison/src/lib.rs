@@ -7,7 +7,7 @@
 //! picked at runtime by injecting the right [`Device`].
 //!
 //! The runner passes the desired backend and dtype as runtime arguments
-//! (`--device <label> --dtype <dtype>`); [`select_device`] / [`select_devices`]
+//! (`--devices <label> --dtype <dtype>`); [`select_device`] / [`select_devices`]
 //! turn those into a configured [`Device`].
 
 use burn::tensor::{
@@ -16,25 +16,25 @@ use burn::tensor::{
 use burnbench::__private::{get_argument, get_sharing_token, get_sharing_url, init_log};
 use burnbench::{BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, save_records};
 
-/// Default backend label used when `--device` is not provided.
+/// Default backend label used when `--devices` is not provided.
 const DEFAULT_DEVICE: &str = "ndarray";
 
-/// Returns the raw backend label passed via `--device` (e.g. `cuda`,
+/// Returns the raw backend label passed via `--devices` (e.g. `cuda`,
 /// `tch-cpu`). The device selects the backend at runtime; it is independent
-/// from the compile-time `--build` profile.
+/// from the compile-time `--builds` profile.
 fn device_label() -> String {
     let args: Vec<String> = std::env::args().collect();
-    get_argument(&args, "--device")
+    get_argument(&args, "--devices")
         .unwrap_or(DEFAULT_DEVICE)
         .to_string()
 }
 
-/// Returns the compile-time build profile requested via `--build` (e.g.
+/// Returns the compile-time build profile requested via `--builds` (e.g.
 /// `default`, `no-fusion`). It is recorded in the result's `feature` column and
 /// does not affect which device is selected.
 fn build_label() -> String {
     let args: Vec<String> = std::env::args().collect();
-    get_argument(&args, "--build")
+    get_argument(&args, "--builds")
         .unwrap_or("default")
         .to_string()
 }
@@ -90,7 +90,7 @@ fn build_device(base: &str) -> Device {
         "vulkan" => Device::vulkan(DeviceKind::DefaultDevice),
         #[cfg(not(target_os = "macos"))]
         "cuda" => Device::cuda(DeviceIndex::Default),
-        #[cfg(target_os = "linux")]
+        #[cfg(feature = "rocm")]
         "rocm" => Device::rocm(DeviceIndex::Default),
         #[cfg(target_os = "macos")]
         "metal" => Device::metal(DeviceKind::DefaultDevice),
@@ -117,7 +117,7 @@ fn device_type(base: &str) -> DeviceType {
         "vulkan" => DeviceType::Vulkan,
         #[cfg(not(target_os = "macos"))]
         "cuda" => DeviceType::Cuda,
-        #[cfg(target_os = "linux")]
+        #[cfg(feature = "rocm")]
         "rocm" => DeviceType::Rocm,
         #[cfg(target_os = "macos")]
         "metal" => DeviceType::Metal,

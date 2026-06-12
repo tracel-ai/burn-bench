@@ -18,7 +18,7 @@ identify regressions, improvements, and the best backend for a given workload.
 To run backend performance benchmarks, use the `burnbench` CLI:
 
 ```sh
-cargo run --release --bin burnbench -- run --benches unary --device wgpu
+cargo run --release --bin burnbench -- run --benches unary --devices wgpu
 ```
 
 Or use the shorthand alias:
@@ -27,9 +27,9 @@ Or use the shorthand alias:
 cargo bb run -b unary -D wgpu
 ```
 
-The device selects the backend at runtime; picking several (`--device wgpu cuda`) does not add
-builds. Compile-time framework decorators are chosen with `--build` (e.g. compare fusion on/off with
-`--build default no-fusion`).
+The device selects the backend at runtime; picking several (`--devices wgpu cuda`) does not add
+builds. Compile-time framework decorators are chosen with `--builds` (e.g. compare fusion on/off with
+`--builds default no-fusion`).
 
 This will use the main branch of Burn by default.
 
@@ -69,7 +69,7 @@ cargo run --release --bin burnbench -- auth
 Then share results with:
 
 ```sh
-cargo bb run --share --benches unary --device wgpu
+cargo bb run --share --benches unary --devices wgpu
 ```
 
 ## Development

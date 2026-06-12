@@ -35,6 +35,7 @@ ndarray-simd = ["burn/simd"]
 ndarray-blas-accelerate = ["burn/accelerate"]
 ndarray-blas-netlib = ["burn/blas-netlib"]
 ndarray-blas-openblas = ["burn/openblas"]
+rocm = ["burn/rocm"]
 
 # Special benchmark capabilities.
 multi-device = []
@@ -87,10 +88,10 @@ wsl = { workspace = true }
 
 # CUDA, ROCm and Vulkan compile on Linux (they don't necessarily run on every
 # machine, but linking them in lets the device be selected at runtime).
+# ROCm links directly instead of at runtime so it must be enabled via a feature.
 [target.'cfg(target_os = "linux")'.dependencies]
 burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
     "cuda",
-    "rocm",
     "vulkan",
 ] }
 
