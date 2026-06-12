@@ -1,7 +1,7 @@
 use burn::tensor::Device;
 use burnbench::BenchmarkResult;
 
-#[cfg(all(feature = "distributed", feature = "multi-device"))]
+#[cfg(feature = "multi-device")]
 mod distributed_benchmarks {
     use burn::tensor::{
         Device, Distribution, Shape, Tensor,
@@ -83,13 +83,13 @@ mod distributed_benchmarks {
     }
 }
 
-#[cfg(all(feature = "distributed", feature = "multi-device"))]
+#[cfg(feature = "multi-device")]
 #[allow(dead_code)]
 fn bench(devices: &[Device]) -> Vec<BenchmarkResult> {
     distributed_benchmarks::bench(devices)
 }
 
-#[cfg(any(not(feature = "distributed"), not(feature = "multi-device")))]
+#[cfg(not(feature = "multi-device"))]
 #[allow(dead_code)]
 fn bench(_devices: &[Device]) -> Vec<BenchmarkResult> {
     vec![]

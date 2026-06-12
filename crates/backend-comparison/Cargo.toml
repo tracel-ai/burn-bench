@@ -39,7 +39,6 @@ rocm = ["burn/rocm"]
 
 # Special benchmark capabilities.
 multi-device = []
-distributed = ["burn/distributed"]
 remote = ["server", "burn/remote"]
 server = ["burn/server"]
 
@@ -229,4 +228,4 @@ required-features = ["multi-device"]
 harness = false
 name = "all-reduce"
 path = "benches/all_reduce.rs"
-required-features = ["multi-device", "distributed"]
+required-features = ["multi-device"]
