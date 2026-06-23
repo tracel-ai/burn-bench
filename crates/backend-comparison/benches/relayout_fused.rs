@@ -1,29 +1,52 @@
 use burn::tensor::{
     Device, Distribution, Shape, Tensor,
-    module::{adaptive_avg_pool2d, avg_pool2d, max_pool2d},
+    module::{adaptive_avg_pool2d, avg_pool2d, interpolate, max_pool2d},
+    ops::{InterpolateMode, InterpolateOptions},
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct PoolBenchmark {
-    name: String,
+pub struct RelayoutBenchmark {
     device: Device,
     shape: Shape,
-    mode: PoolMode,
+    mode: RelayoutAlgorithm,
 }
 
-#[derive(Clone, Copy)]
-pub enum PoolMode {
+#[derive(Clone)]
+pub enum RelayoutAlgorithm {
     MaxPool2D(MaxPool2D),
     AvgPool2D(AvgPool2D),
     AdaptivePool2d(AdaptiveAvgPool2D),
+    Interpolate(Interpolate),
 }
 
-impl PoolMode {
-    pub fn name(&self) -> &'static str {
+fn slice_to_string(slice: &[usize]) -> String {
+    slice
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>()
+        .join("x")
+}
+
+impl RelayoutAlgorithm {
+    pub fn name(&self) -> String {
         match self {
-            PoolMode::MaxPool2D(_) => "max_pool2d",
-            PoolMode::AvgPool2D(_) => "avg_pool2d",
-            PoolMode::AdaptivePool2d(_) => "adaptive_avg_pool2d",
+            RelayoutAlgorithm::MaxPool2D(op) => format!(
+                "max_pool2d_k{}_s{}_p{}_d{}",
+                slice_to_string(&op.kernel_size),
+                slice_to_string(&op.stride),
+                slice_to_string(&op.padding),
+                slice_to_string(&op.dilation)
+            ),
+            RelayoutAlgorithm::AvgPool2D(op) => format!(
+                "avg_pool2d_k{}_s{}_p{}",
+                slice_to_string(&op.kernel_size),
+                slice_to_string(&op.stride),
+                slice_to_string(&op.padding)
+            ),
+            RelayoutAlgorithm::AdaptivePool2d(op) => {
+                format!("adaptive_avg_pool2d_o{}", slice_to_string(&op.output_size))
+            }
+            RelayoutAlgorithm::Interpolate(op) => format!("interpolate_{:?}", op.options.mode),
         }
     }
 }
@@ -48,16 +71,22 @@ pub struct AdaptiveAvgPool2D {
     output_size: [usize; 2],
 }
 
-impl PoolBenchmark {
+#[derive(Clone)]
+pub struct Interpolate {
+    output_size: [usize; 2],
+    options: InterpolateOptions,
+}
+
+impl RelayoutBenchmark {
     pub fn execute(&self, input: Tensor<4>) -> Tensor<4> {
         self.mode.execute(input)
     }
 }
 
-impl PoolMode {
+impl RelayoutAlgorithm {
     pub fn execute(&self, input: Tensor<4>) -> Tensor<4> {
         match self {
-            PoolMode::MaxPool2D(benchmark) => max_pool2d(
+            RelayoutAlgorithm::MaxPool2D(benchmark) => max_pool2d(
                 input,
                 benchmark.kernel_size,
                 benchmark.stride,
@@ -65,7 +94,7 @@ impl PoolMode {
                 benchmark.dilation,
                 false,
             ),
-            PoolMode::AvgPool2D(benchmark) => avg_pool2d(
+            RelayoutAlgorithm::AvgPool2D(benchmark) => avg_pool2d(
                 input,
                 benchmark.kernel_size,
                 benchmark.stride,
@@ -73,22 +102,24 @@ impl PoolMode {
                 false,
                 false,
             ),
-            PoolMode::AdaptivePool2d(benchmark) => {
+            RelayoutAlgorithm::AdaptivePool2d(benchmark) => {
                 adaptive_avg_pool2d(input, benchmark.output_size)
+            }
+            RelayoutAlgorithm::Interpolate(benchmark) => {
+                interpolate(input, benchmark.output_size, benchmark.options.clone())
             }
         }
     }
 }
 
-impl Benchmark for PoolBenchmark {
+impl Benchmark for RelayoutBenchmark {
     type Input = (Tensor<4>, Tensor<4>);
     type Output = Tensor<4>;
 
     fn name(&self) -> String {
         format!(
-            "{}_{}-{:?}",
+            "{}_{:?}",
             self.mode.name(),
-            self.name,
             self.device.settings().float_dtype
         )
         .to_lowercase()
@@ -132,47 +163,36 @@ fn bench(device: &Device) -> Vec<BenchmarkResult> {
         .collect();
 
     let strategies = vec![
-        PoolMode::MaxPool2D(MaxPool2D {
-            kernel_size: [5, 5],
-            stride: [2, 2],
-            padding: [2, 2],
-            dilation: [2, 2],
-        }),
-        PoolMode::MaxPool2D(MaxPool2D {
+        RelayoutAlgorithm::MaxPool2D(MaxPool2D {
             kernel_size: [5, 5],
             stride: [1, 1],
             padding: [2, 2],
             dilation: [1, 1],
         }),
-        PoolMode::AvgPool2D(AvgPool2D {
-            kernel_size: [5, 5],
-            stride: [2, 2],
-            padding: [2, 2],
-        }),
-        PoolMode::AvgPool2D(AvgPool2D {
+        RelayoutAlgorithm::AvgPool2D(AvgPool2D {
             kernel_size: [5, 5],
             stride: [1, 1],
             padding: [2, 2],
         }),
-        PoolMode::AdaptivePool2d(AdaptiveAvgPool2D {
+        RelayoutAlgorithm::AdaptivePool2d(AdaptiveAvgPool2D {
             output_size: [256, 256],
         }),
-        PoolMode::AdaptivePool2d(AdaptiveAvgPool2D {
+        RelayoutAlgorithm::Interpolate(Interpolate {
+            output_size: [1024, 1024],
+            options: InterpolateOptions::new(InterpolateMode::Nearest),
+        }),
+        RelayoutAlgorithm::Interpolate(Interpolate {
             output_size: [256, 256],
+            options: InterpolateOptions::new(InterpolateMode::Lanczos3),
         }),
     ];
 
-    for (name, mode) in strategies
-        .iter()
-        .enumerate()
-        .map(|(i, m)| (format!("strategy_{}", i), m.clone()))
-    {
+    for mode in strategies {
         for shape in &shapes {
-            benches.push(PoolBenchmark {
-                name: name.clone(),
+            benches.push(RelayoutBenchmark {
                 shape: shape.clone(),
                 device: device.clone(),
-                mode: mode,
+                mode: mode.clone(),
             });
         }
     }

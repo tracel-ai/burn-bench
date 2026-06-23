@@ -137,8 +137,8 @@ path = "benches/max_pool2d.rs"
 
 [[bench]]
 harness = false
-name = "pool-fused"
-path = "benches/pool_fused.rs"
+name = "relayout-fused"
+path = "benches/relayout_fused.rs"
 
 [[bench]]
 harness = false
