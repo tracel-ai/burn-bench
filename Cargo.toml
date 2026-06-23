@@ -54,6 +54,8 @@ cfg-if = "1.0.0"
 semver = "1.0.26"
 tempfile = "3.24.0"
 
+[patch."https://github.com/tracel-ai/burn"]
+burn = { path = "../burn/crates/burn" }
 
 [profile.dev]
 debug = 0 # Speed up compilation time and not necessary.

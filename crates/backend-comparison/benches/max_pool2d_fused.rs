@@ -12,12 +12,12 @@ pub struct MaxPool2dBenchmark {
 }
 
 impl Benchmark for MaxPool2dBenchmark {
-    type Input = Tensor<4>;
+    type Input = (Tensor<4>, Tensor<4>);
     type Output = Tensor<4>;
 
     fn name(&self) -> String {
         format!(
-            "max_pool2d_{}-{:?}",
+            "max_pool2d_fused_{}-{:?}",
             self.name,
             self.device.settings().float_dtype
         )
@@ -28,7 +28,12 @@ impl Benchmark for MaxPool2dBenchmark {
         vec![self.shape.to_vec()]
     }
 
-    fn execute(&self, x: Self::Input) -> Self::Output {
+    fn execute(&self, input: Self::Input) -> Self::Output {
+        let x = input.0;
+        let zeros = input.1;
+
+        let x = x + zeros;
+
         max_pool2d(
             x,
             self.kernel_size,
@@ -41,8 +46,12 @@ impl Benchmark for MaxPool2dBenchmark {
 
     fn prepare(&self) -> Self::Input {
         let [batches, ch, h, w] = self.shape.dims();
-        Tensor::random([batches, h, w, ch], Distribution::Default, &self.device)
-            .permute([0, 3, 1, 2])
+
+        let x = Tensor::random([batches, h, w, ch], Distribution::Default, &self.device)
+            .permute([0, 3, 1, 2]);
+        let zeros = Tensor::zeros([batches, h, w, ch], &self.device).permute([0, 3, 1, 2]);
+
+        (x, zeros)
     }
 
     fn sync(&self) {
@@ -51,7 +60,9 @@ impl Benchmark for MaxPool2dBenchmark {
 }
 
 fn bench(device: &Device) -> Vec<BenchmarkResult> {
-    let benchmark = MaxPool2dBenchmark {
+    let mut benches = Vec::new();
+
+    benches.push(MaxPool2dBenchmark {
         name: "default",
         shape: [2, 128, 512, 512].into(),
         kernel_size: [5, 5],
@@ -59,8 +70,8 @@ fn bench(device: &Device) -> Vec<BenchmarkResult> {
         padding: [2, 2],
         dilation: [2, 2],
         device: device.clone(),
-    };
-    let benchmark2 = MaxPool2dBenchmark {
+    });
+    benches.push(MaxPool2dBenchmark {
         name: "unit_stride",
         shape: [2, 32, 512, 512].into(),
         kernel_size: [5, 5],
@@ -68,9 +79,12 @@ fn bench(device: &Device) -> Vec<BenchmarkResult> {
         padding: [2, 2],
         dilation: [1, 1],
         device: device.clone(),
-    };
+    });
 
-    vec![run_benchmark(benchmark), run_benchmark(benchmark2)]
+    benches
+        .into_iter()
+        .map(|bench| run_benchmark(bench))
+        .collect()
 }
 
 fn main() {

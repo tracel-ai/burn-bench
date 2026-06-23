@@ -137,6 +137,11 @@ path = "benches/max_pool2d.rs"
 
 [[bench]]
 harness = false
+name = "max-pool2d-fused"
+path = "benches/max_pool2d_fused.rs"
+
+[[bench]]
+harness = false
 name = "conv-transpose2d"
 path = "benches/conv_transpose2d.rs"
 
