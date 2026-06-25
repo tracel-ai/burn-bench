@@ -5,14 +5,14 @@ use burn::tensor::{
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
 
-pub struct RelayoutBenchmark {
+pub struct NHWCRelayoutBenchmark {
     device: Device,
     shape: Shape,
-    mode: RelayoutAlgorithm,
+    mode: NHWCRelayoutAlgorithm,
 }
 
 #[derive(Clone)]
-pub enum RelayoutAlgorithm {
+pub enum NHWCRelayoutAlgorithm {
     MaxPool2D(MaxPool2D),
     AvgPool2D(AvgPool2D),
     AdaptivePool2d(AdaptiveAvgPool2D),
@@ -27,26 +27,26 @@ fn slice_to_string(slice: &[usize]) -> String {
         .join("x")
 }
 
-impl RelayoutAlgorithm {
+impl NHWCRelayoutAlgorithm {
     pub fn name(&self) -> String {
         match self {
-            RelayoutAlgorithm::MaxPool2D(op) => format!(
+            NHWCRelayoutAlgorithm::MaxPool2D(op) => format!(
                 "max_pool2d_k{}_s{}_p{}_d{}",
                 slice_to_string(&op.kernel_size),
                 slice_to_string(&op.stride),
                 slice_to_string(&op.padding),
                 slice_to_string(&op.dilation)
             ),
-            RelayoutAlgorithm::AvgPool2D(op) => format!(
+            NHWCRelayoutAlgorithm::AvgPool2D(op) => format!(
                 "avg_pool2d_k{}_s{}_p{}",
                 slice_to_string(&op.kernel_size),
                 slice_to_string(&op.stride),
                 slice_to_string(&op.padding)
             ),
-            RelayoutAlgorithm::AdaptivePool2d(op) => {
+            NHWCRelayoutAlgorithm::AdaptivePool2d(op) => {
                 format!("adaptive_avg_pool2d_o{}", slice_to_string(&op.output_size))
             }
-            RelayoutAlgorithm::Interpolate(op) => format!("interpolate_{:?}", op.options.mode),
+            NHWCRelayoutAlgorithm::Interpolate(op) => format!("interpolate_{:?}", op.options.mode),
         }
     }
 }
@@ -77,16 +77,16 @@ pub struct Interpolate {
     options: InterpolateOptions,
 }
 
-impl RelayoutBenchmark {
+impl NHWCRelayoutBenchmark {
     pub fn execute(&self, input: Tensor<4>) -> Tensor<4> {
         self.mode.execute(input)
     }
 }
 
-impl RelayoutAlgorithm {
+impl NHWCRelayoutAlgorithm {
     pub fn execute(&self, input: Tensor<4>) -> Tensor<4> {
         match self {
-            RelayoutAlgorithm::MaxPool2D(benchmark) => max_pool2d(
+            NHWCRelayoutAlgorithm::MaxPool2D(benchmark) => max_pool2d(
                 input,
                 benchmark.kernel_size,
                 benchmark.stride,
@@ -94,7 +94,7 @@ impl RelayoutAlgorithm {
                 benchmark.dilation,
                 false,
             ),
-            RelayoutAlgorithm::AvgPool2D(benchmark) => avg_pool2d(
+            NHWCRelayoutAlgorithm::AvgPool2D(benchmark) => avg_pool2d(
                 input,
                 benchmark.kernel_size,
                 benchmark.stride,
@@ -102,17 +102,17 @@ impl RelayoutAlgorithm {
                 false,
                 false,
             ),
-            RelayoutAlgorithm::AdaptivePool2d(benchmark) => {
+            NHWCRelayoutAlgorithm::AdaptivePool2d(benchmark) => {
                 adaptive_avg_pool2d(input, benchmark.output_size)
             }
-            RelayoutAlgorithm::Interpolate(benchmark) => {
+            NHWCRelayoutAlgorithm::Interpolate(benchmark) => {
                 interpolate(input, benchmark.output_size, benchmark.options.clone())
             }
         }
     }
 }
 
-impl Benchmark for RelayoutBenchmark {
+impl Benchmark for NHWCRelayoutBenchmark {
     type Input = (Tensor<4>, Tensor<4>);
     type Output = Tensor<4>;
 
@@ -133,7 +133,7 @@ impl Benchmark for RelayoutBenchmark {
         let x = input.0;
         let zeros = input.1;
 
-        // trigger relayout
+        // trigger NHWCRelayout
         let x = x + zeros;
 
         // pool
@@ -163,25 +163,25 @@ fn bench(device: &Device) -> Vec<BenchmarkResult> {
         .collect();
 
     let strategies = vec![
-        RelayoutAlgorithm::MaxPool2D(MaxPool2D {
+        NHWCRelayoutAlgorithm::MaxPool2D(MaxPool2D {
             kernel_size: [5, 5],
             stride: [1, 1],
             padding: [2, 2],
             dilation: [1, 1],
         }),
-        RelayoutAlgorithm::AvgPool2D(AvgPool2D {
+        NHWCRelayoutAlgorithm::AvgPool2D(AvgPool2D {
             kernel_size: [5, 5],
             stride: [1, 1],
             padding: [2, 2],
         }),
-        RelayoutAlgorithm::AdaptivePool2d(AdaptiveAvgPool2D {
+        NHWCRelayoutAlgorithm::AdaptivePool2d(AdaptiveAvgPool2D {
             output_size: [256, 256],
         }),
-        RelayoutAlgorithm::Interpolate(Interpolate {
+        NHWCRelayoutAlgorithm::Interpolate(Interpolate {
             output_size: [1024, 1024],
             options: InterpolateOptions::new(InterpolateMode::Nearest),
         }),
-        RelayoutAlgorithm::Interpolate(Interpolate {
+        NHWCRelayoutAlgorithm::Interpolate(Interpolate {
             output_size: [256, 256],
             options: InterpolateOptions::new(InterpolateMode::Lanczos3),
         }),
@@ -189,7 +189,7 @@ fn bench(device: &Device) -> Vec<BenchmarkResult> {
 
     for mode in strategies {
         for shape in &shapes {
-            benches.push(RelayoutBenchmark {
+            benches.push(NHWCRelayoutBenchmark {
                 shape: shape.clone(),
                 device: device.clone(),
                 mode: mode.clone(),
