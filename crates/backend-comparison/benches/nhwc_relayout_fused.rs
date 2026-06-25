@@ -1,9 +1,27 @@
 use burn::tensor::{
-    Device, Distribution, Shape, Tensor,
+    Device, Distribution, Shape, Tensor, Tolerance,
     module::{adaptive_avg_pool2d, avg_pool2d, interpolate, max_pool2d},
     ops::{InterpolateMode, InterpolateOptions},
 };
 use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
+
+#[derive(Clone)]
+pub enum BenchmarkInput {
+    Single4D(Tensor<4>, Tensor<4>),
+}
+
+#[derive(Clone)]
+pub enum BenchmarkOutput {
+    Dim4(Tensor<4>),
+}
+
+impl BenchmarkOutput {
+    pub fn into_data(self) -> burn::tensor::TensorData {
+        match self {
+            BenchmarkOutput::Dim4(tensor) => tensor.into_data(),
+        }
+    }
+}
 
 pub struct NHWCRelayoutBenchmark {
     device: Device,
@@ -78,43 +96,90 @@ pub struct Interpolate {
 }
 
 impl NHWCRelayoutBenchmark {
-    pub fn execute(&self, input: Tensor<4>) -> Tensor<4> {
-        self.mode.execute(input)
+    pub fn bench(&self, input: BenchmarkInput) -> BenchmarkOutput {
+        self.mode.execute(input, true)
+    }
+
+    #[cfg(feature = "correctness")]
+    pub fn check_correctness(&self) {
+        let input = self.prepare();
+        let expected = self.mode.execute(input.clone(), false);
+        let actual = self.bench(input.clone());
+        expected
+            .into_data()
+            .assert_approx_eq(&actual.into_data(), Tolerance::<f32>::strict());
+    }
+
+    pub fn prepare_algorithm(&self) -> BenchmarkInput {
+        self.mode.prepare(&self.shape, &self.device)
     }
 }
 
 impl NHWCRelayoutAlgorithm {
-    pub fn execute(&self, input: Tensor<4>) -> Tensor<4> {
-        match self {
-            NHWCRelayoutAlgorithm::MaxPool2D(benchmark) => max_pool2d(
-                input,
-                benchmark.kernel_size,
-                benchmark.stride,
-                benchmark.padding,
-                benchmark.dilation,
-                false,
-            ),
-            NHWCRelayoutAlgorithm::AvgPool2D(benchmark) => avg_pool2d(
-                input,
-                benchmark.kernel_size,
-                benchmark.stride,
-                benchmark.padding,
-                false,
-                false,
-            ),
-            NHWCRelayoutAlgorithm::AdaptivePool2d(benchmark) => {
-                adaptive_avg_pool2d(input, benchmark.output_size)
+    pub fn execute(&self, input: BenchmarkInput, with_zeros: bool) -> BenchmarkOutput {
+        match (self, input) {
+            (NHWCRelayoutAlgorithm::MaxPool2D(benchmark), BenchmarkInput::Single4D(zeros, x)) => {
+                let x = if with_zeros { x + zeros } else { x };
+                BenchmarkOutput::Dim4(max_pool2d(
+                    x,
+                    benchmark.kernel_size,
+                    benchmark.stride,
+                    benchmark.padding,
+                    benchmark.dilation,
+                    false,
+                ))
             }
-            NHWCRelayoutAlgorithm::Interpolate(benchmark) => {
-                interpolate(input, benchmark.output_size, benchmark.options.clone())
+            (NHWCRelayoutAlgorithm::AvgPool2D(benchmark), BenchmarkInput::Single4D(zeros, x)) => {
+                let x = if with_zeros { x + zeros } else { x };
+                BenchmarkOutput::Dim4(avg_pool2d(
+                    x,
+                    benchmark.kernel_size,
+                    benchmark.stride,
+                    benchmark.padding,
+                    false,
+                    false,
+                ))
+            }
+            (
+                NHWCRelayoutAlgorithm::AdaptivePool2d(benchmark),
+                BenchmarkInput::Single4D(zeros, x),
+            ) => {
+                let x = if with_zeros { x + zeros } else { x };
+                BenchmarkOutput::Dim4(adaptive_avg_pool2d(x, benchmark.output_size))
+            }
+            (NHWCRelayoutAlgorithm::Interpolate(benchmark), BenchmarkInput::Single4D(zeros, x)) => {
+                let x = if with_zeros { x + zeros } else { x };
+                BenchmarkOutput::Dim4(interpolate(
+                    x,
+                    benchmark.output_size,
+                    benchmark.options.clone(),
+                ))
+            }
+        }
+    }
+
+    fn prepare(&self, shape: &Shape, device: &Device) -> BenchmarkInput {
+        match self {
+            NHWCRelayoutAlgorithm::MaxPool2D(_)
+            | NHWCRelayoutAlgorithm::AvgPool2D(_)
+            | NHWCRelayoutAlgorithm::AdaptivePool2d(_)
+            | NHWCRelayoutAlgorithm::Interpolate(_) => {
+                let [batches, ch, h, w] = shape.as_slice() else {
+                    panic!("shape must be 4D")
+                };
+                let x = Tensor::random([batches, h, w, ch], Distribution::Default, device)
+                    .permute([0, 3, 1, 2]);
+                let zeros = Tensor::zeros([batches, h, w, ch], device).permute([0, 3, 1, 2]);
+
+                BenchmarkInput::Single4D(zeros, x)
             }
         }
     }
 }
 
 impl Benchmark for NHWCRelayoutBenchmark {
-    type Input = (Tensor<4>, Tensor<4>);
-    type Output = Tensor<4>;
+    type Input = BenchmarkInput;
+    type Output = BenchmarkOutput;
 
     fn name(&self) -> String {
         format!(
@@ -130,24 +195,11 @@ impl Benchmark for NHWCRelayoutBenchmark {
     }
 
     fn execute(&self, input: Self::Input) -> Self::Output {
-        let x = input.0;
-        let zeros = input.1;
-
-        // trigger NHWCRelayout
-        let x = x + zeros;
-
-        // pool
-        self.execute(x)
+        self.bench(input)
     }
 
     fn prepare(&self) -> Self::Input {
-        let [batches, ch, h, w] = self.shape.dims();
-
-        let x = Tensor::random([batches, h, w, ch], Distribution::Default, &self.device)
-            .permute([0, 3, 1, 2]);
-        let zeros = Tensor::zeros([batches, h, w, ch], &self.device).permute([0, 3, 1, 2]);
-
-        (x, zeros)
+        self.prepare_algorithm()
     }
 
     fn sync(&self) {
@@ -189,11 +241,16 @@ fn bench(device: &Device) -> Vec<BenchmarkResult> {
 
     for mode in strategies {
         for shape in &shapes {
-            benches.push(NHWCRelayoutBenchmark {
+            let bench = NHWCRelayoutBenchmark {
                 shape: shape.clone(),
                 device: device.clone(),
                 mode: mode.clone(),
-            });
+            };
+
+            #[cfg(feature = "correctness")]
+            bench.check_correctness();
+
+            benches.push(bench);
         }
     }
 
