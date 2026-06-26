@@ -123,7 +123,7 @@ fn rand_nlc(shape: [usize; 3], device: &Device) -> Tensor<3> {
 /// Random `[N, C, H, W]` tensor laid out in memory as NHWC.
 fn rand_nhwc(shape: [usize; 4], device: &Device) -> Tensor<4> {
     let [n, c, h, w] = shape;
-    Tensor::random([n, h, w, c], Distribution::Default, device).permute([0, 3, 1, 2])
+    Tensor::random([n, c, h, w], Distribution::Default, device)
 }
 
 /// Random `[N, C, D, H, W]` tensor laid out in memory as NDHWC.
@@ -1167,193 +1167,193 @@ fn bench(
     autodiff_device: &Device,
 ) -> (Vec<BenchmarkResult>, Vec<BenchmarkResult>) {
     let forward_ops: Vec<Box<dyn RelayoutOp>> = vec![
-        Box::new(AvgPool1d {
-            shape: [2, 64, 4096],
-            kernel_size: 4,
-            stride: 4,
-            padding: 0,
-        }),
-        Box::new(AvgPool2d {
-            shape: [2, 64, 256, 256],
-            kernel_size: [3, 3],
-            stride: [1, 1],
-            padding: [1, 1],
-        }),
-        Box::new(AdaptiveAvgPool1d {
-            shape: [2, 64, 4096],
-            output_size: 1024,
-        }),
-        Box::new(AdaptiveAvgPool2d {
-            shape: [2, 64, 256, 256],
-            output_size: [128, 128],
-        }),
-        Box::new(MaxPool1d {
-            shape: [2, 4096, 4096],
-            kernel_size: 4,
-            stride: 4,
-            padding: 0,
-            dilation: 1,
-            with_indices: false,
-        }),
-        Box::new(MaxPool1d {
-            shape: [2, 4096, 4096],
-            kernel_size: 4,
-            stride: 4,
-            padding: 0,
-            dilation: 1,
-            with_indices: true,
-        }),
-        Box::new(MaxPool2d {
-            shape: [2, 64, 256, 256],
-            kernel_size: [3, 3],
-            stride: [1, 1],
-            padding: [1, 1],
-            dilation: [1, 1],
-            with_indices: false,
-        }),
-        Box::new(MaxPool2d {
-            shape: [2, 64, 256, 256],
-            kernel_size: [3, 3],
-            stride: [1, 1],
-            padding: [1, 1],
-            dilation: [1, 1],
-            with_indices: true,
-        }),
-        Box::new(Interpolate {
-            shape: [2, 64, 128, 128],
-            output_size: [256, 256],
-            mode: InterpolateMode::Nearest,
-        }),
-        Box::new(Interpolate {
-            shape: [2, 64, 128, 128],
-            output_size: [256, 256],
-            mode: InterpolateMode::Bilinear,
-        }),
-        Box::new(Conv1d {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
-            options: ConvOptions::new([1], [0], [1], 1),
-        }),
+        // Box::new(AvgPool1d {
+        //     shape: [2, 4096, 4096],
+        //     kernel_size: 4,
+        //     stride: 4,
+        //     padding: 0,
+        // }),
+        // Box::new(AvgPool2d {
+        //     shape: [2, 64, 512, 512],
+        //     kernel_size: [3, 3],
+        //     stride: [1, 1],
+        //     padding: [1, 1],
+        // }),
+        // Box::new(AdaptiveAvgPool1d {
+        //     shape: [2, 512, 24576],
+        //     output_size: 1024,
+        // }),
+        // Box::new(AdaptiveAvgPool2d {
+        //     shape: [2, 64, 512, 512],
+        //     output_size: [128, 128],
+        // }),
+        // Box::new(MaxPool1d {
+        //     shape: [2, 5120, 4096],
+        //     kernel_size: 4,
+        //     stride: 4,
+        //     padding: 0,
+        //     dilation: 1,
+        //     with_indices: false,
+        // }),
+        // Box::new(MaxPool1d {
+        //     shape: [2, 4096, 4096],
+        //     kernel_size: 4,
+        //     stride: 4,
+        //     padding: 0,
+        //     dilation: 1,
+        //     with_indices: true,
+        // }),
+        // Box::new(MaxPool2d {
+        //     shape: [2, 64, 448, 448],
+        //     kernel_size: [3, 3],
+        //     stride: [1, 1],
+        //     padding: [1, 1],
+        //     dilation: [1, 1],
+        //     with_indices: false,
+        // }),
+        // Box::new(MaxPool2d {
+        //     shape: [2, 64, 448, 448],
+        //     kernel_size: [3, 3],
+        //     stride: [1, 1],
+        //     padding: [1, 1],
+        //     dilation: [1, 1],
+        //     with_indices: true,
+        // }),
+        // Box::new(Interpolate {
+        //     shape: [2, 256, 128, 128],
+        //     output_size: [384, 384],
+        //     mode: InterpolateMode::Nearest,
+        // }),
+        // Box::new(Interpolate {
+        //     shape: [2, 256, 128, 128],
+        //     output_size: [384, 384],
+        //     mode: InterpolateMode::Bilinear,
+        // }),
+        // Box::new(Conv1d {
+        //     x_shape: [2, 160, 4096],
+        //     weight_shape: [160, 160, 3],
+        //     options: ConvOptions::new([1], [0], [1], 1),
+        // }),
         Box::new(Conv2d {
             x_shape: [2, 64, 128, 128],
             weight_shape: [64, 64, 3, 3],
             options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
         }),
-        Box::new(Conv3d {
-            x_shape: [2, 16, 16, 32, 32],
-            weight_shape: [16, 16, 3, 3, 3],
-            options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
-        }),
-        Box::new(ConvTranspose1d {
-            x_shape: [2, 64, 1024],
-            weight_shape: [64, 64, 3],
-            options: ConvTransposeOptions::new([1], [0], [0], [1], 1),
-        }),
-        Box::new(ConvTranspose2d {
-            x_shape: [2, 64, 64, 64],
-            weight_shape: [64, 64, 3, 3],
-            options: ConvTransposeOptions::new([1, 1], [0, 0], [0, 0], [1, 1], 1),
-        }),
-        Box::new(ConvTranspose3d {
-            x_shape: [2, 16, 16, 16, 16],
-            weight_shape: [16, 16, 3, 3, 3],
-            options: ConvTransposeOptions::new([1, 1, 1], [0, 0, 0], [0, 0, 0], [1, 1, 1], 1),
-        }),
-        Box::new(DeformConv2d {
-            x_shape: [2, 64, 64, 64],
-            offset_shape: [2, 18, 64, 64],
-            weight_shape: [64, 64, 3, 3],
-            options: DeformConvOptions::new([1, 1], [1, 1], [1, 1], 1, 1),
-        }),
-        Box::new(Conv2dWeightBackward {
-            x_shape: [2, 64, 128, 128],
-            weight_shape: [64, 64, 3, 3],
-            grad_shape: [2, 64, 126, 126],
-            options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
-        }),
+        // Box::new(Conv3d {
+        //     x_shape: [2, 48, 16, 32, 32],
+        //     weight_shape: [48, 48, 3, 3, 3],
+        //     options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
+        // }),
+        // Box::new(ConvTranspose1d {
+        //     x_shape: [2, 640, 1024],
+        //     weight_shape: [640, 640, 3],
+        //     options: ConvTransposeOptions::new([1], [0], [0], [1], 1),
+        // }),
+        // Box::new(ConvTranspose2d {
+        //     x_shape: [2, 112, 64, 64],
+        //     weight_shape: [112, 112, 3, 3],
+        //     options: ConvTransposeOptions::new([1, 1], [0, 0], [0, 0], [1, 1], 1),
+        // }),
+        // Box::new(ConvTranspose3d {
+        //     x_shape: [2, 20, 16, 16, 16],
+        //     weight_shape: [20, 20, 3, 3, 3],
+        //     options: ConvTransposeOptions::new([1, 1, 1], [0, 0, 0], [0, 0, 0], [1, 1, 1], 1),
+        // }),
+        // Box::new(DeformConv2d {
+        //     x_shape: [2, 160, 64, 64],
+        //     offset_shape: [2, 18, 64, 64],
+        //     weight_shape: [160, 160, 3, 3],
+        //     options: DeformConvOptions::new([1, 1], [1, 1], [1, 1], 1, 1),
+        // }),
+        // Box::new(Conv2dWeightBackward {
+        //     x_shape: [2, 64, 128, 128],
+        //     weight_shape: [64, 64, 3, 3],
+        //     grad_shape: [2, 64, 126, 126],
+        //     options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
+        // }),
     ];
 
     let autodiff_ops: Vec<Box<dyn RelayoutOp>> = vec![
-        Box::new(AvgPool1dBackward {
-            shape: [2, 64, 4096],
-            kernel_size: 4,
-            stride: 4,
-            padding: 0,
-        }),
-        Box::new(AdaptiveAvgPool1dBackward {
-            shape: [2, 64, 4096],
-            output_size: 1024,
-        }),
-        Box::new(AdaptiveAvgPool2dBackward {
-            shape: [2, 64, 256, 256],
-            output_size: [128, 128],
-        }),
-        Box::new(MaxPool1dWithIndicesBackward {
-            shape: [2, 64, 4096],
-            kernel_size: 4,
-            stride: 4,
-            padding: 0,
-            dilation: 1,
-        }),
-        Box::new(InterpolateBackward {
-            shape: [2, 64, 128, 128],
-            output_size: [256, 256],
-            mode: InterpolateMode::Nearest,
-        }),
-        Box::new(Conv1dBackward {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
-            options: ConvOptions::new([1], [0], [1], 1),
-            target: ConvGrad::X,
-        }),
-        Box::new(Conv1dBackward {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
-            options: ConvOptions::new([1], [0], [1], 1),
-            target: ConvGrad::Weight,
-        }),
-        Box::new(Conv1dBackward {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
-            options: ConvOptions::new([1], [0], [1], 1),
-            target: ConvGrad::Bias,
-        }),
-        Box::new(Conv2dBackward {
-            x_shape: [2, 64, 128, 128],
-            weight_shape: [64, 64, 3, 3],
-            options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
-            target: ConvGrad::X,
-        }),
-        Box::new(Conv2dBackward {
-            x_shape: [2, 64, 128, 128],
-            weight_shape: [64, 64, 3, 3],
-            options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
-            target: ConvGrad::Bias,
-        }),
-        Box::new(Conv3dBackward {
-            x_shape: [2, 16, 16, 32, 32],
-            weight_shape: [16, 16, 3, 3, 3],
-            options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
-            target: ConvGrad::X,
-        }),
-        Box::new(Conv3dBackward {
-            x_shape: [2, 16, 16, 32, 32],
-            weight_shape: [16, 16, 3, 3, 3],
-            options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
-            target: ConvGrad::Weight,
-        }),
-        Box::new(Conv3dBackward {
-            x_shape: [2, 16, 16, 32, 32],
-            weight_shape: [16, 16, 3, 3, 3],
-            options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
-            target: ConvGrad::Bias,
-        }),
-        Box::new(DeformConv2dBackward {
-            x_shape: [2, 64, 64, 64],
-            offset_shape: [2, 18, 64, 64],
-            weight_shape: [64, 64, 3, 3],
-            options: DeformConvOptions::new([1, 1], [1, 1], [1, 1], 1, 1),
-        }),
+        // Box::new(AvgPool1dBackward {
+        //     shape: [2, 1024, 8192],
+        //     kernel_size: 4,
+        //     stride: 4,
+        //     padding: 0,
+        // }),
+        // Box::new(AdaptiveAvgPool1dBackward {
+        //     shape: [2, 640, 8192],
+        //     output_size: 1024,
+        // }),
+        // Box::new(AdaptiveAvgPool2dBackward {
+        //     shape: [2, 128, 448, 448],
+        //     output_size: [128, 128],
+        // }),
+        // Box::new(MaxPool1dWithIndicesBackward {
+        //     shape: [2, 512, 8192],
+        //     kernel_size: 4,
+        //     stride: 4,
+        //     padding: 0,
+        //     dilation: 1,
+        // }),
+        // Box::new(InterpolateBackward {
+        //     shape: [2, 256, 128, 128],
+        //     output_size: [320, 320],
+        //     mode: InterpolateMode::Nearest,
+        // }),
+        // Box::new(Conv1dBackward {
+        //     x_shape: [2, 352, 4096],
+        //     weight_shape: [352, 352, 3],
+        //     options: ConvOptions::new([1], [0], [1], 1),
+        //     target: ConvGrad::X,
+        // }),
+        // Box::new(Conv1dBackward {
+        //     x_shape: [2, 160, 4096],
+        //     weight_shape: [160, 160, 3],
+        //     options: ConvOptions::new([1], [0], [1], 1),
+        //     target: ConvGrad::Weight,
+        // }),
+        // Box::new(Conv1dBackward {
+        //     x_shape: [2, 512, 8192],
+        //     weight_shape: [512, 512, 3],
+        //     options: ConvOptions::new([1], [0], [1], 1),
+        //     target: ConvGrad::Bias,
+        // }),
+        // Box::new(Conv2dBackward {
+        //     x_shape: [2, 96, 128, 128],
+        //     weight_shape: [96, 96, 3, 3],
+        //     options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
+        //     target: ConvGrad::X,
+        // }),
+        // Box::new(Conv2dBackward {
+        //     x_shape: [2, 288, 128, 128],
+        //     weight_shape: [288, 288, 3, 3],
+        //     options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
+        //     target: ConvGrad::Bias,
+        // }),
+        // Box::new(Conv3dBackward {
+        //     x_shape: [2, 16, 16, 32, 32],
+        //     weight_shape: [16, 16, 3, 3, 3],
+        //     options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
+        //     target: ConvGrad::X,
+        // }),
+        // Box::new(Conv3dBackward {
+        //     x_shape: [2, 28, 16, 32, 32],
+        //     weight_shape: [28, 28, 3, 3, 3],
+        //     options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
+        //     target: ConvGrad::Weight,
+        // }),
+        // Box::new(Conv3dBackward {
+        //     x_shape: [2, 64, 16, 32, 32],
+        //     weight_shape: [64, 64, 3, 3, 3],
+        //     options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
+        //     target: ConvGrad::Bias,
+        // }),
+        // Box::new(DeformConv2dBackward {
+        //     x_shape: [2, 64, 64, 64],
+        //     offset_shape: [2, 18, 64, 64],
+        //     weight_shape: [64, 64, 3, 3],
+        //     options: DeformConvOptions::new([1, 1], [1, 1], [1, 1], 1, 1),
+        // }),
     ];
 
     let mut forward_results = Vec::new();
