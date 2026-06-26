@@ -118,19 +118,30 @@ fn fuse_relayout<const D: usize>(t: Tensor<D>, with_zeros: bool, device: &Device
 /// Random `[N, C, L]` tensor laid out in memory as NLC (the 1D analogue of NHWC).
 fn rand_nlc(shape: [usize; 3], device: &Device) -> Tensor<3> {
     let [n, c, l] = shape;
-    Tensor::random([n, l, c], Distribution::Default, device).permute([0, 2, 1])
+    deterministic_tensor([n, l, c], device).permute([0, 2, 1])
 }
 
 /// Random `[N, C, H, W]` tensor laid out in memory as NHWC.
 fn rand_nhwc(shape: [usize; 4], device: &Device) -> Tensor<4> {
     let [n, c, h, w] = shape;
-    Tensor::random([n, h, w, c], Distribution::Default, device).permute([0, 3, 1, 2])
+    deterministic_tensor([n, h, w, c], device).permute([0, 3, 1, 2])
 }
 
 /// Random `[N, C, D, H, W]` tensor laid out in memory as NDHWC.
 fn rand_ndhwc(shape: [usize; 5], device: &Device) -> Tensor<5> {
     let [n, c, d, h, w] = shape;
-    Tensor::random([n, d, h, w, c], Distribution::Default, device).permute([0, 4, 1, 2, 3])
+    deterministic_tensor([n, d, h, w, c], device).permute([0, 4, 1, 2, 3])
+}
+
+
+fn deterministic_tensor<const D: usize>(
+    shape: impl Into<burn::tensor::Shape<D>>,
+    device: &Device,
+) -> Tensor<D> {
+    let shape = shape.into();
+    let num_elements = shape.num_elements();
+    let data: Vec<f32> = (0..num_elements).map(|i| ((i % 100) as f32 * 0.01)).collect();
+    Tensor::from_floats(data.as_slice(), device).reshape(shape)
 }
 
 fn slice_to_string(slice: &[usize]) -> String {
@@ -430,8 +441,8 @@ impl RelayoutOp for Conv1d {
     fn prepare(&self, device: &Device, _with_zeros: bool) -> BenchmarkInput {
         BenchmarkInput::Conv3 {
             x: rand_nlc(self.x_shape, device),
-            weight: Tensor::random(self.weight_shape, Distribution::Default, device),
-            bias: Tensor::random([self.weight_shape[0]], Distribution::Default, device),
+            weight: deterministic_tensor(self.weight_shape, device),
+            bias: deterministic_tensor([self.weight_shape[0]], device),
         }
     }
     fn run(&self, input: BenchmarkInput, device: &Device, wz: bool) -> BenchmarkOutput {
@@ -460,8 +471,8 @@ impl RelayoutOp for Conv2d {
     fn prepare(&self, device: &Device, _with_zeros: bool) -> BenchmarkInput {
         BenchmarkInput::Conv4 {
             x: rand_nhwc(self.x_shape, device),
-            weight: Tensor::random(self.weight_shape, Distribution::Default, device),
-            bias: Tensor::random([self.weight_shape[0]], Distribution::Default, device),
+            weight: deterministic_tensor(self.weight_shape, device),
+            bias: deterministic_tensor([self.weight_shape[0]], device),
         }
     }
     fn run(&self, input: BenchmarkInput, device: &Device, wz: bool) -> BenchmarkOutput {
@@ -490,8 +501,8 @@ impl RelayoutOp for Conv3d {
     fn prepare(&self, device: &Device, _with_zeros: bool) -> BenchmarkInput {
         BenchmarkInput::Conv5 {
             x: rand_ndhwc(self.x_shape, device),
-            weight: Tensor::random(self.weight_shape, Distribution::Default, device),
-            bias: Tensor::random([self.weight_shape[0]], Distribution::Default, device),
+            weight: deterministic_tensor(self.weight_shape, device),
+            bias: deterministic_tensor([self.weight_shape[0]], device),
         }
     }
     fn run(&self, input: BenchmarkInput, device: &Device, wz: bool) -> BenchmarkOutput {
@@ -520,8 +531,8 @@ impl RelayoutOp for ConvTranspose1d {
     fn prepare(&self, device: &Device, _with_zeros: bool) -> BenchmarkInput {
         BenchmarkInput::Conv3 {
             x: rand_nlc(self.x_shape, device),
-            weight: Tensor::random(self.weight_shape, Distribution::Default, device),
-            bias: Tensor::random([self.weight_shape[1]], Distribution::Default, device),
+            weight: deterministic_tensor(self.weight_shape, device),
+            bias: deterministic_tensor([self.weight_shape[1]], device),
         }
     }
     fn run(&self, input: BenchmarkInput, device: &Device, wz: bool) -> BenchmarkOutput {
@@ -555,8 +566,8 @@ impl RelayoutOp for ConvTranspose2d {
     fn prepare(&self, device: &Device, _with_zeros: bool) -> BenchmarkInput {
         BenchmarkInput::Conv4 {
             x: rand_nhwc(self.x_shape, device),
-            weight: Tensor::random(self.weight_shape, Distribution::Default, device),
-            bias: Tensor::random([self.weight_shape[1]], Distribution::Default, device),
+            weight: deterministic_tensor(self.weight_shape, device),
+            bias: deterministic_tensor([self.weight_shape[1]], device),
         }
     }
     fn run(&self, input: BenchmarkInput, device: &Device, wz: bool) -> BenchmarkOutput {
@@ -590,8 +601,8 @@ impl RelayoutOp for ConvTranspose3d {
     fn prepare(&self, device: &Device, _with_zeros: bool) -> BenchmarkInput {
         BenchmarkInput::Conv5 {
             x: rand_ndhwc(self.x_shape, device),
-            weight: Tensor::random(self.weight_shape, Distribution::Default, device),
-            bias: Tensor::random([self.weight_shape[1]], Distribution::Default, device),
+            weight: deterministic_tensor(self.weight_shape, device),
+            bias: deterministic_tensor([self.weight_shape[1]], device),
         }
     }
     fn run(&self, input: BenchmarkInput, device: &Device, wz: bool) -> BenchmarkOutput {
@@ -631,7 +642,7 @@ impl RelayoutOp for DeformConv2d {
         BenchmarkInput::Deform {
             x: rand_nhwc(self.x_shape, device),
             offset: rand_nhwc(self.offset_shape, device),
-            weight: Tensor::random(self.weight_shape, Distribution::Default, device),
+            weight: deterministic_tensor(self.weight_shape, device),
         }
     }
     fn run(&self, input: BenchmarkInput, device: &Device, wz: bool) -> BenchmarkOutput {
@@ -668,7 +679,7 @@ impl RelayoutOp for Conv2dWeightBackward {
     }
     fn prepare(&self, device: &Device, _with_zeros: bool) -> BenchmarkInput {
         let x = rand_nhwc(self.x_shape, device);
-        let weight = Tensor::random(self.weight_shape, Distribution::Default, device);
+        let weight = deterministic_tensor(self.weight_shape, device);
         let output_grad = rand_nhwc(self.grad_shape, device);
         BenchmarkInput::F4(vec![x, weight, output_grad])
     }
@@ -892,8 +903,8 @@ impl RelayoutOp for Conv1dBackward {
     }
     fn prepare(&self, device: &Device, with_zeros: bool) -> BenchmarkInput {
         let x = rand_nlc(self.x_shape, device);
-        let weight = Tensor::random(self.weight_shape, Distribution::Default, device);
-        let bias = Tensor::random([self.weight_shape[0]], Distribution::Default, device);
+        let weight = deterministic_tensor(self.weight_shape, device);
+        let bias = deterministic_tensor([self.weight_shape[0]], device);
         let (x, weight, bias) = match self.target {
             ConvGrad::X => (x.require_grad(), weight, bias),
             ConvGrad::Weight => (x, weight.require_grad(), bias),
@@ -948,8 +959,8 @@ impl RelayoutOp for Conv2dBackward {
     }
     fn prepare(&self, device: &Device, with_zeros: bool) -> BenchmarkInput {
         let x = rand_nhwc(self.x_shape, device);
-        let weight = Tensor::random(self.weight_shape, Distribution::Default, device);
-        let bias = Tensor::random([self.weight_shape[0]], Distribution::Default, device);
+        let weight = deterministic_tensor(self.weight_shape, device);
+        let bias = deterministic_tensor([self.weight_shape[0]], device);
         let (x, weight, bias) = match self.target {
             ConvGrad::X => (x.require_grad(), weight, bias),
             ConvGrad::Weight => (x, weight.require_grad(), bias),
@@ -1004,8 +1015,8 @@ impl RelayoutOp for Conv3dBackward {
     }
     fn prepare(&self, device: &Device, with_zeros: bool) -> BenchmarkInput {
         let x = rand_ndhwc(self.x_shape, device);
-        let weight = Tensor::random(self.weight_shape, Distribution::Default, device);
-        let bias = Tensor::random([self.weight_shape[0]], Distribution::Default, device);
+        let weight = deterministic_tensor(self.weight_shape, device);
+        let bias = deterministic_tensor([self.weight_shape[0]], device);
         let (x, weight, bias) = match self.target {
             ConvGrad::X => (x.require_grad(), weight, bias),
             ConvGrad::Weight => (x, weight.require_grad(), bias),
@@ -1062,7 +1073,7 @@ impl RelayoutOp for DeformConv2dBackward {
         let x = rand_nhwc(self.x_shape, device).require_grad();
         let offset = rand_nhwc(self.offset_shape, device).require_grad();
         let weight =
-            Tensor::random(self.weight_shape, Distribution::Default, device).require_grad();
+            deterministic_tensor(self.weight_shape, device).require_grad();
 
         let xf = fuse_relayout(x.clone(), with_zeros, device);
         let of = fuse_relayout(offset.clone(), with_zeros, device);
