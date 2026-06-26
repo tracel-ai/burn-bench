@@ -2,6 +2,3 @@
 bb = "run --release --bin burnbench --"
 xtask = "run --manifest-path ../xtask/Cargo.toml --target-dir target/xtask --package xtask --bin xtask --"
 bbd = "run --bin burnbench --"
-
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]

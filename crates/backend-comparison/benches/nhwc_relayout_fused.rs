@@ -3,11 +3,10 @@ use burn::tensor::Tolerance;
 use burn::tensor::{
     Device, Distribution, Int, Tensor, TensorData,
     module::{
-        adaptive_avg_pool1d, adaptive_avg_pool2d, avg_pool1d, avg_pool2d, avg_pool2d_backward,
-        conv_transpose1d, conv_transpose2d, conv_transpose3d, conv1d, conv2d,
-        conv2d_weight_backward, conv3d, deform_conv2d, interpolate, max_pool1d,
-        max_pool1d_with_indices, max_pool2d, max_pool2d_with_indices,
-        max_pool2d_with_indices_backward,
+        adaptive_avg_pool1d, adaptive_avg_pool2d, avg_pool1d, avg_pool2d, conv_transpose1d,
+        conv_transpose2d, conv_transpose3d, conv1d, conv2d, conv2d_weight_backward, conv3d,
+        deform_conv2d, interpolate, max_pool1d, max_pool1d_with_indices, max_pool2d,
+        max_pool2d_with_indices,
     },
     ops::{
         ConvOptions, ConvTransposeOptions, DeformConvOptions, InterpolateMode, InterpolateOptions,
@@ -1101,9 +1100,11 @@ impl NHWCRelayoutBenchmark {
     /// the outputs match. A mismatch means the fused relayout path is wrong.
     #[cfg(feature = "correctness")]
     fn check_correctness(&self) {
+        self.device.seed(42);
         let input_fused = self.op.prepare(&self.device, true);
         let fused = self.op.run(input_fused, &self.device, true);
 
+        self.device.seed(42);
         let input_ref = self.op.prepare(&self.device, false);
         let reference = self.op.run(input_ref, &self.device, false);
 
