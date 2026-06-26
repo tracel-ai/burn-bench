@@ -3,11 +3,10 @@ use burn::tensor::Tolerance;
 use burn::tensor::{
     Device, Distribution, Int, Tensor, TensorData,
     module::{
-        adaptive_avg_pool1d, adaptive_avg_pool2d, avg_pool1d, avg_pool2d, avg_pool2d_backward,
-        conv_transpose1d, conv_transpose2d, conv_transpose3d, conv1d, conv2d,
-        conv2d_weight_backward, conv3d, deform_conv2d, interpolate, max_pool1d,
-        max_pool1d_with_indices, max_pool2d, max_pool2d_with_indices,
-        max_pool2d_with_indices_backward,
+        adaptive_avg_pool1d, adaptive_avg_pool2d, avg_pool1d, avg_pool2d, conv_transpose1d,
+        conv_transpose2d, conv_transpose3d, conv1d, conv2d, conv2d_weight_backward, conv3d,
+        deform_conv2d, interpolate, max_pool1d, max_pool1d_with_indices, max_pool2d,
+        max_pool2d_with_indices,
     },
     ops::{
         ConvOptions, ConvTransposeOptions, DeformConvOptions, InterpolateMode, InterpolateOptions,
@@ -1112,9 +1111,11 @@ impl NHWCRelayoutBenchmark {
     /// the outputs match. A mismatch means the fused relayout path is wrong.
     #[cfg(feature = "correctness")]
     fn check_correctness(&self) {
+        self.device.seed(42);
         let input_fused = self.op.prepare(&self.device, true);
         let fused = self.op.run(input_fused, &self.device, true);
 
+        self.device.seed(42);
         let input_ref = self.op.prepare(&self.device, false);
         let reference = self.op.run(input_ref, &self.device, false);
 
@@ -1178,27 +1179,27 @@ fn bench(
 ) -> (Vec<BenchmarkResult>, Vec<BenchmarkResult>) {
     let forward_ops: Vec<Box<dyn RelayoutOp>> = vec![
         Box::new(AvgPool1d {
-            shape: [2, 64, 4096],
+            shape: [2, 4096, 4096],
             kernel_size: 4,
             stride: 4,
             padding: 0,
         }),
         Box::new(AvgPool2d {
-            shape: [2, 64, 256, 256],
+            shape: [2, 64, 512, 512],
             kernel_size: [3, 3],
             stride: [1, 1],
             padding: [1, 1],
         }),
         Box::new(AdaptiveAvgPool1d {
-            shape: [2, 64, 4096],
+            shape: [2, 512, 24576],
             output_size: 1024,
         }),
         Box::new(AdaptiveAvgPool2d {
-            shape: [2, 64, 256, 256],
+            shape: [2, 64, 512, 512],
             output_size: [128, 128],
         }),
         Box::new(MaxPool1d {
-            shape: [2, 4096, 4096],
+            shape: [2, 5120, 4096],
             kernel_size: 4,
             stride: 4,
             padding: 0,
@@ -1214,7 +1215,7 @@ fn bench(
             with_indices: true,
         }),
         Box::new(MaxPool2d {
-            shape: [2, 64, 256, 256],
+            shape: [2, 64, 448, 448],
             kernel_size: [3, 3],
             stride: [1, 1],
             padding: [1, 1],
@@ -1222,7 +1223,7 @@ fn bench(
             with_indices: false,
         }),
         Box::new(MaxPool2d {
-            shape: [2, 64, 256, 256],
+            shape: [2, 64, 448, 448],
             kernel_size: [3, 3],
             stride: [1, 1],
             padding: [1, 1],
@@ -1230,18 +1231,18 @@ fn bench(
             with_indices: true,
         }),
         Box::new(Interpolate {
-            shape: [2, 64, 128, 128],
-            output_size: [256, 256],
+            shape: [2, 256, 128, 128],
+            output_size: [384, 384],
             mode: InterpolateMode::Nearest,
         }),
         Box::new(Interpolate {
-            shape: [2, 64, 128, 128],
-            output_size: [256, 256],
+            shape: [2, 256, 128, 128],
+            output_size: [384, 384],
             mode: InterpolateMode::Bilinear,
         }),
         Box::new(Conv1d {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
+            x_shape: [2, 160, 4096],
+            weight_shape: [160, 160, 3],
             options: ConvOptions::new([1], [0], [1], 1),
         }),
         Box::new(Conv2d {
@@ -1250,29 +1251,29 @@ fn bench(
             options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
         }),
         Box::new(Conv3d {
-            x_shape: [2, 16, 16, 32, 32],
-            weight_shape: [16, 16, 3, 3, 3],
+            x_shape: [2, 48, 16, 32, 32],
+            weight_shape: [48, 48, 3, 3, 3],
             options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
         }),
         Box::new(ConvTranspose1d {
-            x_shape: [2, 64, 1024],
-            weight_shape: [64, 64, 3],
+            x_shape: [2, 640, 1024],
+            weight_shape: [640, 640, 3],
             options: ConvTransposeOptions::new([1], [0], [0], [1], 1),
         }),
         Box::new(ConvTranspose2d {
-            x_shape: [2, 64, 64, 64],
-            weight_shape: [64, 64, 3, 3],
+            x_shape: [2, 112, 64, 64],
+            weight_shape: [112, 112, 3, 3],
             options: ConvTransposeOptions::new([1, 1], [0, 0], [0, 0], [1, 1], 1),
         }),
         Box::new(ConvTranspose3d {
-            x_shape: [2, 16, 16, 16, 16],
-            weight_shape: [16, 16, 3, 3, 3],
+            x_shape: [2, 20, 16, 16, 16],
+            weight_shape: [20, 20, 3, 3, 3],
             options: ConvTransposeOptions::new([1, 1, 1], [0, 0, 0], [0, 0, 0], [1, 1, 1], 1),
         }),
         Box::new(DeformConv2d {
-            x_shape: [2, 64, 64, 64],
+            x_shape: [2, 160, 64, 64],
             offset_shape: [2, 18, 64, 64],
-            weight_shape: [64, 64, 3, 3],
+            weight_shape: [160, 160, 3, 3],
             options: DeformConvOptions::new([1, 1], [1, 1], [1, 1], 1, 1),
         }),
         Box::new(Conv2dWeightBackward {
@@ -1285,58 +1286,58 @@ fn bench(
 
     let autodiff_ops: Vec<Box<dyn RelayoutOp>> = vec![
         Box::new(AvgPool1dBackward {
-            shape: [2, 64, 4096],
+            shape: [2, 1024, 8192],
             kernel_size: 4,
             stride: 4,
             padding: 0,
         }),
         Box::new(AdaptiveAvgPool1dBackward {
-            shape: [2, 64, 4096],
+            shape: [2, 640, 8192],
             output_size: 1024,
         }),
         Box::new(AdaptiveAvgPool2dBackward {
-            shape: [2, 64, 256, 256],
+            shape: [2, 128, 448, 448],
             output_size: [128, 128],
         }),
         Box::new(MaxPool1dWithIndicesBackward {
-            shape: [2, 64, 4096],
+            shape: [2, 512, 8192],
             kernel_size: 4,
             stride: 4,
             padding: 0,
             dilation: 1,
         }),
         Box::new(InterpolateBackward {
-            shape: [2, 64, 128, 128],
-            output_size: [256, 256],
+            shape: [2, 256, 128, 128],
+            output_size: [320, 320],
             mode: InterpolateMode::Nearest,
         }),
         Box::new(Conv1dBackward {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
+            x_shape: [2, 352, 4096],
+            weight_shape: [352, 352, 3],
             options: ConvOptions::new([1], [0], [1], 1),
             target: ConvGrad::X,
         }),
         Box::new(Conv1dBackward {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
+            x_shape: [2, 160, 4096],
+            weight_shape: [160, 160, 3],
             options: ConvOptions::new([1], [0], [1], 1),
             target: ConvGrad::Weight,
         }),
         Box::new(Conv1dBackward {
-            x_shape: [2, 64, 4096],
-            weight_shape: [64, 64, 3],
+            x_shape: [2, 512, 8192],
+            weight_shape: [512, 512, 3],
             options: ConvOptions::new([1], [0], [1], 1),
             target: ConvGrad::Bias,
         }),
         Box::new(Conv2dBackward {
-            x_shape: [2, 64, 128, 128],
-            weight_shape: [64, 64, 3, 3],
+            x_shape: [2, 96, 128, 128],
+            weight_shape: [96, 96, 3, 3],
             options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
             target: ConvGrad::X,
         }),
         Box::new(Conv2dBackward {
-            x_shape: [2, 64, 128, 128],
-            weight_shape: [64, 64, 3, 3],
+            x_shape: [2, 288, 128, 128],
+            weight_shape: [288, 288, 3, 3],
             options: ConvOptions::new([1, 1], [0, 0], [1, 1], 1),
             target: ConvGrad::Bias,
         }),
@@ -1347,14 +1348,14 @@ fn bench(
             target: ConvGrad::X,
         }),
         Box::new(Conv3dBackward {
-            x_shape: [2, 16, 16, 32, 32],
-            weight_shape: [16, 16, 3, 3, 3],
+            x_shape: [2, 28, 16, 32, 32],
+            weight_shape: [28, 28, 3, 3, 3],
             options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
             target: ConvGrad::Weight,
         }),
         Box::new(Conv3dBackward {
-            x_shape: [2, 16, 16, 32, 32],
-            weight_shape: [16, 16, 3, 3, 3],
+            x_shape: [2, 64, 16, 32, 32],
+            weight_shape: [64, 64, 3, 3, 3],
             options: ConvOptions::new([1, 1, 1], [0, 0, 0], [1, 1, 1], 1),
             target: ConvGrad::Bias,
         }),
