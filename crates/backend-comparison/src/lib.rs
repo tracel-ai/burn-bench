@@ -10,7 +10,9 @@
 //! (`--devices <label> --dtype <dtype>`); [`select_device`] / [`select_devices`]
 //! turn those into a configured [`Device`].
 
-use burn::tensor::{Device, DeviceConfig, DeviceError, DeviceType, FloatDType};
+use burn::tensor::{
+    Device, DeviceConfig, DeviceError, DeviceIndex, DeviceKind, DeviceType, FloatDType,
+};
 use burnbench::__private::{get_argument, get_sharing_token, get_sharing_url, init_log};
 use burnbench::{BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, save_records};
 
@@ -69,15 +71,10 @@ fn configure_dtype(device: &mut Device, dtype: FloatDType) {
 /// unavailable on the host panics with a descriptive message.
 fn build_device(base: &str) -> Device {
     match base {
-        #[cfg(feature = "wgpu")]
-        "wgpu" => Device::wgpu(burn::tensor::DeviceKind::DefaultDevice),
-        #[cfg(feature = "webgpu")]
-        "webgpu" => Device::webgpu(burn::tensor::DeviceKind::DefaultDevice),
-        #[cfg(feature = "cpu")]
+        "wgpu" => Device::wgpu(DeviceKind::DefaultDevice),
+        "webgpu" => Device::webgpu(DeviceKind::DefaultDevice),
         "cpu" => Device::cpu(),
-        #[cfg(feature = "flex")]
         "flex" => Device::flex(),
-        #[cfg(feature = "ndarray")]
         "ndarray"
         | "ndarray-simd"
         | "ndarray-blas-accelerate"
@@ -86,17 +83,17 @@ fn build_device(base: &str) -> Device {
         #[cfg(feature = "tch")]
         "tch-cpu" => Device::libtorch(),
         #[cfg(feature = "tch")]
-        "tch-cuda" => Device::libtorch_cuda(burn::tensor::DeviceIndex::Default),
+        "tch-cuda" => Device::libtorch_cuda(DeviceIndex::Default),
         #[cfg(feature = "tch")]
         "tch-metal" => Device::libtorch_mps(),
-        #[cfg(feature = "vulkan")]
-        "vulkan" => Device::vulkan(burn::tensor::DeviceKind::DefaultDevice),
-        #[cfg(feature = "cuda")]
-        "cuda" => Device::cuda(burn::tensor::DeviceIndex::Default),
+        #[cfg(not(target_os = "macos"))]
+        "vulkan" => Device::vulkan(DeviceKind::DefaultDevice),
+        #[cfg(not(target_os = "macos"))]
+        "cuda" => Device::cuda(DeviceIndex::Default),
         #[cfg(feature = "rocm")]
-        "rocm" => Device::rocm(burn::tensor::DeviceIndex::Default),
+        "rocm" => Device::rocm(DeviceIndex::Default),
         #[cfg(target_os = "macos")]
-        "metal" => Device::metal(burn::tensor::DeviceKind::DefaultDevice),
+        "metal" => Device::metal(DeviceKind::DefaultDevice),
         other => panic!(
             "Backend `{other}` is not available on this platform. \
              Make sure it is enabled in the host's default features."
@@ -109,21 +106,16 @@ fn device_type(base: &str) -> DeviceType {
     // The `DeviceType` variants are gated by the same backend features as the
     // device factories, so the arms mirror `build_device`'s `cfg` gating.
     match base {
-        #[cfg(feature = "wgpu")]
         "wgpu" => DeviceType::Wgpu,
-        #[cfg(feature = "webgpu")]
         "webgpu" => DeviceType::WebGpu,
-        #[cfg(feature = "cpu")]
         "cpu" => DeviceType::Cpu,
-        #[cfg(feature = "flex")]
         "flex" => DeviceType::Flex,
-        #[cfg(feature = "ndarray")]
         base if base.starts_with("ndarray") => DeviceType::NdArray,
         #[cfg(feature = "tch")]
         base if base.starts_with("tch") => DeviceType::LibTorch,
-        #[cfg(feature = "vulkan")]
+        #[cfg(not(target_os = "macos"))]
         "vulkan" => DeviceType::Vulkan,
-        #[cfg(feature = "cuda")]
+        #[cfg(not(target_os = "macos"))]
         "cuda" => DeviceType::Cuda,
         #[cfg(feature = "rocm")]
         "rocm" => DeviceType::Rocm,
@@ -143,7 +135,6 @@ pub fn select_device() -> Device {
 
 /// Selects and configures every available [`Device`] of the requested backend,
 /// for multi-device benchmarks.
-#[allow(unused)]
 pub fn select_devices() -> Vec<Device> {
     let _ = init_log();
     let dtype = dtype_arg();

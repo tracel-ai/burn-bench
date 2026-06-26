@@ -11,21 +11,15 @@ version = "0.1.0"
 
 # Two orthogonal concerns are kept separate:
 #
-# * Backend (the *device*) is a compile-time choice expressed as a cargo
-#   feature (`wgpu`, `cuda`, ...). The runner enables the right backend
-#   feature(s) for the requested `--devices` (see `run_cargo` in burnbench):
-#   by default it links the full set valid on the host so any device can be
-#   selected at runtime without recompiling, but `--fast` links only the
-#   backend(s) actually requested for quicker iteration.
+# * Backend (the *device*) is a runtime choice. Every backend that can be
+#   compiled on the host is linked in by default (see the OS-conditional `burn`
+#   dependency below) and the concrete one is picked at runtime by injecting the
+#   right `Device`. Selecting more devices never adds builds.
 #
 # * Framework decorators (`fusion`, `autotune`) are compile-time, so each
 #   combination is a separate build. They are default-on features that the
 #   runner toggles through `--build` profiles (e.g. `no-fusion`). `std` is not
-#   toggleable here: the GPU backends require it.
-#
-# Backend features are intentionally *not* in `default`: the `--build` profiles
-# pass `--no-default-features` to drop `fusion`, and the backends must survive
-# that, so the runner always re-adds them explicitly.
+#   toggleable here: the always-linked GPU backends require it.
 [features]
 default = ["fusion", "autotune"]
 
@@ -33,24 +27,15 @@ default = ["fusion", "autotune"]
 fusion = ["burn/fusion"]
 autotune = ["burn/autotune"]
 
-# Backends. The runner enables these based on `--devices` (and `--fast`).
-# `tch` depends on an external libtorch and `rocm` links directly, so neither is
-# part of the default set; both are only enabled when explicitly requested.
-wgpu = ["burn/wgpu"]
-webgpu = ["burn/webgpu"]
-cpu = ["burn/cpu"]
-flex = ["burn/flex"]
-ndarray = ["burn/ndarray"]
-vulkan = ["burn/vulkan"]
-cuda = ["burn/cuda"]
-metal = ["burn/metal"]
-rocm = ["burn/rocm"]
+# Backends that depend on external libraries, kept opt-in so the default build
+# stays self-contained. `tch` is enabled automatically by the runner when a
+# `tch-*` device is requested.
 tch = ["burn/tch"]
-
 ndarray-simd = ["burn/simd"]
 ndarray-blas-accelerate = ["burn/accelerate"]
 ndarray-blas-netlib = ["burn/blas-netlib"]
 ndarray-blas-openblas = ["burn/openblas"]
+rocm = ["burn/rocm"]
 
 # Special benchmark capabilities.
 multi-device = []
@@ -60,12 +45,19 @@ server = ["burn/server"]
 correctness = []
 
 [dependencies]
-# Backends are enabled through the cargo features above, which the runner turns
-# on per `--devices`. Only the always-needed bits are listed here; `fusion`/
-# `autotune` are toggleable `--build` features and are pulled in via `default`.
+# Backends that compile cleanly on every platform are always enabled; the
+# concrete one is selected at runtime via the device. Platform-specific backends
+# are enabled through the target-conditional tables below. `fusion`/`autotune`
+# are intentionally *not* listed here: they are toggleable `--build` features.
+# burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false }
 burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
     "std",
     "autodiff",
+    "wgpu",
+    "webgpu",
+    "cpu",
+    "flex",
+    "ndarray",
 ] }
 
 burnbench = { path = "../burnbench" }
@@ -94,6 +86,28 @@ tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing-subscriber = { workspace = true }
 wgpu = { workspace = true }
 wsl = { workspace = true }
+
+# CUDA, ROCm and Vulkan compile on Linux (they don't necessarily run on every
+# machine, but linking them in lets the device be selected at runtime).
+# ROCm links directly instead of at runtime so it must be enabled via a feature.
+[target.'cfg(target_os = "linux")'.dependencies]
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
+    "cuda",
+    "vulkan",
+] }
+
+# Windows: CUDA and Vulkan (ROCm is Linux-only).
+[target.'cfg(target_os = "windows")'.dependencies]
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
+    "cuda",
+    "vulkan",
+] }
+
+# macOS: Metal (CUDA/ROCm/Vulkan don't make sense here).
+[target.'cfg(target_os = "macos")'.dependencies]
+burn = { git = "https://github.com/tracel-ai/burn", branch = "main", default-features = false, features = [
+    "metal",
+] }
 
 [dev-dependencies]
 rstest = { workspace = true }

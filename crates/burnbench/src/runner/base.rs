@@ -57,16 +57,8 @@ struct RunArgs {
     #[clap(short = 'v', long = "verbose")]
     verbose: bool,
 
-    /// Compile only the backend(s) named in `--devices` instead of the full
-    /// host-valid set. Produces a leaner binary for faster iteration, at the
-    /// cost of not being able to switch to an unlisted backend at runtime.
-    #[clap(short = 'f', long = "fast")]
-    fast: bool,
-
-    /// Space separated list of devices (backends) to run on. By default all
-    /// host-valid backends are linked into one binary, so selecting more
-    /// devices does not add builds. With `--fast`, only the listed backends are
-    /// compiled, so each distinct backend is a separate build.
+    /// Space separated list of devices (backends) to run on. Selecting more
+    /// devices does not add builds; they all run on the same binary.
     #[clap(short = 'D', long = "devices", num_args(1..), required = true)]
     devices: Vec<DeviceValues>,
 
@@ -158,64 +150,6 @@ impl DeviceValues {
     fn is_rocm(&self) -> bool {
         matches!(self, DeviceValues::Rocm)
     }
-
-    /// The `backend-comparison` cargo feature that compiles this device's
-    /// backend into the bench binary. `All` has no single backend (it expands
-    /// to the full set earlier), so it returns `None`.
-    fn backend_feature(&self) -> Option<&'static str> {
-        match self {
-            DeviceValues::All => None,
-            #[cfg(not(target_os = "macos"))]
-            DeviceValues::Cuda => Some("cuda"),
-            #[cfg(target_os = "linux")]
-            DeviceValues::Rocm => Some("rocm"),
-            #[cfg(not(target_os = "macos"))]
-            DeviceValues::Vulkan => Some("vulkan"),
-            #[cfg(target_os = "macos")]
-            DeviceValues::Metal => Some("metal"),
-            DeviceValues::Wgpu => Some("wgpu"),
-            DeviceValues::Webgpu => Some("webgpu"),
-            DeviceValues::Cpu => Some("cpu"),
-            DeviceValues::Flex => Some("flex"),
-            DeviceValues::Ndarray => Some("ndarray"),
-            DeviceValues::TchCpu | DeviceValues::TchCuda | DeviceValues::TchMetal => Some("tch"),
-        }
-    }
-}
-
-/// Computes the backend cargo features to compile in for the requested
-/// `devices`.
-///
-/// With `fast`, only the backend(s) actually requested are linked, for quick
-/// iteration. Otherwise the full set of host-valid backends is linked so any
-/// device can be selected at runtime without recompiling (the original
-/// behaviour). `tch` and `rocm` are never part of the full set — they need an
-/// external libtorch / link directly — so they are only added when explicitly
-/// requested, in either mode.
-fn backend_features(devices: &[DeviceValues], fast: bool) -> Vec<String> {
-    let mut features: Vec<String> = Vec::new();
-    let mut push = |f: &str| {
-        if !features.iter().any(|existing| existing == f) {
-            features.push(f.to_string());
-        }
-    };
-
-    if !fast {
-        // Full set: every auto-selectable backend valid on this host.
-        for device in DeviceValues::iter().filter(|d| !d.is_tch() && !d.is_rocm()) {
-            if let Some(f) = device.backend_feature() {
-                push(f);
-            }
-        }
-    }
-    // Requested backends. In fast mode this is the whole set; in full mode it
-    // adds the opt-in ones (`tch`, `rocm`) on top of the auto set above.
-    for device in devices {
-        if let Some(f) = device.backend_feature() {
-            push(f);
-        }
-    }
-    features
 }
 
 /// A compile-time build profile: which framework decorators (`fusion`,
@@ -320,7 +254,8 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
         }
         devices = expanded;
     }
-    let backend_features = backend_features(&devices, run_args.fast);
+    let tch_requested = devices.iter().any(DeviceValues::is_tch);
+    let rocm_requested = devices.iter().any(DeviceValues::is_rocm);
     let access_token = tokens.map(|t| t.access_token);
 
     // Set the defaults
@@ -350,7 +285,8 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
         &run_args.benches,
         &devices,
         &run_args.builds,
-        &backend_features,
+        tch_requested,
+        rocm_requested,
         &run_args.versions,
         &run_args.dtypes,
         access_token.as_deref(),
@@ -365,7 +301,8 @@ fn run_backend_comparison_benchmarks(
     benches: &[String],
     devices: &[DeviceValues],
     builds: &[BuildValues],
-    backend_features: &[String],
+    tch_requested: bool,
+    rocm_requested: bool,
     versions: &[String],
     dtypes: &[BenchDType],
     token: Option<&str>,
@@ -404,7 +341,8 @@ fn run_backend_comparison_benchmarks(
                         benches,
                         &device_str,
                         build,
-                        backend_features,
+                        tch_requested,
+                        rocm_requested,
                         dtype,
                         &url,
                         token,
@@ -495,7 +433,8 @@ fn run_cargo(
     benches: &[String],
     device: &str,
     build: &BuildValues,
-    backend_features: &[String],
+    tch_requested: bool,
+    rocm_requested: bool,
     dtype: &BenchDType,
     url: &str,
     token: Option<&str>,
@@ -521,18 +460,20 @@ fn run_cargo(
     let guard = dependency.patch(info.path.as_path()).unwrap();
     let name = &info.name;
 
-    // Cargo features control the compile-time build profile (framework
-    // decorators from `build.features()`), which backends are linked in
-    // (`backend_features`, derived from `--devices`/`--fast`), and any
-    // benchmark-specific required features. The concrete device is still
-    // injected at runtime via the `--devices` argument below.
+    // Backends are selected at runtime by injecting the right device (the
+    // `--devices` argument below), so cargo features only control the compile-
+    // time build profile (framework decorators), `tch` (when a LibTorch device
+    // is requested), and any benchmark-specific required features.
     let (no_default_features, kept_features) = build.features();
     let mut feature_list: Vec<String> = kept_features
         .iter()
         .map(|f| format!("{name}/{f}"))
         .collect();
-    for backend in backend_features.iter() {
-        feature_list.push(format!("{name}/{backend}"));
+    if tch_requested {
+        feature_list.push(format!("{name}/tch"));
+    }
+    if rocm_requested {
+        feature_list.push(format!("{name}/rocm"));
     }
     for bench in benches.iter() {
         for req_feature in get_required_features(info, bench) {
