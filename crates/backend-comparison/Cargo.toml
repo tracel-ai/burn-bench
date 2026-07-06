@@ -31,6 +31,9 @@ autotune = ["burn/autotune"]
 # stays self-contained. `tch` is enabled automatically by the runner when a
 # `tch-*` device is requested.
 tch = ["burn/tch"]
+# No-op: the cpu backend is already always-linked above, but the runner adds
+# `<crate>/cpu` when the cpu device is requested, so the feature must exist.
+cpu = []
 ndarray-simd = ["burn/simd"]
 ndarray-blas-accelerate = ["burn/accelerate"]
 ndarray-blas-netlib = ["burn/blas-netlib"]

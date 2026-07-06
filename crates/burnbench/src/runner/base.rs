@@ -475,6 +475,11 @@ fn run_cargo(
     if rocm_requested {
         feature_list.push(format!("{name}/rocm"));
     }
+    // The cubecl CPU backend pulls LLVM, so crates keep it behind a `cpu` feature
+    // rather than always-linked; enable it only when the cpu device is requested.
+    if device == "cpu" {
+        feature_list.push(format!("{name}/cpu"));
+    }
     for bench in benches.iter() {
         for req_feature in get_required_features(info, bench) {
             feature_list.push(format!("{name}/{req_feature}"));
