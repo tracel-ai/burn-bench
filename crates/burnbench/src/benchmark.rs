@@ -1,6 +1,6 @@
 use std::{pin::Pin, time::Duration};
 
-use crate::{BenchmarkComputations, BenchmarkDurations, BenchmarkResult, TimingMethod};
+use crate::{BenchmarkComputations, BenchmarkDurations, BenchmarkResult, Limit, TimingMethod};
 
 /// Benchmark trait.
 pub trait Benchmark {
@@ -47,22 +47,13 @@ pub trait Benchmark {
         vec![]
     }
 
-    /// Best-case total floating-point operations performed by this problem.
+    /// Best-case resource usage of this problem: its memory traffic and a list of
+    /// typed compute descriptors (arithmetic / tensor-core, with dtype and MMA
+    /// tile). Used to compute utilization against the measured practical limits.
     ///
-    /// Used to compute the arithmetic and tensor-core throughput utilization
-    /// against the measured practical limits. Returning `None` (the default)
-    /// leaves those columns as `N/A`.
-    fn total_flops(&self) -> Option<u64> {
-        None
-    }
-
-    /// Best-case total bytes moved (reads + writes) by this problem.
-    ///
-    /// Used to compute the memory throughput utilization against the measured
-    /// practical limits. Returning `None` (the default) leaves that column as
-    /// `N/A`.
-    fn total_bytes(&self) -> Option<u64> {
-        None
+    /// The default is empty, which leaves the utilization columns as `N/A`.
+    fn limits(&self) -> Limit {
+        Limit::default()
     }
 
     /// Wait for computation to complete.
@@ -204,8 +195,7 @@ where
         name: benchmark.name(),
         options: benchmark.options(),
         shapes: benchmark.shapes(),
-        flops: benchmark.total_flops(),
-        bytes: benchmark.total_bytes(),
+        limit: benchmark.limits(),
         timestamp,
     }
 }

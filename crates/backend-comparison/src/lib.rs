@@ -17,10 +17,11 @@ use burn::tensor::{
 };
 use burnbench::__private::{get_argument, get_sharing_token, get_sharing_url, init_log};
 use burnbench::{
-    BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, PracticalLimits, save_records,
+    BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, Limit, Peaks, resolve_peaks,
+    save_records,
 };
 
-pub use limits::{CalibrationProvider, LimitsProvider, dtype_size, measure_limits};
+pub use limits::CalibrationProvider;
 
 /// Default backend label used when `--devices` is not provided.
 const DEFAULT_DEVICE: &str = "ndarray";
@@ -157,21 +158,38 @@ pub fn select_devices() -> Vec<Device> {
 /// Persists benchmark results, optionally sharing them with the server when a
 /// sharing URL/token is provided via runtime arguments.
 ///
-/// The device's practical throughput limits are measured (once, cached on disk)
-/// so the report can show how much of the hardware each benchmark utilized.
+/// The device's practical hardware peaks are measured (only for the configurations
+/// the benchmarks declare, cached on disk) so the report can show how much of the
+/// hardware each benchmark utilized.
 pub fn save(results: Vec<BenchmarkResult>, device: &Device) {
-    save_inner(results, format!("{device:?}"), measure_limits(device));
+    let peaks = measure_peaks(device, &results);
+    save_inner(results, format!("{device:?}"), peaks);
 }
 
 /// Like [`save`], but for multi-device benchmarks. The recorded device name
-/// covers every device; the practical limits are calibrated on the first one
+/// covers every device; the practical peaks are calibrated on the first one
 /// (the devices are assumed to be identical hardware).
 pub fn save_multi(results: Vec<BenchmarkResult>, devices: &[Device]) {
-    let limits = devices.first().map(measure_limits).unwrap_or_default();
-    save_inner(results, format!("{devices:?}"), limits);
+    let peaks = match devices.first() {
+        Some(device) => measure_peaks(device, &results),
+        None => Peaks::default(),
+    };
+    save_inner(results, format!("{devices:?}"), peaks);
 }
 
-fn save_inner(results: Vec<BenchmarkResult>, device_name: String, limits: PracticalLimits) {
+/// Measures (via cubecl calibration, cached) the practical peaks needed to score
+/// the configurations declared by `results`.
+fn measure_peaks(device: &Device, results: &[BenchmarkResult]) -> Peaks {
+    let limits: Vec<Limit> = results.iter().map(|r| r.limit.clone()).collect();
+    resolve_peaks(
+        &CalibrationProvider {
+            device: device.clone(),
+        },
+        &limits,
+    )
+}
+
+fn save_inner(results: Vec<BenchmarkResult>, device_name: String, peaks: Peaks) {
     let args: Vec<String> = std::env::args().collect();
     let url = get_sharing_url(&args);
     let token = get_sharing_token(&args);
@@ -191,7 +209,7 @@ fn save_inner(results: Vec<BenchmarkResult>, device_name: String, limits: Practi
             burn_version: burn_version.clone(),
             system_info: BenchmarkSystemInfo::new(),
             results,
-            limits,
+            peaks: peaks.clone(),
         })
         .collect();
 

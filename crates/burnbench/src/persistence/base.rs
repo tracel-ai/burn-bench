@@ -1,6 +1,6 @@
-use crate::PracticalLimits;
 use crate::auth::get_auth_header_value;
 use crate::system_info::BenchmarkSystemInfo;
+use crate::{Limit, Peaks};
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, USER_AGENT};
 use serde::{Deserialize, Serialize, Serializer, de::Visitor, ser::SerializeStruct};
@@ -22,10 +22,8 @@ pub struct BenchmarkResult {
     pub options: Option<String>,
     /// Shape dimensions
     pub shapes: Vec<Vec<usize>>,
-    /// Best-case total floating-point operations for the benchmarked problem.
-    pub flops: Option<u64>,
-    /// Best-case total bytes moved (reads + writes) for the benchmarked problem.
-    pub bytes: Option<u64>,
+    /// Best-case declared resource usage (memory + typed compute) of the problem.
+    pub limit: Limit,
     /// Time just before the run
     pub timestamp: u128,
 }
@@ -115,9 +113,9 @@ pub struct BenchmarkRecord {
     pub burn_version: String,
     pub system_info: BenchmarkSystemInfo,
     pub results: BenchmarkResult,
-    /// Practical throughput limits measured on the device this run executed on.
+    /// Practical hardware peaks measured on the device this run executed on.
     /// Shared by every record produced from a single bench-binary invocation.
-    pub limits: PracticalLimits,
+    pub peaks: Peaks,
 }
 
 /// Save the benchmarks results on disk.
@@ -172,9 +170,9 @@ pub fn save_records(
         let file =
             fs::File::create(file_path.clone()).expect("Benchmark file should exist or be created");
         // Write the on-disk file through `LocalRecord` so it carries the extra
-        // roofline fields (`flops`, `bytes`, `limits`) the report reads back.
-        // The uploaded payload (`upload_record`) still uses the plain
-        // `BenchmarkRecord` serializer and stays unchanged.
+        // roofline fields (`limit`, `peaks`) the report reads back. The uploaded
+        // payload (`upload_record`) still uses the plain `BenchmarkRecord`
+        // serializer and stays unchanged.
         serde_json::to_writer_pretty(file, &LocalRecord(&record))
             .expect("Benchmark file should be updated with benchmark results");
 
@@ -299,9 +297,8 @@ impl Serialize for LocalRecord<'_> {
             ("shapes", &record.results.shapes),
             ("timestamp", &record.results.timestamp),
             ("variance", &record.results.computed.variance.as_micros()),
-            ("flops", &record.results.flops),
-            ("bytes", &record.results.bytes),
-            ("limits", &record.limits)
+            ("limit", &record.results.limit),
+            ("peaks", &record.peaks)
         )
     }
 }
@@ -346,9 +343,8 @@ impl<'de> Visitor<'de> for BenchmarkRecordVisitor {
                 "options" => br.results.options = map.next_value::<Option<String>>()?,
                 "rawDurations" => br.results.raw.durations = map.next_value::<Vec<Duration>>()?,
                 "shapes" => br.results.shapes = map.next_value::<Vec<Vec<usize>>>()?,
-                "flops" => br.results.flops = map.next_value::<Option<u64>>()?,
-                "bytes" => br.results.bytes = map.next_value::<Option<u64>>()?,
-                "limits" => br.limits = map.next_value::<PracticalLimits>()?,
+                "limit" => br.results.limit = map.next_value::<Limit>()?,
+                "peaks" => br.peaks = map.next_value::<Peaks>()?,
                 "systemInfo" => br.system_info = map.next_value::<BenchmarkSystemInfo>()?,
                 "timestamp" => br.results.timestamp = map.next_value::<u128>()?,
                 "variance" => {
@@ -472,26 +468,44 @@ mod tests {
 
     #[test]
     fn local_record_roundtrips_roofline_fields() {
+        use crate::{ArithPeak, Compute, DType, TcPeak};
+
         let mut record = BenchmarkRecord::default();
         record.backend = "cuda".to_string();
         record.results.name = "matmul".to_string();
         record.results.computed.median = Duration::from_micros(1234);
-        record.results.flops = Some(2_000_000_000);
-        record.results.bytes = Some(500_000_000);
-        record.limits = PracticalLimits {
+        record.results.limit = Limit {
+            memory: Some(500_000_000),
+            compute: vec![Compute::TensorCore {
+                dtype: DType::F16,
+                mnk: [16, 16, 16],
+                count: 2_000_000_000,
+            }],
+        };
+        record.peaks = Peaks {
             mem_bytes_per_sec: Some(1.5e12),
-            arith_flops_per_sec: Some(2.0e13),
-            tensor_core_flops_per_sec: Some(1.0e14),
+            arith: vec![ArithPeak {
+                dtype: DType::F16,
+                ops_per_sec: 2.0e13,
+            }],
+            tensor_core: vec![TcPeak {
+                dtype: DType::F16,
+                mnk: [16, 16, 16],
+                ops_per_sec: 1.0e14,
+            }],
         };
 
         let json = serde_json::to_string(&LocalRecord(&record)).unwrap();
         let back = serde_json::from_str::<BenchmarkRecord>(&json).unwrap();
 
-        assert_eq!(back.results.flops, Some(2_000_000_000));
-        assert_eq!(back.results.bytes, Some(500_000_000));
-        assert_eq!(back.limits.mem_bytes_per_sec, Some(1.5e12));
-        assert_eq!(back.limits.arith_flops_per_sec, Some(2.0e13));
-        assert_eq!(back.limits.tensor_core_flops_per_sec, Some(1.0e14));
+        assert_eq!(back.results.limit.memory, Some(500_000_000));
+        assert_eq!(back.results.limit.compute.len(), 1);
+        assert_eq!(back.peaks.mem_bytes_per_sec, Some(1.5e12));
+        assert_eq!(back.peaks.arith(DType::F16), Some(2.0e13));
+        assert_eq!(
+            back.peaks.tensor_core(DType::F16, [16, 16, 16]),
+            Some(1.0e14)
+        );
     }
 
     #[test]

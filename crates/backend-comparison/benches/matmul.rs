@@ -1,6 +1,17 @@
-use burn::tensor::{Device, Distribution, Shape, Tensor};
-use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
+use burn::tensor::{Device, Distribution, FloatDType, Shape, Tensor};
+use burnbench::{Benchmark, BenchmarkResult, Compute, DType, Limit, run_benchmark};
 use derive_new::new;
+
+/// Maps a burn float dtype to the burn-free dtype used in benchmark declarations.
+fn to_dtype(dtype: FloatDType) -> DType {
+    match dtype {
+        FloatDType::F64 => DType::F64,
+        FloatDType::F32 => DType::F32,
+        FloatDType::Flex32 => DType::Flex32,
+        FloatDType::F16 => DType::F16,
+        FloatDType::BF16 => DType::BF16,
+    }
+}
 
 #[derive(new)]
 struct MatmulBenchmark<const D: usize> {
@@ -108,13 +119,22 @@ impl<const D: usize> Benchmark for MatmulBenchmark<D> {
         }
     }
 
-    fn total_flops(&self) -> Option<u64> {
-        Some(self.problem.flops())
-    }
-
-    fn total_bytes(&self) -> Option<u64> {
-        let size = backend_comparison::dtype_size(self.device.settings().float_dtype) as u64;
-        Some(self.problem.elements() * size)
+    fn limits(&self) -> Limit {
+        let float_dtype = self.device.settings().float_dtype;
+        let elem_size = burn::tensor::DType::from(float_dtype).size() as u64;
+        // A dense matmul is tensor-core work: declare it against the canonical
+        // 16x16x16 MMA tile. Calibration measures the real tensor-core peak for
+        // dtypes whose hardware supports that tile (f16/bf16) and reports N/A for
+        // the tensor-core column otherwise (e.g. f32); the arithmetic column is
+        // always scored against the measured scalar peak for the dtype.
+        Limit {
+            memory: Some(self.problem.elements() * elem_size),
+            compute: vec![Compute::TensorCore {
+                dtype: to_dtype(float_dtype),
+                mnk: [16, 16, 16],
+                count: self.problem.flops(),
+            }],
+        }
     }
 
     fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {

@@ -1,251 +1,301 @@
-//! On-device measurement of the practical throughput limits used to report how
-//! much of the hardware each benchmark utilizes.
+//! On-device measurement of practical hardware peaks, implemented with cubecl
+//! kernels. A `cmma` micro-kernel measures the tensor-core peak for an exact MMA
+//! tile + dtype; an FMA-loop kernel measures the scalar arithmetic peak; a
+//! high-level elementwise pass measures memory bandwidth. Results are assembled
+//! (and cached) by [`burnbench::resolve_peaks`].
 //!
-//! The limits are obtained behind the [`LimitsProvider`] seam. The default
-//! [`CalibrationProvider`] runs a few tiny micro-benchmarks on the target
-//! device; a future provider could instead fetch vendor peak specs. Results are
-//! cached on disk per (device, dtype) so the many bench-binary invocations that
-//! make up a run don't each re-measure.
+//! Every measurement returns `None` when it cannot be performed — the backend has
+//! no cubecl compute client (CPU / ndarray / tch), or the requested MMA tile/dtype
+//! is not supported by the hardware — so the report shows `N/A` rather than
+//! crashing.
 
-use std::path::PathBuf;
+use core::mem::size_of;
+use std::time::Instant;
 
-use burn::tensor::{Device, Distribution, FloatDType, Tensor};
-use burnbench::{Benchmark, BenchmarkComputations, PracticalLimits, TimingMethod};
+use burn::backend::DispatchDevice;
+use burn::tensor::{Device, Distribution, Tensor};
+use burnbench::{DType, PeaksProvider};
+use cubecl::features::MmaConfig;
+use cubecl::future::block_on;
+use cubecl::ir::{ElemType, FloatKind};
+use cubecl::prelude::*;
+use half::{bf16, f16};
 
-/// Number of measured samples per calibration micro-benchmark. Kept small since
-/// the result is cached and reused across the whole run.
-const CALIB_SAMPLES: usize = 8;
+/// Measures practical peaks on `device` using cubecl kernels.
+pub struct CalibrationProvider {
+    pub device: Device,
+}
 
-/// Size in bytes of one element of the given float dtype.
-pub fn dtype_size(dtype: FloatDType) -> usize {
-    match dtype {
-        FloatDType::F16 | FloatDType::BF16 => 2,
-        _ => 4,
+impl PeaksProvider for CalibrationProvider {
+    fn device_key(&self) -> String {
+        format!("{:?}", self.device)
     }
-}
 
-/// Source of the practical hardware limits for a device.
-pub trait LimitsProvider {
-    fn measure(&self, device: &Device) -> PracticalLimits;
-}
+    fn measure_memory(&self) -> Option<f64> {
+        // Bandwidth is dtype-agnostic; measured with a cheap high-level elementwise
+        // pass (1 read + 1 write per element) on whatever backend the device uses.
+        let n = 4096usize;
+        let elem = burn::tensor::DType::from(self.device.settings().float_dtype).size() as f64;
+        let bytes = 2.0 * (n * n) as f64 * elem;
 
-/// Default provider: measures each limit with a simple on-device micro-benchmark.
-pub struct CalibrationProvider;
+        let x: Tensor<2> = Tensor::random([n, n], Distribution::Default, &self.device);
+        for _ in 0..5 {
+            let _ = x.clone().mul_scalar(1.0001);
+        }
+        self.device.sync().ok()?;
 
-impl LimitsProvider for CalibrationProvider {
-    fn measure(&self, device: &Device) -> PracticalLimits {
-        let dtype = device.settings().float_dtype;
-        let elem = dtype_size(dtype) as f64;
+        let reps = 20;
+        let start = Instant::now();
+        for _ in 0..reps {
+            let _ = x.clone().mul_scalar(1.0001);
+        }
+        self.device.sync().ok()?;
+        let secs = start.elapsed().as_secs_f64() / reps as f64;
 
-        // Peak memory bandwidth: a cheap elementwise pass moves 1 read + 1 write
-        // per element, so it is bound by bandwidth rather than compute.
-        let mem = {
-            let n = 4096;
-            let median = median_secs(MemBench {
-                n,
-                device: device.clone(),
-            });
-            let bytes = 2.0 * (n * n) as f64 * elem;
-            per_sec(bytes, median)
+        (secs > 0.0).then(|| bytes / secs)
+    }
+
+    fn measure_arith(&self, dtype: DType) -> Option<f64> {
+        match self.device.as_dispatch() {
+            #[cfg(not(target_os = "macos"))]
+            DispatchDevice::Cuda(d) => arith_on(cubecl::cuda::CudaRuntime::client(d), dtype),
+            #[cfg(not(target_os = "macos"))]
+            DispatchDevice::Vulkan(d) => arith_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+            ),
+            DispatchDevice::Wgpu(d) => arith_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+            ),
+            DispatchDevice::WebGpu(d) => arith_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+            ),
+            #[cfg(target_os = "macos")]
+            DispatchDevice::Metal(d) => arith_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+            ),
+            _ => None,
+        }
+    }
+
+    fn measure_tensor_core(&self, dtype: DType, mnk: [u32; 3]) -> Option<f64> {
+        // v1 supports only the canonical 16x16x16 tile with F16/BF16 inputs and an
+        // F32 accumulator; any other configuration reports N/A.
+        if mnk != [16, 16, 16] {
+            return None;
+        }
+        let a_type = match dtype {
+            DType::F16 => ElemType::Float(FloatKind::F16),
+            DType::BF16 => ElemType::Float(FloatKind::BF16),
+            _ => return None,
+        };
+        let cfg = MmaConfig {
+            a_type: a_type.into(),
+            b_type: a_type.into(),
+            cd_type: ElemType::Float(FloatKind::F32).into(),
+            m: 16,
+            n: 16,
+            k: 16,
         };
 
-        // Peak tensor-core throughput: a large square matmul in the device dtype
-        // (engages the tensor cores when the hardware/dtype supports it).
-        let tensor_core = {
-            let n = 2048;
-            let median = median_secs(MatmulBench {
-                n,
-                device: device.clone(),
-            });
-            let flops = 2.0 * (n as f64).powi(3);
-            per_sec(flops, median)
-        };
-
-        // Peak non-tensor-core arithmetic: a fused elementwise chain doing many
-        // FMA-like ops per element. This is an approximation (its accuracy
-        // depends on fusion collapsing the chain into one compute-bound kernel);
-        // it is the seam a future spec-fetching provider would replace.
-        let arith = {
-            let n = 4096;
-            let iters = 32;
-            let median = median_secs(ArithBench {
-                n,
-                iters,
-                device: device.clone(),
-            });
-            let flops = 2.0 * iters as f64 * (n * n) as f64;
-            per_sec(flops, median)
-        };
-
-        PracticalLimits {
-            mem_bytes_per_sec: mem,
-            arith_flops_per_sec: arith,
-            tensor_core_flops_per_sec: tensor_core,
+        match self.device.as_dispatch() {
+            #[cfg(not(target_os = "macos"))]
+            DispatchDevice::Cuda(d) => tc_on(cubecl::cuda::CudaRuntime::client(d), dtype, &cfg),
+            #[cfg(not(target_os = "macos"))]
+            DispatchDevice::Vulkan(d) => tc_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+                &cfg,
+            ),
+            DispatchDevice::Wgpu(d) => tc_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+                &cfg,
+            ),
+            DispatchDevice::WebGpu(d) => tc_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+                &cfg,
+            ),
+            #[cfg(target_os = "macos")]
+            DispatchDevice::Metal(d) => tc_on(
+                cubecl::wgpu::WgpuRuntime::<cubecl::wgpu::AutoCompiler>::client(d),
+                dtype,
+                &cfg,
+            ),
+            _ => None,
         }
     }
 }
 
-/// Returns the practical limits for `device`, using a disk cache keyed by the
-/// device and its configured dtype. Set `BURN_BENCH_LIMITS=off` to skip
-/// calibration entirely (all axes reported as `N/A`), or
-/// `BURN_BENCH_RECALIBRATE=1` to force a fresh measurement.
-pub fn measure_limits(device: &Device) -> PracticalLimits {
-    if matches!(std::env::var("BURN_BENCH_LIMITS").as_deref(), Ok("off")) {
-        return PracticalLimits::default();
+// --- Runtime-generic dispatch --------------------------------------------------
+
+fn arith_on<R: Runtime>(client: ComputeClient<R>, dtype: DType) -> Option<f64> {
+    Some(match dtype {
+        DType::F16 => arith_run::<R, f16>(&client),
+        DType::BF16 => arith_run::<R, bf16>(&client),
+        DType::F32 => arith_run::<R, f32>(&client),
+        DType::Flex32 => arith_run::<R, f32>(&client),
+        // Integer arithmetic peaks are out of scope for v1.
+        _ => return None,
+    })
+}
+
+fn tc_on<R: Runtime>(client: ComputeClient<R>, dtype: DType, cfg: &MmaConfig) -> Option<f64> {
+    if !client.features().matmul.cmma.contains(cfg) {
+        return None;
     }
-
-    let recalibrate = std::env::var("BURN_BENCH_RECALIBRATE").is_ok();
-    if !recalibrate && let Some(cached) = load_cached(device) {
-        return cached;
-    }
-
-    let limits = CalibrationProvider.measure(device);
-    store_cached(device, &limits);
-    limits
+    Some(match dtype {
+        DType::F16 => tc_run::<R, f16>(&client),
+        DType::BF16 => tc_run::<R, bf16>(&client),
+        _ => return None,
+    })
 }
 
-fn per_sec(amount: f64, secs: f64) -> Option<f64> {
-    if secs > 0.0 {
-        Some(amount / secs)
-    } else {
-        None
-    }
-}
+// --- Measurement --------------------------------------------------------------
 
-fn median_secs<B: Benchmark>(bench: B) -> f64 {
-    let durations = bench.run(TimingMethod::System);
-    BenchmarkComputations::new(&durations).median.as_secs_f64()
-}
+const ARITH_CUBE_DIM: u32 = 256;
+const ARITH_CUBES: u32 = 512;
+const ARITH_ITERS: u32 = 32;
+const ARITH_ACC: f64 = 8.0; // independent accumulator chains in the kernel
 
-fn cache_path(device: &Device) -> Option<PathBuf> {
-    let dir = dirs::home_dir()?
-        .join(".cache")
-        .join("burn")
-        .join("burnbench");
-    let raw = format!("{device:?}-{:?}", device.settings().float_dtype);
-    let key: String = raw
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    Some(dir.join(format!("limits_{key}.json")))
-}
+const TC_CUBES: u32 = 4096;
+const TC_ITERS: u32 = 16;
 
-fn load_cached(device: &Device) -> Option<PracticalLimits> {
-    let path = cache_path(device)?;
-    let content = std::fs::read_to_string(path).ok()?;
-    serde_json::from_str(&content).ok()
-}
+fn arith_run<R: Runtime, F: Float + CubeElement>(client: &ComputeClient<R>) -> f64 {
+    let threads = (ARITH_CUBES * ARITH_CUBE_DIM) as usize;
+    let out = client.empty(threads * size_of::<F>());
 
-fn store_cached(device: &Device, limits: &PracticalLimits) {
-    let Some(path) = cache_path(device) else {
-        return;
+    let launch = || unsafe {
+        arith_peak_kernel::launch::<F, R>(
+            client,
+            CubeCount::Static(ARITH_CUBES, 1, 1),
+            CubeDim::new_1d(ARITH_CUBE_DIM),
+            BufferArg::from_raw_parts(out.clone(), threads),
+            ARITH_ITERS,
+        )
     };
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(json) = serde_json::to_string_pretty(limits) {
-        let _ = std::fs::write(path, json);
-    }
+
+    let secs = time_launches(client, 5, 100, launch);
+    // 2 FLOPs per FMA, ARITH_ACC chains, ARITH_ITERS iterations, per thread.
+    let ops = 2.0 * ARITH_ACC * ARITH_ITERS as f64 * threads as f64;
+    ops / secs
 }
 
-// --- Calibration micro-benchmarks ---------------------------------------------
+fn tc_run<R: Runtime, F: Float + CubeElement>(client: &ComputeClient<R>) -> f64 {
+    let lhs = client.empty(256 * size_of::<F>());
+    let rhs = client.empty(256 * size_of::<F>());
+    let out = client.empty(256 * size_of::<f32>());
 
-struct MemBench {
-    n: usize,
-    device: Device,
+    let launch = || unsafe {
+        tc_peak_kernel::launch::<F, R>(
+            client,
+            CubeCount::Static(TC_CUBES, 1, 1),
+            CubeDim::new_1d(32),
+            BufferArg::from_raw_parts(lhs.clone(), 256),
+            BufferArg::from_raw_parts(rhs.clone(), 256),
+            BufferArg::from_raw_parts(out.clone(), 256),
+            TC_ITERS,
+        )
+    };
+
+    let secs = time_launches(client, 5, 50, launch);
+    // 2 * m * n * k FLOPs per tile, one tile per plane per iteration.
+    let ops = 2.0 * 16.0 * 16.0 * 16.0 * TC_CUBES as f64 * TC_ITERS as f64;
+    ops / secs
 }
 
-impl Benchmark for MemBench {
-    type Input = Tensor<2>;
-    type Output = Tensor<2>;
-
-    fn name(&self) -> String {
-        "calib-mem".to_string()
+/// Runs `launch` `warmup` times, then times `reps` launches, returning the mean
+/// seconds per launch.
+fn time_launches<R: Runtime>(
+    client: &ComputeClient<R>,
+    warmup: u32,
+    reps: u32,
+    mut launch: impl FnMut(),
+) -> f64 {
+    for _ in 0..warmup {
+        launch();
     }
+    let _ = block_on(client.sync());
 
-    fn num_samples(&self) -> usize {
-        CALIB_SAMPLES
+    let start = Instant::now();
+    for _ in 0..reps {
+        launch();
     }
-
-    fn prepare(&self) -> Self::Input {
-        Tensor::random([self.n, self.n], Distribution::Default, &self.device)
-    }
-
-    fn execute(&self, input: Self::Input) -> Self::Output {
-        input.mul_scalar(1.0001)
-    }
-
-    fn sync(&self) {
-        self.device.sync().unwrap();
-    }
+    let _ = block_on(client.sync());
+    start.elapsed().as_secs_f64() / reps as f64
 }
 
-struct MatmulBench {
-    n: usize,
-    device: Device,
+// --- Kernels ------------------------------------------------------------------
+
+#[cube(launch)]
+fn arith_peak_kernel<F: Float>(output: &mut [F], #[comptime] iters: u32) {
+    let b = F::new(1.000_000_1);
+    let c = F::new(0.000_000_1);
+
+    // Eight independent accumulator chains to expose instruction-level
+    // parallelism (a single dependent chain would be latency-bound).
+    let mut a0 = F::new(1.0);
+    let mut a1 = F::new(1.1);
+    let mut a2 = F::new(1.2);
+    let mut a3 = F::new(1.3);
+    let mut a4 = F::new(1.4);
+    let mut a5 = F::new(1.5);
+    let mut a6 = F::new(1.6);
+    let mut a7 = F::new(1.7);
+
+    #[unroll]
+    for _ in 0..iters {
+        a0 = a0 * b + c;
+        a1 = a1 * b + c;
+        a2 = a2 * b + c;
+        a3 = a3 * b + c;
+        a4 = a4 * b + c;
+        a5 = a5 * b + c;
+        a6 = a6 * b + c;
+        a7 = a7 * b + c;
+    }
+
+    output[ABSOLUTE_POS] = a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7;
 }
 
-impl Benchmark for MatmulBench {
-    type Input = (Tensor<2>, Tensor<2>);
-    type Output = Tensor<2>;
+#[cube(launch)]
+fn tc_peak_kernel<F: Float>(lhs: &[F], rhs: &[F], out: &mut [f32], #[comptime] iters: u32) {
+    let a = cmma::Matrix::<F>::from_slice(
+        cmma::MatrixIdent::A,
+        16usize,
+        16usize,
+        16usize,
+        cmma::MatrixLayout::RowMajor,
+        lhs,
+        16,
+    );
+    let b = cmma::Matrix::<F>::from_slice(
+        cmma::MatrixIdent::B,
+        16usize,
+        16usize,
+        16usize,
+        cmma::MatrixLayout::ColMajor,
+        rhs,
+        16,
+    );
+    let c = cmma::Matrix::<f32>::from_value(
+        cmma::MatrixIdent::Accumulator,
+        16usize,
+        16usize,
+        16usize,
+        cmma::MatrixLayout::Undefined,
+        0.0f32,
+    );
 
-    fn name(&self) -> String {
-        "calib-matmul".to_string()
+    // Loop-carried on the accumulator so the executes can't be folded away.
+    #[unroll]
+    for _ in 0..iters {
+        cmma::execute(&a, &b, &c, &c);
     }
 
-    fn num_samples(&self) -> usize {
-        CALIB_SAMPLES
-    }
-
-    fn prepare(&self) -> Self::Input {
-        let lhs = Tensor::random([self.n, self.n], Distribution::Default, &self.device);
-        let rhs = Tensor::random([self.n, self.n], Distribution::Default, &self.device);
-        (lhs, rhs)
-    }
-
-    fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {
-        lhs.matmul(rhs)
-    }
-
-    fn sync(&self) {
-        self.device.sync().unwrap();
-    }
-}
-
-struct ArithBench {
-    n: usize,
-    iters: usize,
-    device: Device,
-}
-
-impl Benchmark for ArithBench {
-    type Input = Tensor<2>;
-    type Output = Tensor<2>;
-
-    fn name(&self) -> String {
-        "calib-arith".to_string()
-    }
-
-    fn num_samples(&self) -> usize {
-        CALIB_SAMPLES
-    }
-
-    fn prepare(&self) -> Self::Input {
-        Tensor::random([self.n, self.n], Distribution::Default, &self.device)
-    }
-
-    fn execute(&self, input: Self::Input) -> Self::Output {
-        // Each iteration is one multiply + one add (2 FLOPs per element). The
-        // scalars are near-identity to keep the values bounded without changing
-        // the FLOP count.
-        let mut x = input;
-        for _ in 0..self.iters {
-            x = x.mul_scalar(1.0000001).add_scalar(0.0000001);
-        }
-        x
-    }
-
-    fn sync(&self) {
-        self.device.sync().unwrap();
-    }
+    cmma::store(out, &c, 16, cmma::MatrixLayout::RowMajor);
 }

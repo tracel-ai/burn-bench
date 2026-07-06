@@ -110,11 +110,9 @@ impl BenchmarkCollection {
                 prev_shapes = record.results.shapes.clone();
             }
 
-            let util = record.limits.utilization(
-                record.results.flops,
-                record.results.bytes,
-                record.results.computed.median,
-            );
+            let util = record
+                .peaks
+                .utilization(&record.results.limit, record.results.computed.median);
 
             table.add_row(vec![
                 Cell::new(&record.results.name).fg(Color::Green),
@@ -127,7 +125,7 @@ impl BenchmarkCollection {
                     .set_alignment(CellAlignment::Right),
                 Cell::new(fmt_utilization(util.mem)).set_alignment(CellAlignment::Right),
                 Cell::new(fmt_utilization(util.arith)).set_alignment(CellAlignment::Right),
-                Cell::new(fmt_utilization(util.tensor_core)).set_alignment(CellAlignment::Right),
+                Cell::new(fmt_utilization(util.tc)).set_alignment(CellAlignment::Right),
             ]);
         }
 
