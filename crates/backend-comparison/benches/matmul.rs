@@ -57,6 +57,32 @@ impl Problem {
             Problem::Outer { b, m, n } => ([b, m, 1].into(), [b, 1, n].into()),
         }
     }
+
+    /// Effective `(batch, m, n, k)` of the matmul, with batch broadcast applied.
+    fn matmul_dims(self) -> (usize, usize, usize, usize) {
+        match self {
+            Problem::General { b, m, n, k } => (b, m, n, k),
+            Problem::MatVec { b, m, k } => (b, m, 1, k),
+            Problem::VecMat { b_lhs, b_rhs, n, k } => (b_lhs.max(b_rhs), 1, n, k),
+            Problem::Inner { b, k } => (b, 1, 1, k),
+            Problem::Outer { b, m, n } => (b, m, n, 1),
+        }
+    }
+
+    /// Best-case FLOPs: one multiply and one add per accumulated element.
+    fn flops(self) -> u64 {
+        let (b, m, n, k) = self.matmul_dims();
+        2 * b as u64 * m as u64 * n as u64 * k as u64
+    }
+
+    /// Best-case element traffic: both inputs read once plus the output written
+    /// once.
+    fn elements(self) -> u64 {
+        let (shape_lhs, shape_rhs) = self.shapes();
+        let prod = |shape: &Shape| shape.to_vec().iter().map(|&d| d as u64).product::<u64>();
+        let (b, m, n, _k) = self.matmul_dims();
+        prod(&shape_lhs) + prod(&shape_rhs) + b as u64 * m as u64 * n as u64
+    }
 }
 
 impl<const D: usize> Benchmark for MatmulBenchmark<D> {
@@ -80,6 +106,15 @@ impl<const D: usize> Benchmark for MatmulBenchmark<D> {
         } else {
             vec![shape_lhs.to_vec(), shape_rhs.to_vec()]
         }
+    }
+
+    fn total_flops(&self) -> Option<u64> {
+        Some(self.problem.flops())
+    }
+
+    fn total_bytes(&self) -> Option<u64> {
+        let size = backend_comparison::dtype_size(self.device.settings().float_dtype) as u64;
+        Some(self.problem.elements() * size)
     }
 
     fn execute(&self, (lhs, rhs): Self::Input) -> Self::Output {

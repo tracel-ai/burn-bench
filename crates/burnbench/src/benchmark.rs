@@ -47,6 +47,24 @@ pub trait Benchmark {
         vec![]
     }
 
+    /// Best-case total floating-point operations performed by this problem.
+    ///
+    /// Used to compute the arithmetic and tensor-core throughput utilization
+    /// against the measured practical limits. Returning `None` (the default)
+    /// leaves those columns as `N/A`.
+    fn total_flops(&self) -> Option<u64> {
+        None
+    }
+
+    /// Best-case total bytes moved (reads + writes) by this problem.
+    ///
+    /// Used to compute the memory throughput utilization against the measured
+    /// practical limits. Returning `None` (the default) leaves that column as
+    /// `N/A`.
+    fn total_bytes(&self) -> Option<u64> {
+        None
+    }
+
     /// Wait for computation to complete.
     fn sync(&self);
 
@@ -186,6 +204,8 @@ where
         name: benchmark.name(),
         options: benchmark.options(),
         shapes: benchmark.shapes(),
+        flops: benchmark.total_flops(),
+        bytes: benchmark.total_bytes(),
         timestamp,
     }
 }

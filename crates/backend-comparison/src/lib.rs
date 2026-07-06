@@ -10,11 +10,17 @@
 //! (`--devices <label> --dtype <dtype>`); [`select_device`] / [`select_devices`]
 //! turn those into a configured [`Device`].
 
+pub mod limits;
+
 use burn::tensor::{
     Device, DeviceConfig, DeviceError, DeviceIndex, DeviceKind, DeviceType, FloatDType,
 };
 use burnbench::__private::{get_argument, get_sharing_token, get_sharing_url, init_log};
-use burnbench::{BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, save_records};
+use burnbench::{
+    BenchmarkRecord, BenchmarkResult, BenchmarkSystemInfo, PracticalLimits, save_records,
+};
+
+pub use limits::{CalibrationProvider, LimitsProvider, dtype_size, measure_limits};
 
 /// Default backend label used when `--devices` is not provided.
 const DEFAULT_DEVICE: &str = "ndarray";
@@ -150,7 +156,22 @@ pub fn select_devices() -> Vec<Device> {
 
 /// Persists benchmark results, optionally sharing them with the server when a
 /// sharing URL/token is provided via runtime arguments.
-pub fn save(results: Vec<BenchmarkResult>, device: impl core::fmt::Debug) {
+///
+/// The device's practical throughput limits are measured (once, cached on disk)
+/// so the report can show how much of the hardware each benchmark utilized.
+pub fn save(results: Vec<BenchmarkResult>, device: &Device) {
+    save_inner(results, format!("{device:?}"), measure_limits(device));
+}
+
+/// Like [`save`], but for multi-device benchmarks. The recorded device name
+/// covers every device; the practical limits are calibrated on the first one
+/// (the devices are assumed to be identical hardware).
+pub fn save_multi(results: Vec<BenchmarkResult>, devices: &[Device]) {
+    let limits = devices.first().map(measure_limits).unwrap_or_default();
+    save_inner(results, format!("{devices:?}"), limits);
+}
+
+fn save_inner(results: Vec<BenchmarkResult>, device_name: String, limits: PracticalLimits) {
     let args: Vec<String> = std::env::args().collect();
     let url = get_sharing_url(&args);
     let token = get_sharing_token(&args);
@@ -160,7 +181,6 @@ pub fn save(results: Vec<BenchmarkResult>, device: impl core::fmt::Debug) {
     let feature = build_label();
     let burn_version =
         std::env::var("BURN_BENCH_BURN_VERSION").unwrap_or_else(|_| "main".to_string());
-    let device_name = format!("{device:?}");
 
     let records: Vec<BenchmarkRecord> = results
         .into_iter()
@@ -171,6 +191,7 @@ pub fn save(results: Vec<BenchmarkResult>, device: impl core::fmt::Debug) {
             burn_version: burn_version.clone(),
             system_info: BenchmarkSystemInfo::new(),
             results,
+            limits,
         })
         .collect();
 

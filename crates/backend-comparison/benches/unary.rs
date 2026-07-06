@@ -20,6 +20,13 @@ impl<const D: usize> Benchmark for UnaryBenchmark<D> {
         vec![self.shape.to_vec()]
     }
 
+    fn total_bytes(&self) -> Option<u64> {
+        // Elementwise unary: read every element once, write every element once.
+        let elems: u64 = self.shape.to_vec().iter().map(|&d| d as u64).product();
+        let size = backend_comparison::dtype_size(self.device.settings().float_dtype) as u64;
+        Some(2 * elems * size)
+    }
+
     fn execute(&self, args: Self::Input) -> Self::Output {
         // Choice of tanh is arbitrary
         args.tanh()

@@ -79,5 +79,5 @@ fn bench(_devices: &[Device]) -> Vec<BenchmarkResult> {
 fn main() {
     let devices = backend_comparison::select_devices();
     let results = bench(&devices);
-    backend_comparison::save(results, &devices);
+    backend_comparison::save_multi(results, &devices);
 }
