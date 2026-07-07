@@ -42,8 +42,8 @@ rocm = ["burn/rocm"]
 
 # Special benchmark capabilities.
 multi-device = []
-remote = ["server", "burn/remote"]
-server = ["burn/server"]
+# remote = ["server", "burn/remote"]
+# server = ["burn/server"]
 
 [dependencies]
 # Backends that compile cleanly on every platform are always enabled; the
@@ -123,6 +123,10 @@ tempfile = { workspace = true }
 [[bench]]
 harness = false
 name = "unary"
+
+[[bench]]
+harness = false
+name = "elemwise"
 
 [[bench]]
 harness = false
