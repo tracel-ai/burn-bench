@@ -480,6 +480,10 @@ fn run_cargo(
             feature_list.push(format!("{name}/{req_feature}"));
         }
     }
+
+    #[cfg(feature = "correctness")]
+    feature_list.push(format!("correctness"));
+
     let features = feature_list.join(",");
     let dtype_str = dtype.to_string();
 

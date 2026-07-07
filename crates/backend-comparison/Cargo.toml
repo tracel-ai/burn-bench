@@ -42,6 +42,8 @@ multi-device = []
 remote = ["server", "burn/remote"]
 server = ["burn/server"]
 
+correctness = []
+
 [dependencies]
 # Backends that compile cleanly on every platform are always enabled; the
 # concrete one is selected at runtime via the device. Platform-specific backends
@@ -134,6 +136,11 @@ path = "benches/launch_overhead.rs"
 harness = false
 name = "max-pool2d"
 path = "benches/max_pool2d.rs"
+
+[[bench]]
+harness = false
+name = "nhwc-relayout-fused"
+path = "benches/nhwc_relayout_fused.rs"
 
 [[bench]]
 harness = false

@@ -50,7 +50,6 @@ impl Benchmark for MaxPool2dBenchmark {
     }
 }
 
-#[allow(dead_code)]
 fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let benchmark = MaxPool2dBenchmark {
         name: "default",
