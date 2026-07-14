@@ -22,25 +22,12 @@ impl BenchmarkConfig {
                 .collect(),
         }
     }
-    pub fn init_with(&self, record: BenchmarkModuleRecord) -> BenchmarkModule {
-        BenchmarkModule {
-            linears: record
-                .linears
-                .into_iter()
-                .map(|record| nn::Linear {
-                    weight: record.weight,
-                    bias: record.bias,
-                })
-                .collect(),
-        }
-    }
 }
 
 #[derive(Debug)]
 enum Kind {
     Lazy,
     Sync,
-    Manual,
 }
 
 #[derive(new)]
@@ -85,7 +72,6 @@ impl Benchmark for LoadRecordBenchmark {
                 let _ = module.clone();
                 module.load_record(record)
             }
-            Kind::Manual => self.config.init_with(record),
         }
     }
 
@@ -105,7 +91,7 @@ impl Benchmark for LoadRecordBenchmark {
 fn bench(device: &Device) -> Vec<BenchmarkResult> {
     let config = BenchmarkConfig::new(nn::LinearConfig::new(2048, 2048), 12);
 
-    [Kind::Lazy, Kind::Sync, Kind::Manual]
+    [Kind::Lazy, Kind::Sync]
         .into_iter()
         .map(|kind| LoadRecordBenchmark::new(config.clone(), device.clone(), kind))
         .map(run_benchmark)

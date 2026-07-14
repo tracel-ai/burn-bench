@@ -1,5 +1,5 @@
 use burn::tensor::{Device, Distribution, Shape, Tensor};
-use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
+use burnbench::{Benchmark, BenchmarkResult, Limit, run_benchmark};
 use derive_new::new;
 
 #[derive(new)]
@@ -18,6 +18,17 @@ impl<const D: usize> Benchmark for UnaryBenchmark<D> {
 
     fn shapes(&self) -> Vec<Vec<usize>> {
         vec![self.shape.to_vec()]
+    }
+
+    fn limits(&self) -> Limit {
+        // Memory-bound elementwise unary: read every element once, write once.
+        // The tanh arithmetic is intentionally uncounted (no compute descriptor).
+        let elems: u64 = self.shape.to_vec().iter().map(|&d| d as u64).product();
+        let size = burn::tensor::DType::from(self.device.settings().float_dtype).size() as u64;
+        Limit {
+            memory: Some(2 * elems * size),
+            compute: vec![],
+        }
     }
 
     fn execute(&self, args: Self::Input) -> Self::Output {

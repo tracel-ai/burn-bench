@@ -1,11 +1,13 @@
 pub mod __private;
 mod benchmark;
+mod limits;
 mod persistence;
 mod runner;
 
 pub(crate) mod system_info;
 
 pub use benchmark::*;
+pub use limits::*;
 pub use persistence::*;
 pub use runner::*;
 pub use system_info::*;

@@ -1,6 +1,17 @@
-use burn::tensor::{Device, Distribution, Shape, Tensor};
-use burnbench::{Benchmark, BenchmarkResult, run_benchmark};
+use burn::tensor::{Device, Distribution, FloatDType, Shape, Tensor};
+use burnbench::{Benchmark, BenchmarkResult, Compute, DType, Limit, run_benchmark};
 use derive_new::new;
+
+/// Maps a burn float dtype to the burn-free dtype used in benchmark declarations.
+fn to_dtype(dtype: FloatDType) -> DType {
+    match dtype {
+        FloatDType::F64 => DType::F64,
+        FloatDType::F32 => DType::F32,
+        FloatDType::Flex32 => DType::Flex32,
+        FloatDType::F16 => DType::F16,
+        FloatDType::BF16 => DType::BF16,
+    }
+}
 
 #[derive(new)]
 struct MatmulBenchmark<const D: usize> {
@@ -57,6 +68,32 @@ impl Problem {
             Problem::Outer { b, m, n } => ([b, m, 1].into(), [b, 1, n].into()),
         }
     }
+
+    /// Effective `(batch, m, n, k)` of the matmul, with batch broadcast applied.
+    fn matmul_dims(self) -> (usize, usize, usize, usize) {
+        match self {
+            Problem::General { b, m, n, k } => (b, m, n, k),
+            Problem::MatVec { b, m, k } => (b, m, 1, k),
+            Problem::VecMat { b_lhs, b_rhs, n, k } => (b_lhs.max(b_rhs), 1, n, k),
+            Problem::Inner { b, k } => (b, 1, 1, k),
+            Problem::Outer { b, m, n } => (b, m, n, 1),
+        }
+    }
+
+    /// Best-case FLOPs: one multiply and one add per accumulated element.
+    fn flops(self) -> u64 {
+        let (b, m, n, k) = self.matmul_dims();
+        2 * b as u64 * m as u64 * n as u64 * k as u64
+    }
+
+    /// Best-case element traffic: both inputs read once plus the output written
+    /// once.
+    fn elements(self) -> u64 {
+        let (shape_lhs, shape_rhs) = self.shapes();
+        let prod = |shape: &Shape| shape.to_vec().iter().map(|&d| d as u64).product::<u64>();
+        let (b, m, n, _k) = self.matmul_dims();
+        prod(&shape_lhs) + prod(&shape_rhs) + b as u64 * m as u64 * n as u64
+    }
 }
 
 impl<const D: usize> Benchmark for MatmulBenchmark<D> {
@@ -79,6 +116,24 @@ impl<const D: usize> Benchmark for MatmulBenchmark<D> {
             vec![shape_lhs.to_vec()]
         } else {
             vec![shape_lhs.to_vec(), shape_rhs.to_vec()]
+        }
+    }
+
+    fn limits(&self) -> Limit {
+        let float_dtype = self.device.settings().float_dtype;
+        let elem_size = burn::tensor::DType::from(float_dtype).size() as u64;
+        // A dense matmul is tensor-core work: declare it against the canonical
+        // 16x16x16 MMA tile. Calibration measures the real tensor-core peak for
+        // dtypes whose hardware supports that tile (f16/bf16) and reports N/A for
+        // the tensor-core column otherwise (e.g. f32); the arithmetic column is
+        // always scored against the measured scalar peak for the dtype.
+        Limit {
+            memory: Some(self.problem.elements() * elem_size),
+            compute: vec![Compute::TensorCore {
+                dtype: to_dtype(float_dtype),
+                mnk: [16, 16, 16],
+                count: self.problem.flops(),
+            }],
         }
     }
 

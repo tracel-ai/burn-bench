@@ -92,6 +92,9 @@ impl BenchmarkCollection {
             "Backend",
             "Device",
             "Median",
+            "Mem %",
+            "Arith %",
+            "TC %",
         ]);
 
         let mut prev_benchmark = "";
@@ -101,19 +104,15 @@ impl BenchmarkCollection {
         for record in &records {
             if prev_benchmark != record.results.name || prev_shapes != record.results.shapes {
                 if !prev_benchmark.is_empty() {
-                    table.add_row(vec![
-                        Cell::new("----").fg(Color::DarkGrey),
-                        Cell::new("----").fg(Color::DarkGrey),
-                        Cell::new("----").fg(Color::DarkGrey),
-                        Cell::new("----").fg(Color::DarkGrey),
-                        Cell::new("----").fg(Color::DarkGrey),
-                        Cell::new("----").fg(Color::DarkGrey),
-                        Cell::new("----").fg(Color::DarkGrey),
-                    ]);
+                    table.add_row(vec![Cell::new("----").fg(Color::DarkGrey); 10]);
                 }
                 prev_benchmark = &record.results.name;
                 prev_shapes = record.results.shapes.clone();
             }
+
+            let util = record
+                .peaks
+                .utilization(&record.results.limit, record.results.computed.median);
 
             table.add_row(vec![
                 Cell::new(&record.results.name).fg(Color::Green),
@@ -124,13 +123,16 @@ impl BenchmarkCollection {
                 Cell::new(&record.device).fg(Color::Green),
                 Cell::new(format!("{:.3?}", record.results.computed.median))
                     .set_alignment(CellAlignment::Right),
+                Cell::new(fmt_utilization(util.mem)).set_alignment(CellAlignment::Right),
+                Cell::new(fmt_utilization(util.arith)).set_alignment(CellAlignment::Right),
+                Cell::new(fmt_utilization(util.tc)).set_alignment(CellAlignment::Right),
             ]);
         }
 
         // failed benchmarks: one row per failed combination, mirroring the
         // success columns (Feature = build profile, Backend = device).
         if !self.failed_benchmarks.is_empty() && !records.is_empty() {
-            table.add_row(vec![Cell::new("----").fg(Color::DarkGrey); 7]);
+            table.add_row(vec![Cell::new("----").fg(Color::DarkGrey); 10]);
         }
         for benchmark in &self.failed_benchmarks {
             table.add_row(vec![
@@ -141,10 +143,22 @@ impl BenchmarkCollection {
                 Cell::new(format!("`{}`", &benchmark.device)).fg(Color::Red),
                 Cell::new("-"),
                 Cell::new("FAILED").fg(Color::Red),
+                Cell::new("-"),
+                Cell::new("-"),
+                Cell::new("-"),
             ]);
         }
 
         table.to_string()
+    }
+}
+
+/// Formats a utilization ratio (1.0 == 100%) as a percentage, or `N/A` when the
+/// benchmark property or measured peak was missing.
+fn fmt_utilization(ratio: Option<f64>) -> String {
+    match ratio {
+        Some(ratio) => format!("{:.1}%", ratio * 100.0),
+        None => "N/A".to_string(),
     }
 }
 

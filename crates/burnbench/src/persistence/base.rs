@@ -1,5 +1,6 @@
 use crate::auth::get_auth_header_value;
 use crate::system_info::BenchmarkSystemInfo;
+use crate::{Limit, Peaks};
 
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, USER_AGENT};
 use serde::{Deserialize, Serialize, Serializer, de::Visitor, ser::SerializeStruct};
@@ -21,6 +22,8 @@ pub struct BenchmarkResult {
     pub options: Option<String>,
     /// Shape dimensions
     pub shapes: Vec<Vec<usize>>,
+    /// Best-case declared resource usage (memory + typed compute) of the problem.
+    pub limit: Limit,
     /// Time just before the run
     pub timestamp: u128,
 }
@@ -110,6 +113,9 @@ pub struct BenchmarkRecord {
     pub burn_version: String,
     pub system_info: BenchmarkSystemInfo,
     pub results: BenchmarkResult,
+    /// Practical hardware peaks measured on the device this run executed on.
+    /// Shared by every record produced from a single bench-binary invocation.
+    pub peaks: Peaks,
 }
 
 /// Save the benchmarks results on disk.
@@ -163,7 +169,11 @@ pub fn save_records(
         let file_path = cache_dir.join(file_name);
         let file =
             fs::File::create(file_path.clone()).expect("Benchmark file should exist or be created");
-        serde_json::to_writer_pretty(file, &record)
+        // Write the on-disk file through `LocalRecord` so it carries the extra
+        // roofline fields (`limit`, `peaks`) the report reads back. The uploaded
+        // payload (`upload_record`) still uses the plain `BenchmarkRecord`
+        // serializer and stays unchanged.
+        serde_json::to_writer_pretty(file, &LocalRecord(&record))
             .expect("Benchmark file should be updated with benchmark results");
 
         // Append the benchmark result filepath in the benchmark_results.tx file of
@@ -255,6 +265,44 @@ impl Serialize for BenchmarkRecord {
     }
 }
 
+/// Local-file view of a [`BenchmarkRecord`] that additionally serializes the
+/// roofline fields (`flops`, `bytes`, `limits`). Used only for the on-disk
+/// cache the runner reads back to build the report table; the uploaded payload
+/// keeps using [`BenchmarkRecord`]'s serializer so it stays unchanged.
+pub(crate) struct LocalRecord<'a>(pub(crate) &'a BenchmarkRecord);
+
+impl Serialize for LocalRecord<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let record = self.0;
+        serialize_fields!(
+            serializer,
+            record,
+            ("backend", &record.backend),
+            ("device", &record.device),
+            ("feature", &record.feature),
+            ("gitHash", &record.results.git_hash),
+            ("burnVersion", &record.burn_version),
+            ("max", &record.results.computed.max.as_micros()),
+            ("mean", &record.results.computed.mean.as_micros()),
+            ("median", &record.results.computed.median.as_micros()),
+            ("min", &record.results.computed.min.as_micros()),
+            ("name", &record.results.name),
+            ("numSamples", &record.results.raw.durations.len()),
+            ("options", &record.results.options),
+            ("rawDurations", &record.results.raw.durations),
+            ("systemInfo", &record.system_info),
+            ("shapes", &record.results.shapes),
+            ("timestamp", &record.results.timestamp),
+            ("variance", &record.results.computed.variance.as_micros()),
+            ("limit", &record.results.limit),
+            ("peaks", &record.peaks)
+        )
+    }
+}
+
 struct BenchmarkRecordVisitor;
 
 impl<'de> Visitor<'de> for BenchmarkRecordVisitor {
@@ -295,6 +343,8 @@ impl<'de> Visitor<'de> for BenchmarkRecordVisitor {
                 "options" => br.results.options = map.next_value::<Option<String>>()?,
                 "rawDurations" => br.results.raw.durations = map.next_value::<Vec<Duration>>()?,
                 "shapes" => br.results.shapes = map.next_value::<Vec<Vec<usize>>>()?,
+                "limit" => br.results.limit = map.next_value::<Limit>()?,
+                "peaks" => br.peaks = map.next_value::<Peaks>()?,
                 "systemInfo" => br.system_info = map.next_value::<BenchmarkSystemInfo>()?,
                 "timestamp" => br.results.timestamp = map.next_value::<u128>()?,
                 "variance" => {
@@ -414,6 +464,48 @@ mod tests {
         assert!(record.results.raw.durations[7] == Duration::from_nanos(8506627));
         assert!(record.results.raw.durations[8] == Duration::from_nanos(8521615));
         assert!(record.results.raw.durations[9] == Duration::from_nanos(8511474));
+    }
+
+    #[test]
+    fn local_record_roundtrips_roofline_fields() {
+        use crate::{ArithPeak, Compute, DType, TcPeak};
+
+        let mut record = BenchmarkRecord::default();
+        record.backend = "cuda".to_string();
+        record.results.name = "matmul".to_string();
+        record.results.computed.median = Duration::from_micros(1234);
+        record.results.limit = Limit {
+            memory: Some(500_000_000),
+            compute: vec![Compute::TensorCore {
+                dtype: DType::F16,
+                mnk: [16, 16, 16],
+                count: 2_000_000_000,
+            }],
+        };
+        record.peaks = Peaks {
+            mem_bytes_per_sec: Some(1.5e12),
+            arith: vec![ArithPeak {
+                dtype: DType::F16,
+                ops_per_sec: 2.0e13,
+            }],
+            tensor_core: vec![TcPeak {
+                dtype: DType::F16,
+                mnk: [16, 16, 16],
+                ops_per_sec: 1.0e14,
+            }],
+        };
+
+        let json = serde_json::to_string(&LocalRecord(&record)).unwrap();
+        let back = serde_json::from_str::<BenchmarkRecord>(&json).unwrap();
+
+        assert_eq!(back.results.limit.memory, Some(500_000_000));
+        assert_eq!(back.results.limit.compute.len(), 1);
+        assert_eq!(back.peaks.mem_bytes_per_sec, Some(1.5e12));
+        assert_eq!(back.peaks.arith(DType::F16), Some(2.0e13));
+        assert_eq!(
+            back.peaks.tensor_core(DType::F16, [16, 16, 16]),
+            Some(1.0e14)
+        );
     }
 
     #[test]

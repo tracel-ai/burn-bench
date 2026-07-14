@@ -48,7 +48,16 @@ struct DependencyContent {
     workspace_path: Option<PathBuf>,
 }
 
-static BURN_BASE: [&str; 3] = ["burn", "burn-common", "burn-import"];
+static BURN_BASE: [&str; 6] = [
+    "burn",
+    "burn-common",
+    "burn-import",
+    // Backend-extension internals: must be patched in lockstep with `burn` so a
+    // custom cubecl kernel's `CubeBackend`/`Fusion` types keep matching `burn`'s.
+    "burn-cubecl",
+    "burn-fusion",
+    "burn-ir",
+];
 // Match any char except \} including new lines.
 static REGEX_BASE: &str = r" = \{([^\}]|\n)*\}";
 
