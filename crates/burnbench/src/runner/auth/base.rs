@@ -67,7 +67,7 @@ where
             } else {
                 refresh_tokens(&tokens).map_or_else(
                     || {
-                        println!("⚠️ Cannot refresh no the access token. You need to reauthorize the Burnbench application.");
+                        println!("⚠️ Cannot refresh the access token. You need to reauthorize the Burnbench application.");
                         auth()
                     },
                     |new_tokens| {
