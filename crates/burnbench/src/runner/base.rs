@@ -148,7 +148,10 @@ impl DeviceValues {
         )
     }
     fn is_rocm(&self) -> bool {
-        matches!(self, DeviceValues::Rocm)
+        #[cfg(target_os = "linux")]
+        return matches!(self, DeviceValues::Rocm);
+        #[cfg(not(target_os = "linux"))]
+        return false;
     }
 }
 
