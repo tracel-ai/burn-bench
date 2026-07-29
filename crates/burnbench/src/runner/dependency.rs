@@ -8,14 +8,24 @@ use std::{
 };
 
 pub(crate) enum Dependency {
+    /// Leave every manifest alone and benchmark whatever Burn the application
+    /// already depends on. The default, and the only variant that measures the
+    /// code as it actually ships.
+    Workspace,
     Local,
     Crate(Version),
     Git(String),
 }
 
+/// The `-V` value selecting [`Dependency::Workspace`], and the label such a run
+/// is recorded under.
+pub(crate) const WORKSPACE_VERSION: &str = "workspace";
+
 impl Dependency {
     pub fn new(version: &str) -> Self {
-        if version == "local" {
+        if version == WORKSPACE_VERSION {
+            Self::Workspace
+        } else if version == "local" {
             Self::Local
         } else if let Ok(version) = Version::parse(version) {
             Self::Crate(version)
@@ -156,10 +166,25 @@ impl Drop for TomlDependencyGuard {
 
 impl Dependency {
     pub fn patch(&self, base_path: &Path) -> std::io::Result<CargoDependencyGuard> {
+        // Nothing to rewrite, so nothing to restore either: return before the
+        // manifests are even read. Rewriting `burn` while the workspace pins
+        // `cubecl`/`cubek` (or any other crate that must move in lockstep with
+        // it) desynchronizes them, and the build fails with duplicate-crate type
+        // errors rather than a wrong number — but the default should not be
+        // touching the application's manifest at all.
+        if let Dependency::Workspace = self {
+            log::info!("Benchmarking the application's own Burn dependency");
+            return Ok(CargoDependencyGuard {
+                benches: None,
+                workspace: None,
+            });
+        }
+
         let burn_dir = std::env::var("BURN_BENCH_BURN_DIR").unwrap_or("../../burn/".into());
         let content_original = DependencyContent::from_path(base_path)?;
 
         let content = match self {
+            Dependency::Workspace => unreachable!("returned above"),
             Dependency::Local => self.update_burn_local(&content_original, &burn_dir),
             Dependency::Crate(version) => self.update_burn_version(&content_original, version),
             Dependency::Git(version) => self.update_burn_git(&content_original, version),

@@ -16,7 +16,7 @@ use crate::{BENCHMARK_WEBSITE_URL, TRACEL_CI_SERVER_BASE_URL};
 
 use super::auth::get_tokens;
 use super::auth::get_username;
-use super::dependency::Dependency;
+use super::dependency::{Dependency, WORKSPACE_VERSION};
 use super::processor::{CargoRunner, NiceProcessor, OutputProcessor, Profiling, VerboseProcessor};
 use super::progressbar::RunnerProgressBar;
 use super::reports::{BenchmarkCollection, FailedBenchmark};
@@ -72,9 +72,13 @@ struct RunArgs {
     #[clap(short = 'b', long = "benches", num_args(0..))]
     benches: Vec<String>,
 
-    /// One or more Burn versions, git branches, or commit hashes
+    /// One or more Burn versions, git branches, or commit hashes.
     ///
-    /// Default using @main.
+    /// Defaults to `workspace`: benchmark the Burn the application already
+    /// depends on, leaving every manifest untouched. Passing anything else
+    /// rewrites the `burn*` dependencies for the run and restores them after,
+    /// which only holds together when nothing else in the graph is pinned in
+    /// lockstep with Burn.
     #[clap(short = 'V', long = "versions", num_args(0..))]
     pub versions: Vec<String>,
 
@@ -272,7 +276,7 @@ fn command_run(info: &CrateInfo, mut run_args: RunArgs) {
         run_args.benches.push("all".to_string());
     }
     if run_args.versions.is_empty() {
-        run_args.versions.push("main".to_string());
+        run_args.versions.push(WORKSPACE_VERSION.to_string());
     }
 
     let profiling = if run_args.profile {
