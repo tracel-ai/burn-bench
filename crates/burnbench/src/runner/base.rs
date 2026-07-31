@@ -487,6 +487,11 @@ fn run_cargo(
     if device == "cpu" {
         feature_list.push(format!("{name}/cpu"));
     }
+    // Same pattern for Metal, which a benches crate may keep feature-gated
+    // rather than always-linked (the backend only builds on Apple hosts).
+    if device == "metal" {
+        feature_list.push(format!("{name}/metal"));
+    }
     for bench in benches.iter() {
         for req_feature in get_required_features(info, bench) {
             feature_list.push(format!("{name}/{req_feature}"));
