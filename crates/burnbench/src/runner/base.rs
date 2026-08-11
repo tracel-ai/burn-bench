@@ -193,12 +193,64 @@ impl BuildValues {
     }
 }
 
+/// Where the benchmarked crate's manifest actually is.
+///
+/// `<root>/crates/<name>` is this repository's own layout and stays the fast
+/// path, so nothing about a workspace shaped like ours changes. It was also the
+/// *only* path, which made it a silent requirement on every consumer: a
+/// workspace that keeps its crates anywhere else — `engine/`, `packages/`, the
+/// root itself — gets `Failed to read Cargo.toml` out of
+/// [`get_required_features`], naming neither the file it wanted nor the reason,
+/// after a full release build. `list` keeps working throughout, because only
+/// `run` resolves this, so the breakage reads as a broken benchmark rather than
+/// a layout the runner cannot see.
+///
+/// The fallback asks cargo, which is the only thing that actually knows: one
+/// `cargo metadata --no-deps`, package by name, the manifest's parent. Exact
+/// rather than a directory search — a guess that landed on the wrong crate
+/// would be handed to [`super::dependency::Dependency::patch`], which rewrites
+/// manifests in place.
+fn locate_crate(root: &Path, name: &str) -> PathBuf {
+    let conventional = root.join("crates").join(name);
+    if conventional.join("Cargo.toml").is_file() {
+        return conventional;
+    }
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
+    let metadata = std::process::Command::new(cargo)
+        .args(["metadata", "--no-deps", "--format-version", "1"])
+        .current_dir(root)
+        .output();
+    if let Ok(out) = metadata {
+        if out.status.success() {
+            if let Ok(doc) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                let found = doc["packages"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .find(|p| p["name"].as_str() == Some(name))
+                    .and_then(|p| p["manifest_path"].as_str())
+                    .map(PathBuf::from);
+                if let Some(dir) = found.as_deref().and_then(Path::parent) {
+                    return dir.to_path_buf();
+                }
+            }
+        }
+    }
+    panic!(
+        "cannot locate the crate {name:?} to benchmark: nothing at {}, and \
+         `cargo metadata` in {} does not list it. burnbench must be run from the \
+         workspace root of the crate that owns the `[[bench]]` targets.",
+        conventional.display(),
+        root.display(),
+    )
+}
+
 /// Execute burnbench on the provided crate located at the provided path.
 pub fn execute<P: AsRef<Path>>(name: &str, path: P) {
     let path: &Path = path.as_ref();
     let info = CrateInfo {
         name: name.to_string(),
-        path: path.join("crates").join(name),
+        path: locate_crate(path, name),
     };
     let args = Args::parse();
     match args.command {
