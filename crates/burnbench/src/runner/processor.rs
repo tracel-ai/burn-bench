@@ -181,6 +181,8 @@ impl<'a> CargoRunner<'a> {
             "sudo",
             &[
                 "BENCH_NUM_SAMPLES=1",
+                // Warmup executions are profiled too, so keep them to the bare minimum.
+                "BENCH_WARMUP_MS=0",
                 &libtorch_env,
                 &ld_env,
                 ncu_bin_path.trim(),
