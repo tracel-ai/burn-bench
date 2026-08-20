@@ -107,8 +107,11 @@ jobs:
       '@gpu:${{ inputs.gcp_gpu_attached }}' ]
     steps:
       # ----------------------------------------------------------------------
-      - name: Setup Rust
-        uses: tracel-ai/github-actions/setup-rust@v5
+      - name: Checkout
+        uses: actions/checkout@v6
+      # ----------------------------------------------------------------------
+      - name: Install Rust
+        uses: tracel-ai/github-actions/install-rust@v11
         with:
           rust-toolchain: ${{ inputs.rust_toolchain }}
           cache-key: ${{ inputs.rust_version }}-benchmarks
